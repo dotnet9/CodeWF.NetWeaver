@@ -10,7 +10,7 @@ namespace CodeWF.NetWeaver
 {
     public partial class SerializeHelper
     {
-        public const int PacketHeadLen = 14; //数据包包头大小
+        public const int PacketHeadLen = 14; 
 
         private static readonly ConcurrentDictionary<string, List<PropertyInfo>> ObjectPropertyInfos =
             new ConcurrentDictionary<string, List<PropertyInfo>>();

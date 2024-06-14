@@ -20,11 +20,11 @@ namespace CodeWF.NetWeaver.Tests
             var processItem = new ProcessItem
             {
                 Pid = 1,
-                Name = "Dotnet工具箱",
+                Name = "CodeWF.NetWeaver",
                 Type = (byte)ProcessType.Application,
                 ProcessStatus = (byte)ProcessStatus.Running,
                 Publisher = "沙漠尽头的狼",
-                CommandLine = "dotnet Dotnetools.com",
+                CommandLine = "dotnet CodeWF.com",
                 Cpu = 112,
                 Memory = 325,
                 Disk = 23,

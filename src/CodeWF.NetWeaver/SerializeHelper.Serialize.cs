@@ -8,14 +8,6 @@ namespace CodeWF.NetWeaver
 {
     public partial class SerializeHelper
     {
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <typeparam name="T"></typeparam>
-        /// <param name="data"></param>
-        /// <param name="systemId"></param>
-        /// <returns></returns>
-        /// <exception cref="ArgumentNullException"></exception>
         public static byte[] Serialize<T>(this T data, long systemId) where T : INetObject
         {
             if (data == null) throw new ArgumentNullException(nameof(data));

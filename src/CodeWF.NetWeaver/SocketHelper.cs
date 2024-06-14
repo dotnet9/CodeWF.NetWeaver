@@ -6,14 +6,10 @@ namespace CodeWF.NetWeaver
 {
     public static partial class SerializeHelper
     {
-        /// <summary>
-        ///     UDP单包控制最大大小
-        /// </summary>
         public const int MaxUdpPacketSize = 65507;
 
         public static bool ReadPacket(this Socket socket, out byte[] buffer, out NetHeadInfo netObject)
         {
-            // 1、接收数据包
             var lenBuffer = ReceiveBuffer(socket, 4);
             var bufferLen = BitConverter.ToInt32(lenBuffer, 0);
 
@@ -24,7 +20,6 @@ namespace CodeWF.NetWeaver
             Array.Copy(lenBuffer, buffer, 4);
             Buffer.BlockCopy(exceptLenBuffer, 0, buffer, 4, bufferLen - 4);
 
-            // 2、解析数据包
             var readIndex = 0;
             return ReadHead(buffer, ref readIndex, out netObject);
         }

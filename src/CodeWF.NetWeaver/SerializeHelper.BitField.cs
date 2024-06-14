@@ -11,7 +11,6 @@ namespace CodeWF.NetWeaver
             var properties = typeof(T).GetProperties();
             var totalSize = 0;
 
-            // 计算总的bit长度
             foreach (var property in properties)
             {
                 if (!Attribute.IsDefined(property, typeof(NetFieldOffsetAttribute))) continue;
@@ -30,7 +29,7 @@ namespace CodeWF.NetWeaver
 
                 var offsetAttribute =
                     (NetFieldOffsetAttribute)property.GetCustomAttribute(typeof(NetFieldOffsetAttribute));
-                dynamic value = property.GetValue(obj); // 使用dynamic类型动态获取属性值
+                dynamic value = property.GetValue(obj);
                 SetBitValue(ref buffer, value, offsetAttribute.Offset, offsetAttribute.Size);
             }
 
@@ -56,13 +55,6 @@ namespace CodeWF.NetWeaver
             return obj;
         }
 
-        /// <summary>
-        ///     将值按位写入buffer
-        /// </summary>
-        /// <param name="buffer"></param>
-        /// <param name="value"></param>
-        /// <param name="offset"></param>
-        /// <param name="size"></param>
         private static void SetBitValue(ref byte[] buffer, int value, int offset, int size)
         {
             var mask = (1 << size) - 1;
@@ -70,14 +62,6 @@ namespace CodeWF.NetWeaver
             if (offset % 8 + size > 8) buffer[offset / 8 + 1] |= (byte)((value & mask) >> (8 - offset % 8));
         }
 
-        /// <summary>
-        ///     从buffer中按位读取值
-        /// </summary>
-        /// <param name="buffer"></param>
-        /// <param name="offset"></param>
-        /// <param name="size"></param>
-        /// <param name="propertyType"></param>
-        /// <returns></returns>
         private static dynamic GetValueFromBit(byte[] buffer, int offset, int size, Type propertyType)
         {
             var mask = (1 << size) - 1;

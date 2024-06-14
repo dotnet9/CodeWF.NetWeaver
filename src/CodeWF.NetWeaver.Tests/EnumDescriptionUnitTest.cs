@@ -15,12 +15,12 @@ namespace CodeWF.NetWeaver.Tests
             var usageDescription = usage.Description();
             var alarmStatusDescription = alarmStatus.Description();
 
-            Assert.Equal("高", usageDescription);
-            Assert.Equal("超限,切换用户", alarmStatusDescription);
+            Assert.Equal("High", usageDescription);
+            Assert.Equal("OverLimit,User Changed", alarmStatusDescription);
 
             alarmStatus = AlarmStatus.Normal;
             alarmStatusDescription = alarmStatus.Description();
-            Assert.Equal("正常", alarmStatusDescription);
+            Assert.Equal("Normal", alarmStatusDescription);
         }
     }
 }
