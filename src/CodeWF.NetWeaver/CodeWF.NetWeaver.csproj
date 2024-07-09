@@ -5,9 +5,9 @@
 		<Company>https://codewf.com</Company>
 		<Authors>沙漠尽头的狼</Authors>
 		<Owners>https://codewf.com</Owners>
-		<AssemblyVersion>1.0.1</AssemblyVersion>
-		<FileVersion>1.0.1</FileVersion>
-		<Version>1.0.1</Version>
+		<AssemblyVersion>1.1.0</AssemblyVersion>
+		<FileVersion>1.1.0</FileVersion>
+		<Version>1.1.0</Version>
 		<Description>CodeWF.NetWeaver 是一个简洁而强大的C#库，用于处理TCP和UDP数据包的组包和解包操作。</Description>
 		<ApplicationIcon>Resources\logo.ico</ApplicationIcon>
 		<GeneratePackageOnBuild>True</GeneratePackageOnBuild>

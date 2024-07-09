@@ -22,6 +22,7 @@ namespace CodeWF.NetWeaver
                     writer.Write(systemId);
                     writer.Write(netObjectInfo.Id);
                     writer.Write(netObjectInfo.Version);
+                    writer.Write(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
                     writer.Write(bodyBuffer);
 
                     return stream.ToArray();

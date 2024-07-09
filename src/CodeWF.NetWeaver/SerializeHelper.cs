@@ -10,7 +10,7 @@ namespace CodeWF.NetWeaver
 {
     public partial class SerializeHelper
     {
-        public const int PacketHeadLen = 14; 
+        public const int PacketHeadLen = 22; 
 
         private static readonly ConcurrentDictionary<string, List<PropertyInfo>> ObjectPropertyInfos =
             new ConcurrentDictionary<string, List<PropertyInfo>>();
@@ -40,7 +40,7 @@ namespace CodeWF.NetWeaver
                 $"{netObjectType.Name} has not been marked with the attribute {nameof(NetHeadAttribute)}");
         }
 
-        public static bool ReadHead(byte[] buffer, ref int readIndex, out NetHeadInfo netObjectHeadInfo)
+        public static bool ReadHead(this byte[] buffer, ref int readIndex, out NetHeadInfo netObjectHeadInfo)
         {
             netObjectHeadInfo = null;
             if (buffer.Length < readIndex + PacketHeadLen) return false;
@@ -58,6 +58,9 @@ namespace CodeWF.NetWeaver
 
             netObjectHeadInfo.ObjectVersion = buffer[readIndex];
             readIndex += sizeof(byte);
+
+            netObjectHeadInfo.UnixTimeMilliseconds = BitConverter.ToInt64(buffer, readIndex);
+            readIndex += sizeof(long);
 
             return true;
         }

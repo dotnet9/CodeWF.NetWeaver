@@ -10,6 +10,8 @@
 
         public byte ObjectVersion { get; set; }
 
+        public long UnixTimeMilliseconds { get; set; }
+
         public override string ToString()
         {
             return

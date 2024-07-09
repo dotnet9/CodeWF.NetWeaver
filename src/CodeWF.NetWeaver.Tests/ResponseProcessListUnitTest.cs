@@ -1,4 +1,6 @@
-﻿using CodeWF.NetWeaver.Tests.Models;
+﻿using CodeWF.NetWeaver;
+using CodeWF.NetWeaver.Tests.Models;
+using CodeWF.Tools.Extensions;
 using Xunit;
 
 namespace CodeWF.NetWeaver.Tests
@@ -39,6 +41,11 @@ namespace CodeWF.NetWeaver.Tests
             netObject.Processes.Add(processItem);
 
             var buffer = netObject.Serialize(32);
+            var readIndex = 0;
+            Assert.True(buffer.ReadHead(ref readIndex, out var header));
+            var serverSendTime = header.UnixTimeMilliseconds.FromUnixTimeMillisecondsToDateTimeOffset();
+            Assert.True(DateTimeOffset.UtcNow > serverSendTime);
+
             var desObject = buffer.Deserialize<ResponseProcessList>();
 
             Assert.Equal(netObject.TotalSize, desObject.TotalSize);
