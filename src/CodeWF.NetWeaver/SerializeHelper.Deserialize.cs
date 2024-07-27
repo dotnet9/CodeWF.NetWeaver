@@ -9,8 +9,12 @@ namespace CodeWF.NetWeaver
     {
         public static T Deserialize<T>(this byte[] buffer) where T : new()
         {
-            var bodyBufferLen = buffer.Length - PacketHeadLen;
-            using (var stream = new MemoryStream(buffer, PacketHeadLen, bodyBufferLen))
+            return DeserializeObject<T>(buffer, PacketHeadLen);
+        }
+
+        public static T DeserializeObject<T>(this byte[] buffer, int readIndex = 0) where T : new()
+        {
+            using (var stream = new MemoryStream(buffer, readIndex, buffer.Length - readIndex))
             {
                 using (var reader = new BinaryReader(stream))
                 {
@@ -78,7 +82,7 @@ namespace CodeWF.NetWeaver
         {
             var count = reader.ReadInt32();
             var genericArguments = propertyType.GetGenericArguments();
-            dynamic complexObj = Activator.CreateInstance(propertyType);
+            var complexObj = Activator.CreateInstance(propertyType);
             var addMethod = propertyType.GetMethod("Add");
 
             for (var i = 0; i < count; i++)

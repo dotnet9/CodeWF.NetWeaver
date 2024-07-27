@@ -29,8 +29,8 @@ namespace CodeWF.NetWeaver
 
                 var offsetAttribute =
                     (NetFieldOffsetAttribute)property.GetCustomAttribute(typeof(NetFieldOffsetAttribute));
-                dynamic value = property.GetValue(obj);
-                SetBitValue(ref buffer, value, offsetAttribute.Offset, offsetAttribute.Size);
+                var value = property.GetValue(obj);
+                SetBitValue(ref buffer, (int)value, offsetAttribute.Offset, offsetAttribute.Size);
             }
 
             return buffer;
@@ -62,14 +62,13 @@ namespace CodeWF.NetWeaver
             if (offset % 8 + size > 8) buffer[offset / 8 + 1] |= (byte)((value & mask) >> (8 - offset % 8));
         }
 
-        private static dynamic GetValueFromBit(byte[] buffer, int offset, int size, Type propertyType)
+        private static object GetValueFromBit(byte[] buffer, int offset, int size, Type propertyType)
         {
             var mask = (1 << size) - 1;
             var bitValue = (buffer[offset / 8] >> (offset % 8)) & mask;
             if (offset % 8 + size > 8) bitValue |= (buffer[offset / 8 + 1] << (8 - offset % 8)) & mask;
 
-            dynamic result = Convert.ChangeType(bitValue, propertyType); // 根据属性类型进行转换
-            return result;
+            return  Convert.ChangeType(bitValue, propertyType); // 根据属性类型进行转换
         }
     }
 }

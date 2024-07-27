@@ -2,12 +2,14 @@
 
 	<PropertyGroup>
 		<TargetFramework>netstandard2.0</TargetFramework>
+		<Nullable>enable</Nullable>
+		<LangVersion>latest</LangVersion>
 		<Company>https://codewf.com</Company>
 		<Authors>沙漠尽头的狼</Authors>
 		<Owners>https://codewf.com</Owners>
-		<AssemblyVersion>1.1.0</AssemblyVersion>
-		<FileVersion>1.1.0</FileVersion>
-		<Version>1.1.0</Version>
+		<AssemblyVersion>1.1.1</AssemblyVersion>
+		<FileVersion>1.1.1</FileVersion>
+		<Version>1.1.1</Version>
 		<Description>CodeWF.NetWeaver 是一个简洁而强大的C#库，用于处理TCP和UDP数据包的组包和解包操作。</Description>
 		<ApplicationIcon>Resources\logo.ico</ApplicationIcon>
 		<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
@@ -20,17 +22,15 @@
 		<PackageIcon>logo.png</PackageIcon>
 		<PackageProjectUrl>https://github.com/dotnet9/$(AssemblyName)</PackageProjectUrl>
 		<RepositoryUrl>https://github.com/dotnet9/$(AssemblyName)</RepositoryUrl>
+		<PackageReadmeFile>README.MD</PackageReadmeFile>
 	</PropertyGroup>
-
-	<ItemGroup>
-		<PackageReference Include="Microsoft.CSharp" Version="4.7.0" />
-	</ItemGroup>
 
 	<ItemGroup>
 		<None Include="Resources\logo.png">
 			<Pack>True</Pack>
 			<PackagePath>\</PackagePath>
 		</None>
+		<None Include="..\..\README.MD" Pack="true" PackagePath="" />
 	</ItemGroup>
 
 </Project>

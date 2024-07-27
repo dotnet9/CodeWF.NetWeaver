@@ -1,8 +1,10 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using CodeWF.NetWeaver.Base;
+using CodeWF.NetWeaver.Extensions;
 
 namespace CodeWF.NetWeaver
 {
@@ -30,7 +32,7 @@ namespace CodeWF.NetWeaver
             }
         }
 
-        private static byte[] SerializeObject<T>(T data)
+        public static byte[] SerializeObject<T>(this T data)
         {
             using (var stream = new MemoryStream())
             {
@@ -140,20 +142,25 @@ namespace CodeWF.NetWeaver
                 return;
             }
 
-            dynamic dynamicValue = value;
-            count = dynamicValue.Count;
+            count = value.Property("Count", 0);
             writer.Write(count);
 
             var genericArguments = valueType.GetGenericArguments();
-            if (valueType.Name.Equals(typeof(List<>).Name))
-                foreach (var item in dynamicValue)
+            if (value is IList list)
+            {
+                foreach (var item in list)
+                {
                     SerializeValue(writer, item, genericArguments[0]);
-            else
-                foreach (var item in dynamicValue)
+                }
+            }
+            else if (value is IDictionary dictionary)
+            {
+                foreach (DictionaryEntry item in dictionary)
                 {
                     SerializeValue(writer, item.Key, genericArguments[0]);
                     SerializeValue(writer, item.Value, genericArguments[1]);
                 }
+            }
         }
     }
 }
