@@ -6,7 +6,20 @@ namespace CodeWF.NetWeaver
 {
     public static partial class SerializeHelper
     {
+        /// <summary>
+        /// UDP建议最大包大小
+        /// </summary>
         public const int MaxUdpPacketSize = 65507;
+
+        /// <summary>
+        /// 网络数据包头部固定大小
+        /// </summary>
+        public const int PacketHeadLen = 22;
+
+        /// <summary>
+        /// 数组、列表、字典等数据结构数据量字段大小：如Length、Count
+        /// </summary>
+        public const int ArrayOrDictionaryCountSize = 4;
 
         public static bool ReadPacket(this Socket socket, out byte[] buffer, out NetHeadInfo netObject)
         {
