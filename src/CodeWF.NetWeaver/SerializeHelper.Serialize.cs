@@ -1,10 +1,10 @@
-﻿using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.IO;
-using System.Reflection;
-using CodeWF.NetWeaver.Base;
+﻿using CodeWF.NetWeaver.Base;
 using CodeWF.NetWeaver.Extensions;
+using System;
+using System.Collections;
+using System.IO;
+using System.Linq;
+using System.Reflection;
 
 namespace CodeWF.NetWeaver
 {
@@ -46,12 +46,9 @@ namespace CodeWF.NetWeaver
 
         private static void SerializeProperties<T>(BinaryWriter writer, T data)
         {
-            var properties = GetProperties(data.GetType());
+            var properties = GetProperties(data.GetType()).Where(p=> p.GetCustomAttribute(typeof(NetIgnoreMemberAttribute)) == null);
             foreach (var property in properties)
             {
-                if (property.GetCustomAttribute(typeof(NetIgnoreMemberAttribute)) is NetIgnoreMemberAttribute _)
-                    continue;
-
                 SerializeProperty(writer, data, property);
             }
         }
@@ -65,8 +62,10 @@ namespace CodeWF.NetWeaver
 
         private static void SerializeValue(BinaryWriter writer, object value, Type valueType)
         {
-            if (valueType.IsPrimitive || valueType == typeof(string) || valueType == typeof(byte[]))
+            if (valueType.IsPrimitive || valueType == typeof(string))
                 SerializeBaseValue(writer, value, valueType);
+            else if(valueType.IsArray)
+                SerializeArrayValue(writer, value, valueType);
             else if (ComplexTypeNames.Contains(valueType.Name))
                 SerializeComplexValue(writer, value, valueType);
             else
@@ -78,18 +77,6 @@ namespace CodeWF.NetWeaver
             if (valueType == typeof(byte))
             {
                 writer.Write(value == null ? default : byte.Parse(value.ToString()));
-            }
-            else if (valueType == typeof(byte[]))
-            {
-                if (!(value is byte[] buffer))
-                {
-                    writer.Write(0);
-                }
-                else
-                {
-                    writer.Write(buffer.Length);
-                    writer.Write(buffer);
-                }
             }
             else if (valueType == typeof(short))
             {
@@ -130,6 +117,25 @@ namespace CodeWF.NetWeaver
             else
             {
                 throw new Exception($"Unsupported data type: {valueType.Name}");
+            }
+        }
+        private static void SerializeArrayValue(BinaryWriter writer, object value, Type valueType)
+        {
+            var length = 0;
+            if (value == null)
+            {
+                writer.Write(length);
+                return;
+            }
+
+            length = value.Property("Length", 0);
+            writer.Write(length);
+
+            var elementType = valueType.GetElementType();
+            for (var i = 0; i < length; i++)
+            {
+                var elementValue = ((Array)value).GetValue(i);
+                SerializeValue(writer, elementValue, elementType);
             }
         }
 

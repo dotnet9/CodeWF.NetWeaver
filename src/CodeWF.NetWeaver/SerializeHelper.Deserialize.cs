@@ -41,8 +41,10 @@ namespace CodeWF.NetWeaver
         private static object DeserializeValue(BinaryReader reader, Type propertyType)
         {
             object value;
-            if (propertyType.IsPrimitive || propertyType == typeof(string) || propertyType == typeof(byte[]))
+            if (propertyType.IsPrimitive || propertyType == typeof(string))
                 value = DeserializeBaseValue(reader, propertyType);
+            else if (propertyType.IsArray)
+                value = DeserializeArrayValue(reader, propertyType);
             else if (ComplexTypeNames.Contains(propertyType.Name))
                 value = DeserializeComplexValue(reader, propertyType);
             else
@@ -54,8 +56,6 @@ namespace CodeWF.NetWeaver
         private static object DeserializeBaseValue(BinaryReader reader, Type propertyType)
         {
             if (propertyType == typeof(byte)) return reader.ReadByte();
-
-            if (propertyType == typeof(byte[])) return reader.ReadBytes(reader.ReadInt32());
 
             if (propertyType == typeof(short)) return reader.ReadInt16();
 
@@ -100,6 +100,21 @@ namespace CodeWF.NetWeaver
             }
 
             return complexObj;
+        }
+
+        private static object DeserializeArrayValue(BinaryReader reader, Type propertyType)
+        {
+            var length = reader.ReadInt32();
+            var elementType = propertyType.GetElementType();
+            var array = Array.CreateInstance(elementType, length);
+            for (var i = 0; i < length; i++)
+            {
+                var value = DeserializeValue(reader, elementType);
+
+                array.SetValue(value, i);
+            }
+
+            return array;
         }
 
         private static object DeserializeObject(BinaryReader reader, Type type)

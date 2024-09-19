@@ -30,7 +30,7 @@ namespace CodeWF.NetWeaver
                 var offsetAttribute =
                     (NetFieldOffsetAttribute)property.GetCustomAttribute(typeof(NetFieldOffsetAttribute));
                 var value = property.GetValue(obj);
-                SetBitValue(ref buffer, (int)value, offsetAttribute.Offset, offsetAttribute.Size);
+                SetBitValue(ref buffer, Convert.ToInt32(value), offsetAttribute.Offset, offsetAttribute.Size);
             }
 
             return buffer;
