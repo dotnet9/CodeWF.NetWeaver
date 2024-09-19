@@ -25,6 +25,18 @@ namespace CodeWF.NetWeaver
             }
         }
 
+        public static object DeserializeObject(this byte[] buffer, Type type, int readIndex = 0)
+        {
+            using (var stream = new MemoryStream(buffer, readIndex, buffer.Length - readIndex))
+            {
+                using (var reader = new BinaryReader(stream))
+                {
+                    var data = DeserializeValue(reader, type);
+                    return data;
+                }
+            }
+        }
+
         private static void DeserializeProperties<T>(BinaryReader reader, T data)
         {
             var properties = GetProperties(data.GetType());
