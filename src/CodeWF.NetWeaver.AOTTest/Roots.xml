@@ -1,0 +1,3 @@
+<linker>
+	<assembly fullname="CodeWF.NetWeaver.AOTTest" preserve="All" />
+</linker>

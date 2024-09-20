@@ -1,5 +1,4 @@
 ﻿using CodeWF.NetWeaver.Base;
-using CodeWF.NetWeaver.Extensions;
 using System;
 using System.Collections;
 using System.IO;
@@ -140,7 +139,7 @@ namespace CodeWF.NetWeaver
                 return;
             }
 
-            length = value.Property("Length", 0);
+            length = ((Array)value).Length;
             writer.Write(length);
 
             var elementType = valueType.GetElementType();
@@ -160,12 +159,11 @@ namespace CodeWF.NetWeaver
                 return;
             }
 
-            count = value.Property("Count", 0);
-            writer.Write(count);
 
             var genericArguments = valueType.GetGenericArguments();
             if (value is IList list)
             {
+                writer.Write(list.Count);
                 foreach (var item in list)
                 {
                     SerializeValue(writer, item, genericArguments[0]);
@@ -173,6 +171,7 @@ namespace CodeWF.NetWeaver
             }
             else if (value is IDictionary dictionary)
             {
+                writer.Write(dictionary.Count);
                 foreach (DictionaryEntry item in dictionary)
                 {
                     SerializeValue(writer, item.Key, genericArguments[0]);
