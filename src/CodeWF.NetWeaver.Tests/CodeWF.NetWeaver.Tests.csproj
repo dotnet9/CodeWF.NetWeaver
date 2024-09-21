@@ -8,14 +8,14 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-		<PackageReference Include="CodeWF.Tools" Version="1.2.0" />
+		<PackageReference Include="CodeWF.Tools" Version="1.2.5.2" />
 		<PackageReference Include="coverlet.collector" Version="6.0.2">
 			<PrivateAssets>all</PrivateAssets>
 			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 		</PackageReference>
-		<PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.0-release-24373-02" />
+		<PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
 		<PackageReference Include="xunit" Version="2.9.0" />
-		<PackageReference Include="xunit.runner.visualstudio" Version="2.8.2">
+		<PackageReference Include="xunit.runner.visualstudio" Version="3.0.0-pre.30">
 			<PrivateAssets>all</PrivateAssets>
 			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 		</PackageReference>
@@ -23,6 +23,26 @@
 
 	<ItemGroup>
 		<ProjectReference Include="..\CodeWF.NetWeaver\CodeWF.NetWeaver.csproj" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <PackageReference Update="Microsoft.Testing.Extensions.CodeCoverage" Version="17.12.4" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <PackageReference Update="Microsoft.Testing.Extensions.TrxReport" Version="1.4.0" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <PackageReference Update="MSTest.Analyzers" Version="3.6.0" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <PackageReference Update="MSTest.TestAdapter" Version="3.6.0" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <PackageReference Update="MSTest.TestFramework" Version="3.6.0" />
 	</ItemGroup>
 
 </Project>

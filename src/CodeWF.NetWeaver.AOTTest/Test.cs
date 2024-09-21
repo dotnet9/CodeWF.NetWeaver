@@ -7,49 +7,110 @@ public static class Test
 {
     public static void TestAOT()
     {
-        Console.WriteLine("===1、测试AOT获取数组长度====");
+        Console.WriteLine("===1、AOT Array====");
+        AOTArray();
 
-        int[] arr = [1, 3, 4];
+        Console.WriteLine("\r\n\r\n===2、AOT List===");
+        AOTList();
 
-        Console.WriteLine($"直接获取数组长度：{arr.Length}");
+        Console.WriteLine("\r\n\r\n===3、AOT Dictionary===");
+        AOTDictionary();
 
-        var arrLen1 = arr.GetType()?.GetProperty(nameof(Array.Length))?.GetValue(arr);
-        Console.WriteLine($"反射获取数组长度：{arrLen1}");
-
-        var arrObj = arr as Array;
-        var arrLen2 = arrObj.Length;
-        Console.WriteLine($"转Array获取数组长度：{arrLen2}");
-        Console.WriteLine("=========================");
-
-
-        Console.WriteLine("===2、测试AOT获取List长度===");
-
-        var lst = new List<int> { 1, 2, 3, 4 };
-        Console.WriteLine($"直接获取List长度：{lst.Count}");
-
-        var listLen1 = lst.GetType()?.GetProperty(nameof(IList.Count))?.GetValue(lst);
-        Console.WriteLine($"反射获取List长度：{listLen1}");
-
-        var listObj = arr as IList;
-        var listLen2 = listObj.Count;
-        Console.WriteLine($"转IList获取List长度：{listLen2}");
-        Console.WriteLine("=========================");
+        Console.WriteLine("\r\n\r\n===4、AOT Custom Object");
+        AOTObject();
+    }
 
 
-        Console.WriteLine("===3、测试AOT获取Dictionary长度===");
+    private static void AOTArray()
+    {
+        try
+        {
+            int[] arr = [1, 3, 4];
+            var type = arr.GetType();
 
-        var dict = new Dictionary<int, int>() { { 1, 2 }, { 3, 4 }, { 5, 6 }, { 7, 8 } };
-        Console.WriteLine($"直接获取Dictionary长度：{dict.Count}");
+            Console.WriteLine($"直接获取数组长度：{arr.Length}");
 
-        var dictLen1 = dict.GetType()?.GetProperty(nameof(IDictionary.Count))?.GetValue(dict);
-        Console.WriteLine($"反射获取Dictionary长度：{dictLen1}");
+            var arrLen1 = type.GetProperty(nameof(Array.Length))?.GetValue(arr);
+            Console.WriteLine($"反射获取数组长度：{arrLen1}");
 
-        var dictObj = dict as IDictionary;
-        var dictLen2 = dictObj.Count;
-        Console.WriteLine($"反射获取Dictionary长度：{dictLen2}");
-        Console.WriteLine("=========================");
+            Array arrObj = arr;
+            var arrLen2 = arrObj.Length;
+            Console.WriteLine($"转Array获取数组长度：{arrLen2}");
 
-        Console.WriteLine("===4、测试复杂对象序列化");
+            var elementType = type.GetElementType();
+            var newObj = Array.CreateInstance(elementType, arrLen2);
+            Console.WriteLine($"{newObj}");
+
+            Console.WriteLine("=========================");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"{nameof(AOTArray)}:\r\n{ex}");
+        }
+    }
+
+    private static void AOTList()
+    {
+        try
+        {
+            var lst = new List<int> { 1, 2, 3, 4 };
+            var type = lst.GetType();
+
+            Console.WriteLine($"直接获取List长度：{lst.Count}");
+
+            var listLen1 = type.GetProperty(nameof(IList.Count))?.GetValue(lst);
+            Console.WriteLine($"反射获取List长度：{listLen1}");
+
+            var listObj = lst as IList;
+            var listLen2 = listObj.Count;
+            Console.WriteLine($"转IList获取List长度：{listLen2}");
+
+            var newObj1 = CreateInstance(lst);
+            Console.WriteLine($"ins1: {newObj1}");
+
+            var newObj2 = Activator.CreateInstance(type);
+            Console.WriteLine($"ins2:{newObj2}");
+
+            Console.WriteLine("=========================");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"{nameof(AOTList)}:\r\n{ex}");
+        }
+    }
+
+    private static void AOTDictionary()
+    {
+        try
+        {
+            var dict = new Dictionary<int, int>() { { 1, 2 }, { 3, 4 }, { 5, 6 }, { 7, 8 } };
+            var type = dict.GetType();
+
+            Console.WriteLine($"直接获取Dictionary长度：{dict.Count}");
+
+            var dictLen1 = type.GetProperty(nameof(IDictionary.Count))?.GetValue(dict);
+            Console.WriteLine($"反射获取Dictionary长度：{dictLen1}");
+
+            var dictObj = dict as IDictionary;
+            var dictLen2 = dictObj.Count;
+            Console.WriteLine($"反射获取Dictionary长度：{dictLen2}");
+
+            var newObj1 = CreateInstance(dict);
+            Console.WriteLine($"ins1: {newObj1}");
+
+            var newObj = Activator.CreateInstance(type);
+            Console.WriteLine($"ins2: {newObj}");
+
+            Console.WriteLine("=========================");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"{nameof(AOTDictionary)}:\r\n{ex}");
+        }
+    }
+
+    private static void AOTObject()
+    {
         try
         {
             var person = new PersonDto()
@@ -70,7 +131,25 @@ public static class Test
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"序列化异常：{ex}");
+            Console.WriteLine($"{nameof(AOTObject)}:\r\n{ex}");
+        }
+    }
+
+    private static object CreateInstance(object val)
+    {
+        var type = val.GetType();
+        var itemTypes = type.GetGenericArguments();
+        if (val is IList)
+        {
+            var lstType = typeof(List<>);
+            var genericType = lstType.MakeGenericType(itemTypes.First());
+            return Activator.CreateInstance(genericType)!;
+        }
+        else
+        {
+            var dictType = typeof(Dictionary<,>);
+            var genericType = dictType.MakeGenericType(itemTypes.First(), itemTypes[1]);
+            return Activator.CreateInstance(genericType)!;
         }
     }
 }

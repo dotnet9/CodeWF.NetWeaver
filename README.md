@@ -1,6 +1,16 @@
 # CodeWF.NetWeaver
 
-CodeWF.NetWeaver 是一个简洁而强大的C#库，用于处理TCP和UDP数据包的组包和解包操作。
+CodeWF.NetWeaver 是一个简洁而强大的C#库，支持AOT，用于处理TCP和UDP数据包的组包和解包操作。
+
+CodeWF.NetWeaver is a concise and powerful C# library that supports AOT for handling TCP and UDP packet grouping and unpacking operations. 
+
+## 安装(Installer)
+
+```bash
+NuGet\Install-Package CodeWF.NetWeaver -Version 1.3.0
+```
+
+## 定义通信对象(Define net object)
 
 定义数据包如下（来自单元测试`CodeWF.NetWeaver.Tests`），`ResponseProcessList`类继承自`INetObject`, `NetHead`配置数据包标识和版本
 
@@ -59,6 +69,8 @@ public record ProcessItem
 }
 ```
 
+## 使用(Use)
+
 单元测试数据组包与解包：
 
 ```csharp
@@ -104,3 +116,8 @@ public void Test_SerializeResponseProcessList_Success()
     Assert.Equal(processItem.LastUpdateTime, desObject.Processes[0].LastUpdateTime);
 }
 ```
+
+## 参考
+
+- https://github.com/dotnet9/CsharpSocketTest
+- https://github.com/dotnet9/CodeWF.EventBus.Socket

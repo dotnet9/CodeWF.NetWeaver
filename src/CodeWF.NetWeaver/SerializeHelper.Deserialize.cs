@@ -1,5 +1,8 @@
 ﻿using System;
+using System.Collections;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using CodeWF.NetWeaver.Base;
 
@@ -34,6 +37,22 @@ namespace CodeWF.NetWeaver
                     var data = DeserializeValue(reader, type);
                     return data;
                 }
+            }
+        }
+        public static object CreateInstance(Type type)
+        {
+            var itemTypes = type.GetGenericArguments();
+            if (typeof(IList).IsAssignableFrom(type))
+            {
+                var lstType = typeof(List<>);
+                var genericType = lstType.MakeGenericType(itemTypes.First());
+                return Activator.CreateInstance(genericType)!;
+            }
+            else
+            {
+                var dictType = typeof(Dictionary<,>);
+                var genericType = dictType.MakeGenericType(itemTypes.First(), itemTypes[1]);
+                return Activator.CreateInstance(genericType)!;
             }
         }
 
@@ -94,20 +113,19 @@ namespace CodeWF.NetWeaver
         {
             var count = reader.ReadInt32();
             var genericArguments = propertyType.GetGenericArguments();
-            var complexObj = Activator.CreateInstance(propertyType);
-            var addMethod = propertyType.GetMethod("Add");
+            var complexObj = CreateInstance(propertyType);
 
             for (var i = 0; i < count; i++)
             {
                 var key = DeserializeValue(reader, genericArguments[0]);
                 if (genericArguments.Length == 1)
                 {
-                    addMethod.Invoke(complexObj, new[] { key });
+                    (complexObj as IList).Add(key);
                 }
                 else if (genericArguments.Length == 2)
                 {
                     var value = DeserializeValue(reader, genericArguments[1]);
-                    addMethod.Invoke(complexObj, new[] { key, value });
+                    (complexObj as IDictionary)[key] = value;
                 }
             }
 
