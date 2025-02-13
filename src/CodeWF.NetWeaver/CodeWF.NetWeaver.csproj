@@ -23,6 +23,7 @@
 		<PackageProjectUrl>https://github.com/dotnet9/$(AssemblyName)</PackageProjectUrl>
 		<RepositoryUrl>https://github.com/dotnet9/$(AssemblyName)</RepositoryUrl>
 		<PackageReadmeFile>README.MD</PackageReadmeFile>
+		<Platforms>AnyCPU;x64</Platforms>
 	</PropertyGroup>
 
 	<ItemGroup>

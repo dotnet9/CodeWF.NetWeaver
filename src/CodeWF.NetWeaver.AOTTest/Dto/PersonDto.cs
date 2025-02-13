@@ -11,6 +11,8 @@ public class PersonDto
     public List<Project>? Projects { get; set; }
 
     public Dictionary<int, int>? Records { get; set; }
+
+    public Dictionary<string, double>? Course { get; set; }
 }
 
 public class Project

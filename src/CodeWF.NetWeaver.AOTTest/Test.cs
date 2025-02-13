@@ -13,8 +13,11 @@ public static class Test
         Console.WriteLine("\r\n\r\n===2、AOT List===");
         AOTList();
 
-        Console.WriteLine("\r\n\r\n===3、AOT Dictionary===");
+        Console.WriteLine("\r\n\r\n===3、AOT Dictionary<int,int>===");
         AOTDictionary();
+
+        Console.WriteLine("\r\n\r\n===3、AOT Dictionary<stirng,double>===");
+        AOTDictionary2();
 
         Console.WriteLine("\r\n\r\n===4、AOT Custom Object");
         AOTObject();
@@ -108,6 +111,35 @@ public static class Test
             Console.WriteLine($"{nameof(AOTDictionary)}:\r\n{ex}");
         }
     }
+    private static void AOTDictionary2()
+    {
+        try
+        {
+            var dict = new Dictionary<string, double>() { { "1", 2 }, { "3", 4 }, { "5", 6 }, { "7", 8 } };
+            var type = dict.GetType();
+
+            Console.WriteLine($"直接获取Dictionary长度：{dict.Count}");
+
+            var dictLen1 = type.GetProperty(nameof(IDictionary.Count))?.GetValue(dict);
+            Console.WriteLine($"反射获取Dictionary长度：{dictLen1}");
+
+            var dictObj = dict as IDictionary;
+            var dictLen2 = dictObj.Count;
+            Console.WriteLine($"反射获取Dictionary长度：{dictLen2}");
+
+            var newObj1 = CreateInstance(dict);
+            Console.WriteLine($"ins1: {newObj1}");
+
+            var newObj = Activator.CreateInstance(type);
+            Console.WriteLine($"ins2: {newObj}");
+
+            Console.WriteLine("=========================");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"{nameof(AOTDictionary)}:\r\n{ex}");
+        }
+    }
 
     private static void AOTObject()
     {
@@ -119,7 +151,8 @@ public static class Test
                 Tags = [1, 2, 3],
                 Addresses = ["四川", "成都"],
                 Projects = [new Project() { Id = 1, Name = "Math" }, new Project() { Id = 2, Name = "Chinese" }],
-                Records = new() { { 1, 98 }, { 2, 99 } }
+                Records = new() { { 1, 98 }, { 2, 99 } },
+                Course = new() { { "Math", 98.5 }, { "Chinese", 99.5 } }
             };
             var buffer = person.SerializeObject();
             var newPerson = buffer.DeserializeObject(typeof(PersonDto)) as PersonDto;
@@ -128,6 +161,7 @@ public static class Test
             Console.WriteLine($"Addresses【{person.Addresses.Length}】=》【{newPerson.Addresses?.Length}】");
             Console.WriteLine($"Projects【{person.Projects.Count}】=》【{newPerson.Projects?.Count}】");
             Console.WriteLine($"Records【{person.Records.Count}】=》【{newPerson.Records?.Count}】");
+            Console.WriteLine($"Course【{person.Course.Count}】=》【{newPerson.Course?.Count}】");
         }
         catch (Exception ex)
         {
