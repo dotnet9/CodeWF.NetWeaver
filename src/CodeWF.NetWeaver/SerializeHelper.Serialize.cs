@@ -9,7 +9,7 @@ namespace CodeWF.NetWeaver
 {
     public partial class SerializeHelper
     {
-        public static byte[] Serialize<T>(this T data, long systemId) where T : INetObject
+        public static byte[] Serialize<T>(this T data, long systemId, DateTimeOffset sendTime = default) where T : INetObject
         {
             if (data == null) throw new ArgumentNullException(nameof(data));
 
@@ -23,7 +23,15 @@ namespace CodeWF.NetWeaver
                     writer.Write(systemId);
                     writer.Write(netObjectInfo.Id);
                     writer.Write(netObjectInfo.Version);
-                    writer.Write(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+                    if (sendTime == default)
+                    {
+                        writer.Write(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+                    }
+                    else
+                    {
+                        writer.Write(sendTime.ToUnixTimeMilliseconds());
+                    }
+
                     writer.Write(bodyBuffer);
 
                     return stream.ToArray();
