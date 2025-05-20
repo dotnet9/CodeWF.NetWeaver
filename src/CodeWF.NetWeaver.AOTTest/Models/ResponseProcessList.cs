@@ -15,6 +15,8 @@ namespace CodeWF.NetWeaver.AOTTest.Models
 
         public int PageIndex { get; set; }
 
+        public double Record { get; set; }
+
         public List<ProcessItem>? Processes { get; set; }
     }
 

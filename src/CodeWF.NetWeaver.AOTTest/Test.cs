@@ -19,15 +19,19 @@ public static class Test
             Processes = new List<ProcessItem>()
         };
 
+        netObject.Record = 23.3;
         var buffer1 = netObject.Serialize(32);
+        netObject.Record = double.NaN;
         var serilizeTime = DateTimeOffset.UtcNow;
         var buffer2 = netObject.Serialize(32, serilizeTime);
 
         var readIndex = 0;
         buffer1.ReadHead(ref readIndex, out var header1);
+        var obj1 = buffer1.Deserialize<ResponseProcessList>();
         
         readIndex = 0;
         buffer2.ReadHead(ref readIndex, out var header2);
+        var obj2 = buffer2.Deserialize<ResponseProcessList>();
         var dt = header2.UnixTimeMilliseconds.FromUnixTimeMilliseconds();
         Console.WriteLine($"Old: {serilizeTime.LocalDateTime:yyyy-MM-dd HH:mm:ss fff}, New: {dt:yyyy-MM-dd HH:mm:ss fff}");
     }

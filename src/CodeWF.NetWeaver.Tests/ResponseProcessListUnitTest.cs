@@ -76,7 +76,8 @@ public class ResponseProcessListUnitTest
         var obj = new Student()
         {
             Id = 1,
-            Name = "codewf"
+            Name = "codewf",
+            Record = double.NaN
         };
 
         var buffer = SerializeHelper.SerializeObject(obj);
@@ -91,4 +92,5 @@ public class Student
 {
     public int Id { get; set; }
     public string? Name { get; set; }
+    public double Record { get; set; }
 }
