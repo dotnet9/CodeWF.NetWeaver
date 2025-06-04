@@ -21,7 +21,7 @@ public static class Test
         };
 
         netObject.Record = 23.3;
-        Console.WriteLine($"before serialize List<double> values is: {string.Join(',', netObject.Records)}");
+        Console.WriteLine($"before serialize List<double> values are: {string.Join(',', netObject.Records)}");
         var buffer1 = netObject.Serialize(32);
         netObject.Record = double.NaN;
         var serilizeTime = DateTimeOffset.UtcNow;
@@ -30,7 +30,7 @@ public static class Test
         var readIndex = 0;
         buffer1.ReadHead(ref readIndex, out var header1);
         var obj1 = buffer1.Deserialize<ResponseProcessList>();
-        Console.WriteLine($"after deserialize List<double> values is: {string.Join(',', obj1.Records)}");
+        Console.WriteLine($"after deserialize List<double> values are: {string.Join(',', obj1.Records)}");
 
         readIndex = 0;
         buffer2.ReadHead(ref readIndex, out var header2);
