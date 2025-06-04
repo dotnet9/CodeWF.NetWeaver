@@ -17,6 +17,8 @@ namespace CodeWF.NetWeaver.AOTTest.Models
 
         public double Record { get; set; }
 
+        public List<double> Records { get; set; }
+
         public List<ProcessItem>? Processes { get; set; }
     }
 

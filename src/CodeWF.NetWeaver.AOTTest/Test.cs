@@ -16,10 +16,12 @@ public static class Test
             PageSize = 3,
             PageCount = 67,
             PageIndex = 1,
+            Records = new List<double>() { 2.0, 1.0, 3.0 },
             Processes = new List<ProcessItem>()
         };
 
         netObject.Record = 23.3;
+        Console.WriteLine($"before serialize List<double> values is: {string.Join(',', netObject.Records)}");
         var buffer1 = netObject.Serialize(32);
         netObject.Record = double.NaN;
         var serilizeTime = DateTimeOffset.UtcNow;
@@ -28,13 +30,16 @@ public static class Test
         var readIndex = 0;
         buffer1.ReadHead(ref readIndex, out var header1);
         var obj1 = buffer1.Deserialize<ResponseProcessList>();
-        
+        Console.WriteLine($"after deserialize List<double> values is: {string.Join(',', obj1.Records)}");
+
         readIndex = 0;
         buffer2.ReadHead(ref readIndex, out var header2);
         var obj2 = buffer2.Deserialize<ResponseProcessList>();
         var dt = header2.UnixTimeMilliseconds.FromUnixTimeMilliseconds();
-        Console.WriteLine($"Old: {serilizeTime.LocalDateTime:yyyy-MM-dd HH:mm:ss fff}, New: {dt:yyyy-MM-dd HH:mm:ss fff}");
+        Console.WriteLine(
+            $"Old: {serilizeTime.LocalDateTime:yyyy-MM-dd HH:mm:ss fff}, New: {dt:yyyy-MM-dd HH:mm:ss fff}");
     }
+
     public static void TestAOT()
     {
         Console.WriteLine("===1、AOT Array====");
@@ -141,6 +146,7 @@ public static class Test
             Console.WriteLine($"{nameof(AOTDictionary)}:\r\n{ex}");
         }
     }
+
     private static void AOTDictionary2()
     {
         try
