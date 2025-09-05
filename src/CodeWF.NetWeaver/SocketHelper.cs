@@ -12,9 +12,9 @@ namespace CodeWF.NetWeaver
         public const int MaxUdpPacketSize = 65507;
 
         /// <summary>
-        /// 网络数据包头部固定大小
+        /// 网络数据包头部固定大小，头部固定字段数据类型大小(PacketSize + SystemId + ObjectId + ObjectVersion + UnixTimeMilliseconds)
         /// </summary>
-        public const int PacketHeadLen = 22;
+        public const int PacketHeadLen = sizeof(int) + sizeof(long) + sizeof(ushort) + sizeof(byte) + sizeof(long);
 
         /// <summary>
         /// 数组、列表、字典等数据结构数据量字段大小：如Length、Count

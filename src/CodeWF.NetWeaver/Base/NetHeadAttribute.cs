@@ -5,7 +5,7 @@ namespace CodeWF.NetWeaver.Base
     [AttributeUsage(AttributeTargets.Class, Inherited = false)]
     public class NetHeadAttribute : Attribute
     {
-        public byte Id { get; set; }
+        public ushort Id { get; set; }
 
         public byte Version { get; set; }
 

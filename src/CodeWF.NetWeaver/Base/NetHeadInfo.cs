@@ -6,7 +6,7 @@
 
         public long SystemId { get; set; }
 
-        public byte ObjectId { get; set; }
+        public ushort ObjectId { get; set; }
 
         public byte ObjectVersion { get; set; }
 

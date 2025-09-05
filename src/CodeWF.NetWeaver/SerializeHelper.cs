@@ -51,8 +51,8 @@ namespace CodeWF.NetWeaver
             netObjectHeadInfo.SystemId = BitConverter.ToInt64(buffer, readIndex);
             readIndex += sizeof(long);
 
-            netObjectHeadInfo.ObjectId = buffer[readIndex];
-            readIndex += sizeof(byte);
+            netObjectHeadInfo.ObjectId = BitConverter.ToUInt16(buffer, readIndex);
+            readIndex += sizeof(ushort);
 
             netObjectHeadInfo.ObjectVersion = buffer[readIndex];
             readIndex += sizeof(byte);
