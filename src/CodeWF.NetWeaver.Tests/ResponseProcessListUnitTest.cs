@@ -7,6 +7,22 @@ namespace CodeWF.NetWeaver.Tests;
 public class ResponseProcessListUnitTest
 {
     [Fact]
+    public void Test_EnumAndBool_Serialization()
+    {
+        var obj = new EnumAndBool
+        {
+            Name = "TestEnum",
+            Flag = true,
+            Kind = SampleEnum.SecondValue
+        };
+        var buffer = SerializeHelper.SerializeObject(obj);
+        var newObj = buffer.DeserializeObject<EnumAndBool>();
+        Assert.Equal(obj.Name, newObj.Name);
+        Assert.Equal(obj.Flag, newObj.Flag);
+        Assert.Equal(obj.Kind, newObj.Kind);
+    }
+
+    [Fact]
     public void Test_SerializeResponseProcessList_Success()
     {
         var netObject = new ResponseProcessList

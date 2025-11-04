@@ -81,7 +81,7 @@ namespace CodeWF.NetWeaver
 
         private static void SerializeValue(BinaryWriter writer, object value, Type valueType)
         {
-            if (valueType.IsPrimitive || valueType == typeof(string))
+            if (valueType.IsPrimitive || valueType == typeof(string) || valueType.IsEnum)
                 SerializeBaseValue(writer, value, valueType);
             else if(valueType.IsArray)
                 SerializeArrayValue(writer, value, valueType);
@@ -93,7 +93,11 @@ namespace CodeWF.NetWeaver
 
         private static void SerializeBaseValue(BinaryWriter writer, object value, Type valueType)
         {
-            if (valueType == typeof(byte))
+            if (valueType.IsEnum)
+            {
+                writer.Write(value == null ? 0 : Convert.ToInt32(value));
+            }
+            else if (valueType == typeof(byte))
             {
                 writer.Write(value == null ? default : byte.Parse(value.ToString()));
             }
@@ -133,6 +137,10 @@ namespace CodeWF.NetWeaver
             {
                 writer.Write(value == null ? string.Empty : value.ToString());
             }
+            else if(valueType == typeof(bool))
+            {
+                writer.Write(value == null ? default : bool.Parse(value.ToString()));
+            }            
             else
             {
                 throw new Exception($"Unsupported data type: {valueType.Name}");

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
@@ -72,7 +72,7 @@ namespace CodeWF.NetWeaver
         private static object DeserializeValue(BinaryReader reader, Type propertyType)
         {
             object value;
-            if (propertyType.IsPrimitive || propertyType == typeof(string))
+            if (propertyType.IsPrimitive || propertyType == typeof(string) || propertyType.IsEnum)
                 value = DeserializeBaseValue(reader, propertyType);
             else if (propertyType.IsArray)
                 value = DeserializeArrayValue(reader, propertyType);
@@ -86,6 +86,11 @@ namespace CodeWF.NetWeaver
 
         private static object DeserializeBaseValue(BinaryReader reader, Type propertyType)
         {
+            if (propertyType.IsEnum)
+            {
+                return Enum.ToObject(propertyType, reader.ReadInt32());
+            }
+            
             if (propertyType == typeof(byte)) return reader.ReadByte();
 
             if (propertyType == typeof(short)) return reader.ReadInt16();
@@ -105,6 +110,8 @@ namespace CodeWF.NetWeaver
             if (propertyType == typeof(decimal)) return reader.ReadDecimal();
 
             if (propertyType == typeof(string)) return reader.ReadString();
+
+            if(propertyType == typeof(bool)) return reader.ReadBoolean();
 
             throw new Exception($"Unsupported data type: {propertyType.Name}");
         }

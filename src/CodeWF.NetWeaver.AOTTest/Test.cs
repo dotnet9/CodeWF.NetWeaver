@@ -56,6 +56,9 @@ public static class Test
 
         Console.WriteLine("\r\n\r\n===4、AOT Custom Object");
         AOTObject();
+
+        Console.WriteLine("\r\n\r\n===5、AOT Enum And Bool");
+        TestEnumAndBool();
     }
 
 
@@ -221,5 +224,18 @@ public static class Test
             var genericType = dictType.MakeGenericType(itemTypes.First(), itemTypes[1]);
             return Activator.CreateInstance(genericType)!;
         }
+    }
+
+    private static void TestEnumAndBool()
+    {
+        var obj = new EnumAndBool
+        {
+            Name = "TestEnum",
+            Flag = true,
+            Kind = SampleEnum.SecondValue
+        };
+        var buffer = obj.SerializeObject();
+        var newObj = buffer.DeserializeObject<EnumAndBool>();
+        Console.WriteLine($"Name: {newObj.Name}, Flag: {newObj.Flag}, Kind: {newObj.Kind}");
     }
 }
