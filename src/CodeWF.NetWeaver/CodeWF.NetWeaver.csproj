@@ -7,7 +7,7 @@
 		<Company>https://codewf.com</Company>
 		<Authors>沙漠尽头的狼</Authors>
 		<Owners>https://codewf.com</Owners>
-		<Version>2.0.1</Version>
+		<Version>2.0.2</Version>
 		<Description>CodeWF.NetWeaver is a concise and powerful C# library that supports AOT for handling TCP and UDP packet grouping and unpacking operations. CodeWF.NetWeaver 是一个简洁而强大的C#库，支持AOT，用于处理TCP和UDP数据包的组包和解包操作。</Description>
 		<ApplicationIcon>Resources\logo.ico</ApplicationIcon>
 		<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
