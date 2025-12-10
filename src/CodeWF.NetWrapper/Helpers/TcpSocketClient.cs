@@ -1,4 +1,4 @@
-﻿using CodeWF.Log.Core;
+using CodeWF.Log.Core;
 using CodeWF.NetWeaver;
 using CodeWF.NetWeaver.Base;
 using CodeWF.NetWrapper.Commands;
@@ -10,11 +10,20 @@ using System.Threading.Tasks;
 
 namespace CodeWF.NetWrapper.Helpers;
 
+/// <summary>
+/// TCP Socket 客户端类，用于与 TCP 服务器建立连接并进行通信
+/// </summary>
 public class TcpSocketClient
 {
     private Socket? _client;
-    public long SystemId { get; private set; } // 服务端标识，TCP数据接收时保存，用于UDP数据包识别
+    /// <summary>
+    /// 服务端标识，TCP数据接收时保存，用于UDP数据包识别
+    /// </summary>
+    public long SystemId { get; private set; }
 
+    /// <summary>
+    /// 响应命令队列，用于存储接收到的响应命令
+    /// </summary>
     public readonly BlockingCollection<SocketCommand> _responses = new(new ConcurrentQueue<SocketCommand>());
 
     #region 公开属性
@@ -24,7 +33,14 @@ public class TcpSocketClient
     /// </summary>
     public string? ServerMark { get; private set; }
 
+    /// <summary>
+    /// 获取或设置服务器IP地址
+    /// </summary>
     public string? ServerIP { get; private set; }
+    
+    /// <summary>
+    /// 获取或设置服务器端口号
+    /// </summary>
     public int ServerPort { get; private set; }
 
 
@@ -33,6 +49,9 @@ public class TcpSocketClient
     /// </summary>
     public bool IsRunning { get; set; }
 
+    /// <summary>
+    /// 发送时间
+    /// </summary>
     private DateTime _sendTime;
 
     /// <summary>
@@ -50,13 +69,12 @@ public class TcpSocketClient
 
 
     /// <summary>
-    ///     心跳发送时间
+    /// 获取或设置心跳发送时间
     /// </summary>
     public DateTime SendHeartbeatTime { get; set; }
 
-
     /// <summary>
-    ///     心跳响应时间
+    /// 获取或设置心跳响应时间
     /// </summary>
     public DateTime ResponseHeartbeatTime { get; set; }
 
@@ -65,6 +83,13 @@ public class TcpSocketClient
     #region 公开接口
 
 
+    /// <summary>
+    /// 异步连接到TCP服务器
+    /// </summary>
+    /// <param name="serverMark">服务器标识</param>
+    /// <param name="serverIP">服务器IP地址</param>
+    /// <param name="serverPort">服务器端口号</param>
+    /// <returns>连接结果，包含是否成功和错误信息</returns>
     public async Task<(bool IsSuccess, string? ErrorMessage)> ConnectAsync(string serverMark, string serverIP, int serverPort)
     {
         ServerMark = serverMark;
@@ -91,6 +116,9 @@ public class TcpSocketClient
         }
     }
 
+    /// <summary>
+    /// 停止TCP客户端
+    /// </summary>
     public void Stop()
     {
         IsRunning = false;
@@ -98,6 +126,11 @@ public class TcpSocketClient
 
     }
 
+    /// <summary>
+    /// 异步发送命令到服务器
+    /// </summary>
+    /// <param name="command">要发送的命令对象</param>
+    /// <exception cref="Exception">当客户端未连接时抛出</exception>
     public async Task SendCommandAsync(INetObject command)
     {
         if (!IsRunning || !_client.Connected)
@@ -113,6 +146,9 @@ public class TcpSocketClient
 
     #region 连接TCP、接收数据
 
+    /// <summary>
+    /// 监听服务器发送的数据
+    /// </summary>
     private async Task ListenForServerAsync()
     {
         while (IsRunning)
@@ -142,6 +178,9 @@ public class TcpSocketClient
         }
     }
 
+    /// <summary>
+    /// 检查响应命令队列
+    /// </summary>
     private async Task CheckResponseAsync()
     {
         while (!IsRunning)

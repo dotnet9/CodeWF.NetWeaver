@@ -1,4 +1,4 @@
-﻿using CodeWF.Log.Core;
+using CodeWF.Log.Core;
 using CodeWF.NetWeaver;
 using CodeWF.NetWrapper.Commands;
 using System;
@@ -10,10 +10,24 @@ using System.Threading.Tasks;
 
 namespace CodeWF.NetWrapper.Helpers;
 
+/// <summary>
+/// UDP Socket 客户端类，用于与 UDP 服务器建立连接并进行通信
+/// </summary>
 public class UdpSocketClient
 {
+    /// <summary>
+    /// 接收缓冲区队列
+    /// </summary>
     private readonly BlockingCollection<SocketCommand> _receivedBuffers = new(new ConcurrentQueue<SocketCommand>());
+    
+    /// <summary>
+    /// UDP客户端对象
+    /// </summary>
     private UdpClient? _client;
+    
+    /// <summary>
+    /// 远程端点
+    /// </summary>
     private IPEndPoint _remoteEp = new(IPAddress.Any, 0);
 
     #region 公开属性
@@ -23,7 +37,14 @@ public class UdpSocketClient
     /// </summary>
     public string? ServerMark { get; private set; }
 
+    /// <summary>
+    /// 获取或设置服务器IP地址
+    /// </summary>
     public string? ServerIP { get; private set; }
+    
+    /// <summary>
+    /// 获取或设置服务器端口号
+    /// </summary>
     public int ServerPort { get; private set; }
 
 
@@ -44,7 +65,7 @@ public class UdpSocketClient
     public DateTime ReceiveTime { get; set; }
 
     /// <summary>
-    /// 新数据通知
+    /// 新数据通知事件
     /// </summary>
     public Action<SocketCommand>? NewDataResponse;
 
@@ -53,6 +74,13 @@ public class UdpSocketClient
     #region 公开接口
 
 
+    /// <summary>
+    /// 连接到UDP服务器
+    /// </summary>
+    /// <param name="serverMark">服务器标识</param>
+    /// <param name="serverIP">服务器IP地址</param>
+    /// <param name="endpoint">本地端点</param>
+    /// <param name="serverPort">服务器端口号</param>
     public void Connect(string serverMark, string serverIP, string endpoint ,int serverPort)
     {
         ServerMark = serverMark;
@@ -94,6 +122,10 @@ public class UdpSocketClient
         }
     }
 
+    /// <summary>
+    /// 停止UDP客户端
+    /// </summary>
+    /// <returns>是否成功停止</returns>
     public bool Stop()
     {
         try
@@ -116,6 +148,9 @@ public class UdpSocketClient
 
     #region 接收处理数据
 
+    /// <summary>
+    /// 接收数据
+    /// </summary>
     private void ReceiveData()
     {
         Task.Run(async () =>
@@ -155,6 +190,9 @@ public class UdpSocketClient
         });
     }
 
+    /// <summary>
+    /// 检查消息队列
+    /// </summary>
     private void CheckMessage()
     {
         Task.Run(async () =>

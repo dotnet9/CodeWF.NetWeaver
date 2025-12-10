@@ -1,4 +1,4 @@
-﻿using CodeWF.Log.Core;
+using CodeWF.Log.Core;
 using CodeWF.NetWeaver;
 using CodeWF.NetWeaver.Base;
 using System;
@@ -6,9 +6,20 @@ using System.Net;
 using System.Net.Sockets;
 
 namespace CodeWF.NetWrapper.Helpers;
+
+/// <summary>
+/// UDP Socket 服务端类，用于创建UDP组播服务器并发送数据
+/// </summary>
 public class UdpSocketServer
 {
+    /// <summary>
+    /// UDP客户端对象
+    /// </summary>
     private UdpClient? _client;
+    
+    /// <summary>
+    /// UDP IP端点
+    /// </summary>
     private IPEndPoint? _udpIpEndPoint;
 
 
@@ -18,10 +29,28 @@ public class UdpSocketServer
     /// 服务标识，用以区分多个服务
     /// </summary>
     public string? ServerMark { get; private set; }
+    /// <summary>
+    /// 获取或设置服务器IP地址
+    /// </summary>
     public string? ServerIP { get; private set; }
+    
+    /// <summary>
+    /// 获取或设置服务器端口号
+    /// </summary>
     public int ServerPort { get; private set; }
+    
+    /// <summary>
+    /// 获取或设置系统ID
+    /// </summary>
     public long SystemId { get; private set; }
+    /// <summary>
+    /// 获取或设置回环IP地址
+    /// </summary>
     public static string LoopbackIP { get; set; } = "127.0.0.1";
+    
+    /// <summary>
+    /// 获取或设置回环子IP地址
+    /// </summary>
     public static string LoopbackSubIP { get; set; } = "239.0.0.1";
 
 
@@ -52,6 +81,15 @@ public class UdpSocketServer
     #region 公开接口方法
 
 
+    /// <summary>
+    /// 启动UDP组播服务器
+    /// </summary>
+    /// <param name="serverMark">服务器标识</param>
+    /// <param name="systemId">系统ID</param>
+    /// <param name="serverIP">服务器IP地址</param>
+    /// <param name="serverPort">服务器端口号</param>
+    /// <param name="localIP">本地IP地址</param>
+    /// <returns>启动结果和错误信息</returns>
     public (bool IsSuccess, string? ErrorMessage) Start(string serverMark, long systemId, string serverIP, int serverPort, string localIP)
     {
         ServerMark = serverMark;
@@ -94,6 +132,9 @@ public class UdpSocketServer
         }
     }
 
+    /// <summary>
+    /// 停止UDP组播服务器
+    /// </summary>
     public void Stop()
     {
         try
@@ -110,6 +151,11 @@ public class UdpSocketServer
         IsRunning = false;
     }
 
+    /// <summary>
+    /// 发送命令
+    /// </summary>
+    /// <param name="command">要发送的网络对象命令</param>
+    /// <param name="time">发送时间</param>
     public void SendCommand(INetObject command, DateTimeOffset time)
     {
         if (!IsRunning || _client == null) return;

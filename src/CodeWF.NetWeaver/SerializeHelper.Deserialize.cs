@@ -8,13 +8,29 @@ using CodeWF.NetWeaver.Base;
 
 namespace CodeWF.NetWeaver
 {
+    /// <summary>
+    /// SerializeHelper 的反序列化部分实现
+    /// </summary>
     public partial class SerializeHelper
     {
+        /// <summary>
+        /// 从字节数组反序列化对象
+        /// </summary>
+        /// <typeparam name="T">要反序列化的对象类型</typeparam>
+        /// <param name="buffer">字节数组</param>
+        /// <returns>反序列化后的对象</returns>
         public static T Deserialize<T>(this byte[] buffer) where T : new()
         {
             return DeserializeObject<T>(buffer, PacketHeadLen);
         }
 
+        /// <summary>
+        /// 从字节数组反序列化对象
+        /// </summary>
+        /// <typeparam name="T">要反序列化的对象类型</typeparam>
+        /// <param name="buffer">字节数组</param>
+        /// <param name="readIndex">读取起始索引</param>
+        /// <returns>反序列化后的对象</returns>
         public static T DeserializeObject<T>(this byte[] buffer, int readIndex = 0) where T : new()
         {
             using (var stream = new MemoryStream(buffer, readIndex, buffer.Length - readIndex))
@@ -28,6 +44,13 @@ namespace CodeWF.NetWeaver
             }
         }
 
+        /// <summary>
+        /// 从字节数组反序列化对象
+        /// </summary>
+        /// <param name="buffer">字节数组</param>
+        /// <param name="type">要反序列化的对象类型</param>
+        /// <param name="readIndex">读取起始索引</param>
+        /// <returns>反序列化后的对象</returns>
         public static object DeserializeObject(this byte[] buffer, Type type, int readIndex = 0)
         {
             using (var stream = new MemoryStream(buffer, readIndex, buffer.Length - readIndex))
@@ -39,6 +62,11 @@ namespace CodeWF.NetWeaver
                 }
             }
         }
+        /// <summary>
+        /// 创建实例
+        /// </summary>
+        /// <param name="type">类型</param>
+        /// <returns>创建的实例</returns>
         public static object CreateInstance(Type type)
         {
             var itemTypes = type.GetGenericArguments();
@@ -56,6 +84,12 @@ namespace CodeWF.NetWeaver
             }
         }
 
+        /// <summary>
+        /// 反序列化对象的所有属性
+        /// </summary>
+        /// <typeparam name="T">对象类型</typeparam>
+        /// <param name="reader">BinaryReader 实例</param>
+        /// <param name="data">要反序列化的对象</param>
         private static void DeserializeProperties<T>(BinaryReader reader, T data)
         {
             var properties = GetProperties(data.GetType());
@@ -69,6 +103,12 @@ namespace CodeWF.NetWeaver
             }
         }
 
+        /// <summary>
+        /// 根据类型反序列化值
+        /// </summary>
+        /// <param name="reader">BinaryReader 实例</param>
+        /// <param name="propertyType">属性类型</param>
+        /// <returns>反序列化后的值</returns>
         private static object DeserializeValue(BinaryReader reader, Type propertyType)
         {
             object value;
@@ -84,6 +124,13 @@ namespace CodeWF.NetWeaver
             return value;
         }
 
+        /// <summary>
+        /// 反序列化基本类型、字符串和枚举
+        /// </summary>
+        /// <param name="reader">BinaryReader 实例</param>
+        /// <param name="propertyType">属性类型</param>
+        /// <returns>反序列化后的值</returns>
+        /// <exception cref="Exception">当遇到不支持的类型时抛出</exception>
         private static object DeserializeBaseValue(BinaryReader reader, Type propertyType)
         {
             if (propertyType.IsEnum)
@@ -116,6 +163,12 @@ namespace CodeWF.NetWeaver
             throw new Exception($"Unsupported data type: {propertyType.Name}");
         }
 
+        /// <summary>
+        /// 反序列化复杂类型（如 List、Dictionary）
+        /// </summary>
+        /// <param name="reader">BinaryReader 实例</param>
+        /// <param name="propertyType">属性类型</param>
+        /// <returns>反序列化后的对象</returns>
         private static object DeserializeComplexValue(BinaryReader reader, Type propertyType)
         {
             var count = reader.ReadInt32();
@@ -139,6 +192,12 @@ namespace CodeWF.NetWeaver
             return complexObj;
         }
 
+        /// <summary>
+        /// 反序列化数组
+        /// </summary>
+        /// <param name="reader">BinaryReader 实例</param>
+        /// <param name="propertyType">数组类型</param>
+        /// <returns>反序列化后的数组</returns>
         private static object DeserializeArrayValue(BinaryReader reader, Type propertyType)
         {
             var length = reader.ReadInt32();
@@ -154,6 +213,12 @@ namespace CodeWF.NetWeaver
             return array;
         }
 
+        /// <summary>
+        /// 反序列化对象
+        /// </summary>
+        /// <param name="reader">BinaryReader 实例</param>
+        /// <param name="type">对象类型</param>
+        /// <returns>反序列化后的对象</returns>
         private static object DeserializeObject(BinaryReader reader, Type type)
         {
             var data = Activator.CreateInstance(type);

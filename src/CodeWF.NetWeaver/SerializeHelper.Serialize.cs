@@ -1,4 +1,4 @@
-﻿using CodeWF.NetWeaver.Base;
+using CodeWF.NetWeaver.Base;
 using System;
 using System.Collections;
 using System.IO;
@@ -7,8 +7,20 @@ using System.Reflection;
 
 namespace CodeWF.NetWeaver
 {
+    /// <summary>
+    /// SerializeHelper 的序列化部分实现
+    /// </summary>
     public partial class SerializeHelper
     {
+        /// <summary>
+        /// 序列化网络对象为字节数组
+        /// </summary>
+        /// <typeparam name="T">网络对象类型</typeparam>
+        /// <param name="data">要序列化的对象</param>
+        /// <param name="systemId">系统ID</param>
+        /// <param name="sendTime">发送时间</param>
+        /// <returns>序列化后的字节数组</returns>
+        /// <exception cref="ArgumentNullException">当 data 为 null 时抛出</exception>
         public static byte[] Serialize<T>(this T data, long systemId, DateTimeOffset sendTime = default) where T : INetObject
         {
             if (data == null) throw new ArgumentNullException(nameof(data));
@@ -39,6 +51,12 @@ namespace CodeWF.NetWeaver
             }
         }
 
+        /// <summary>
+        /// 序列化对象为字节数组
+        /// </summary>
+        /// <typeparam name="T">对象类型</typeparam>
+        /// <param name="data">要序列化的对象</param>
+        /// <returns>序列化后的字节数组</returns>
         public static byte[] SerializeObject<T>(this T data)
         {
             using (var stream = new MemoryStream())
@@ -51,6 +69,12 @@ namespace CodeWF.NetWeaver
             }
         }
 
+        /// <summary>
+        /// 序列化对象为字节数组
+        /// </summary>
+        /// <param name="data">要序列化的对象</param>
+        /// <param name="type">对象类型</param>
+        /// <returns>序列化后的字节数组</returns>
         public static byte[] SerializeObject(this object data, Type type)
         {
             using (var stream = new MemoryStream())
@@ -63,6 +87,12 @@ namespace CodeWF.NetWeaver
             }
         }
 
+        /// <summary>
+        /// 序列化对象的所有属性
+        /// </summary>
+        /// <typeparam name="T">对象类型</typeparam>
+        /// <param name="writer">BinaryWriter 实例</param>
+        /// <param name="data">要序列化的对象</param>
         private static void SerializeProperties<T>(BinaryWriter writer, T data)
         {
             var properties = GetProperties(data.GetType()).Where(p=> p.GetCustomAttribute(typeof(NetIgnoreMemberAttribute)) == null);
@@ -72,6 +102,13 @@ namespace CodeWF.NetWeaver
             }
         }
 
+        /// <summary>
+        /// 序列化单个属性
+        /// </summary>
+        /// <typeparam name="T">对象类型</typeparam>
+        /// <param name="writer">BinaryWriter 实例</param>
+        /// <param name="data">要序列化的对象</param>
+        /// <param name="property">属性信息</param>
         private static void SerializeProperty<T>(BinaryWriter writer, T data, PropertyInfo property)
         {
             var propertyType = property.PropertyType;
@@ -79,6 +116,12 @@ namespace CodeWF.NetWeaver
             SerializeValue(writer, propertyValue, propertyType);
         }
 
+        /// <summary>
+        /// 根据类型序列化值
+        /// </summary>
+        /// <param name="writer">BinaryWriter 实例</param>
+        /// <param name="value">要序列化的值</param>
+        /// <param name="valueType">值的类型</param>
         private static void SerializeValue(BinaryWriter writer, object value, Type valueType)
         {
             if (valueType.IsPrimitive || valueType == typeof(string) || valueType.IsEnum)
@@ -91,10 +134,18 @@ namespace CodeWF.NetWeaver
                 SerializeProperties(writer, value);
         }
 
+        /// <summary>
+        /// 序列化基本类型、字符串和枚举
+        /// </summary>
+        /// <param name="writer">BinaryWriter 实例</param>
+        /// <param name="value">要序列化的值</param>
+        /// <param name="valueType">值的类型</param>
+        /// <exception cref="Exception">当遇到不支持的类型时抛出</exception>
         private static void SerializeBaseValue(BinaryWriter writer, object value, Type valueType)
         {
             if (valueType.IsEnum)
             {
+                // 对于枚举类型，将其转换为整数进行序列化
                 writer.Write(value == null ? 0 : Convert.ToInt32(value));
             }
             else if (valueType == typeof(byte))
@@ -146,6 +197,12 @@ namespace CodeWF.NetWeaver
                 throw new Exception($"Unsupported data type: {valueType.Name}");
             }
         }
+        /// <summary>
+        /// 序列化数组
+        /// </summary>
+        /// <param name="writer">BinaryWriter 实例</param>
+        /// <param name="value">要序列化的数组</param>
+        /// <param name="valueType">数组类型</param>
         private static void SerializeArrayValue(BinaryWriter writer, object value, Type valueType)
         {
             var length = 0;
@@ -166,6 +223,12 @@ namespace CodeWF.NetWeaver
             }
         }
 
+        /// <summary>
+        /// 序列化复杂类型（如 List、Dictionary）
+        /// </summary>
+        /// <param name="writer">BinaryWriter 实例</param>
+        /// <param name="value">要序列化的对象</param>
+        /// <param name="valueType">对象类型</param>
         private static void SerializeComplexValue(BinaryWriter writer, object value, Type valueType)
         {
             var count = 0;

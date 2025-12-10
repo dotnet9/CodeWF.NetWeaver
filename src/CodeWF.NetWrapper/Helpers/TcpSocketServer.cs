@@ -1,4 +1,4 @@
-﻿using CodeWF.Log.Core;
+using CodeWF.Log.Core;
 using CodeWF.NetWeaver;
 using CodeWF.NetWeaver.Base;
 using CodeWF.NetWrapper.Commands;
@@ -15,31 +15,59 @@ using System.Threading.Tasks;
 namespace CodeWF.NetWrapper.Helpers;
 
 /// <summary>
-/// TCP Socket服务端
+/// TCP Socket 服务端类，用于监听客户端连接并进行通信
 /// </summary>
 public class TcpSocketServer
 {
+    /// <summary>
+    /// 客户端会话字典，键为客户端IP和端口
+    /// </summary>
     public readonly ConcurrentDictionary<string, TcpSession> _clients = new();
+    
+    /// <summary>
+    /// 请求命令队列字典，键为客户端IP和端口
+    /// </summary>
     private readonly ConcurrentDictionary<string, ConcurrentQueue<SocketCommand>> _requests = new();
+    
+    /// <summary>
+    /// 客户端检测定时器
+    /// </summary>
     private PeriodicTimer? _detectionTimer;
 
+    /// <summary>
+    /// 监听取消令牌源
+    /// </summary>
     private CancellationTokenSource? _listenTokenSource;
 
     #region 公开属性
 
+    /// <summary>
+    /// 获取或设置TCP服务器Socket对象
+    /// </summary>
     public Socket? Server { get; private set; }
-    public long SystemId { get; } // 服务端标识，TCP数据接收时保存，用于UDP数据包识别
+    
+    /// <summary>
+    /// 服务端标识，TCP数据接收时保存，用于UDP数据包识别
+    /// </summary>
+    public long SystemId { get; }
 
     /// <summary>
     /// 服务标识，用以区分多个服务
     /// </summary>
     public string? ServerMark { get; private set; }
 
+    /// <summary>
+    /// 获取或设置服务器IP地址
+    /// </summary>
     public string? ServerIP { get; private set; }
+    
+    /// <summary>
+    /// 获取或设置服务器端口号
+    /// </summary>
     public int ServerPort { get; private set; }
 
     /// <summary>
-    /// 客户端心跳超时时间，单位秒
+    /// 获取或设置客户端心跳超时时间（单位：秒）
     /// </summary>
     public int TimeOut { get; private set; }
 
@@ -114,6 +142,9 @@ public class TcpSocketServer
         }
     }
 
+    /// <summary>
+    /// 停止TCP服务器
+    /// </summary>
     public async Task StopAsync()
     {
         IsRunning = false;
@@ -156,14 +187,26 @@ public class TcpSocketServer
         }
     }
 
+    /// <summary>
+    /// 向指定客户端发送命令
+    /// </summary>
+    /// <param name="client">客户端Socket对象</param>
+    /// <param name="command">要发送的命令对象</param>
     public async Task SendCommandAsync(Socket client, INetObject command)
     {
         var buffer = command.Serialize(SystemId);
         await client.SendAsync(buffer); 
     }
 
+    /// <summary>
+    /// 任务ID计数器
+    /// </summary>
     private static int _taskId;
 
+    /// <summary>
+    /// 获取新的任务ID
+    /// </summary>
+    /// <returns>新的任务ID</returns>
     public static int GetNewTaskId()
     {
         return ++_taskId;
@@ -173,11 +216,19 @@ public class TcpSocketServer
 
     #region 接收客户端命令
 
+    /// <summary>
+    /// 移除客户端连接
+    /// </summary>
+    /// <param name="tcpClient">客户端Socket对象</param>
     private async Task RemoveClientAsync(Socket tcpClient)
     {
         await RemoveClientAsync(tcpClient.RemoteEndPoint!.ToString()!);
     }
 
+    /// <summary>
+    /// 移除客户端连接
+    /// </summary>
+    /// <param name="key">客户端键（IP和端口）</param>
     private async Task RemoveClientAsync(string key)
     {
         if (!_clients.TryGetValue(key, out var session))
@@ -194,6 +245,9 @@ public class TcpSocketServer
         Logger.Warn($"已清除客户端信息{key}");
     }
 
+    /// <summary>
+    /// 监听客户端连接
+    /// </summary>
     private async Task ListenForClientsAsync()
     {
         while (IsRunning && _listenTokenSource?.IsCancellationRequested != true)
@@ -220,6 +274,10 @@ public class TcpSocketServer
         }
     }
 
+    /// <summary>
+    /// 处理客户端连接
+    /// </summary>
+    /// <param name="client">客户端会话对象</param>
     private void HandleClient(TcpSession client)
     {
         Task.Run(async() =>
@@ -262,6 +320,9 @@ public class TcpSocketServer
 
     #region 处理客户端请求
 
+    /// <summary>
+    /// 处理客户端请求
+    /// </summary>
     private async Task ProcessingRequestsAsync()
     {
         while (IsRunning && _listenTokenSource?.IsCancellationRequested != true)
@@ -308,6 +369,11 @@ public class TcpSocketServer
         }
     }
 
+    /// <summary>
+    /// 缓存客户端会话
+    /// </summary>
+    /// <param name="socket">客户端Socket对象</param>
+    /// <returns>客户端会话对象</returns>
     private async Task<TcpSession> CacheClientAsync(Socket? socket)
     {
         var key = socket?.RemoteEndPoint?.ToString() ?? string.Empty;
@@ -326,6 +392,9 @@ public class TcpSocketServer
         return session;
     }
 
+    /// <summary>
+    /// 检测客户端心跳
+    /// </summary>
     private async Task DetectionClientsAsync()
     {
         if (_detectionTimer == null || _listenTokenSource == null)
@@ -359,6 +428,10 @@ public class TcpSocketServer
         }
     }
 
+    /// <summary>
+    /// 更新客户端活动时间
+    /// </summary>
+    /// <param name="clientKey">客户端键（IP和端口）</param>
     private void ActiveClient(string clientKey)
     {
         if(_clients.TryGetValue(clientKey, out var session))

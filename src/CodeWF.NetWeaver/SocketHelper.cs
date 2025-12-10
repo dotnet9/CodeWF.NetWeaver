@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Net.Sockets;
 using CodeWF.NetWeaver.Base;
 
@@ -21,6 +21,13 @@ namespace CodeWF.NetWeaver
         /// </summary>
         public const int ArrayOrDictionaryCountSize = 4;
 
+        /// <summary>
+        /// 从Socket读取数据包
+        /// </summary>
+        /// <param name="socket">Socket对象</param>
+        /// <param name="buffer">输出参数，包含读取的数据包</param>
+        /// <param name="netObject">输出参数，包含解析的网络头信息</param>
+        /// <returns>是否成功读取数据包</returns>
         public static bool ReadPacket(this Socket socket, out byte[] buffer, out NetHeadInfo netObject)
         {
             var lenBuffer = ReceiveBuffer(socket, 4);
@@ -37,6 +44,12 @@ namespace CodeWF.NetWeaver
             return ReadHead(buffer, ref readIndex, out netObject);
         }
 
+        /// <summary>
+        /// 从Socket接收指定长度的缓冲区数据
+        /// </summary>
+        /// <param name="client">Socket客户端</param>
+        /// <param name="count">要接收的数据长度</param>
+        /// <returns>包含接收数据的字节数组</returns>
         private static byte[] ReceiveBuffer(Socket client, int count)
         {
             var buffer = new byte[count];
