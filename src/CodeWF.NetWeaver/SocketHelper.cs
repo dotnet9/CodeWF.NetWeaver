@@ -1,4 +1,5 @@
 using System;
+using System.Buffers;
 using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
@@ -31,32 +32,50 @@ namespace CodeWF.NetWeaver
         /// <returns>元组，包含是否成功读取数据包、读取的数据包和解析的网络头信息</returns>
         public static async Task<(bool Success, byte[] Buffer, NetHeadInfo NetObject)> ReadPacketAsync(this Socket socket, CancellationToken cancellationToken = default)
         {
-            var lenBuffer = new byte[4];
-            var bytesRead = await socket.ReceiveAsync(new ArraySegment<byte>(lenBuffer), SocketFlags.None, cancellationToken);
-            if (bytesRead != 4)
+            // 使用ArrayPool.Shared.Rent来减少内存分配
+            var lenBuffer = ArrayPool<byte>.Shared.Rent(4);
+            try
             {
-                return (false, Array.Empty<byte>(), default);
-            }
-
-            var bufferLen = BitConverter.ToInt32(lenBuffer, 0);
-            var buffer = new byte[bufferLen];
-
-            Array.Copy(lenBuffer, buffer, 4);
-            var totalBytesRead = 4;
-
-            while (totalBytesRead < bufferLen)
-            {
-                bytesRead = await socket.ReceiveAsync(new ArraySegment<byte>(buffer, totalBytesRead, bufferLen - totalBytesRead), SocketFlags.None, cancellationToken);
-                if (bytesRead == 0)
+                var bytesRead = await socket.ReceiveAsync(new ArraySegment<byte>(lenBuffer, 0, 4), SocketFlags.None, cancellationToken);
+                if (bytesRead != 4)
                 {
                     return (false, Array.Empty<byte>(), default);
                 }
-                totalBytesRead += bytesRead;
-            }
 
-            var readIndex = 0;
-            var success = ReadHead(buffer, ref readIndex, out var netObject);
-            return (success, buffer, netObject);
+                // 使用Span<T>来避免不必要的内存拷贝
+                var bufferLen = BitConverter.ToInt32(lenBuffer.AsSpan(0, 4));
+                var buffer = ArrayPool<byte>.Shared.Rent(bufferLen);
+                try
+                {
+                    // 将长度信息复制到结果缓冲的开头
+                    lenBuffer.AsSpan(0, 4).CopyTo(buffer.AsSpan(0, 4));
+                    var totalBytesRead = 4;
+
+                    while (totalBytesRead < bufferLen)
+                    {
+                        bytesRead = await socket.ReceiveAsync(new ArraySegment<byte>(buffer, totalBytesRead, bufferLen - totalBytesRead), SocketFlags.None, cancellationToken);
+                        if (bytesRead == 0)
+                        {
+                            ArrayPool<byte>.Shared.Return(buffer);
+                            return (false, Array.Empty<byte>(), default);
+                        }
+                        totalBytesRead += bytesRead;
+                    }
+
+                    var readIndex = 0;
+                    var success = ReadHead(buffer, ref readIndex, out var netObject);
+                    return (success, buffer, netObject);
+                }
+                catch
+                {
+                    ArrayPool<byte>.Shared.Return(buffer);
+                    throw;
+                }
+            }
+            finally
+            {
+                ArrayPool<byte>.Shared.Return(lenBuffer);
+            }
         }
     }
 }

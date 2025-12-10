@@ -69,32 +69,43 @@ namespace CodeWF.NetWeaver
         /// <returns>是否成功读取头部信息</returns>
         public static bool ReadHead(this byte[] buffer, ref int readIndex, out NetHeadInfo netObjectHeadInfo)
         {
+            if (ReadHead(buffer.AsSpan(readIndex), out netObjectHeadInfo, out var bytesConsumed))
+            {
+                readIndex += bytesConsumed;
+                return true;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// 从Span<byte>中读取网络对象头部信息（高性能版本）
+        /// </summary>
+        /// <param name="span">字节Span</param>
+        /// <param name="netObjectHeadInfo">输出的网络对象头部信息</param>
+        /// <param name="bytesConsumed">消耗的字节数</param>
+        /// <returns>是否成功读取头部信息</returns>
+        public static bool ReadHead(this Span<byte> span, out NetHeadInfo netObjectHeadInfo, out int bytesConsumed)
+        {
             netObjectHeadInfo = null;
+            bytesConsumed = 0;
             // 检查缓冲区长度是否足够
-            if (buffer.Length < readIndex + PacketHeadLen) return false;
+            if (span.Length < PacketHeadLen) return false;
 
             netObjectHeadInfo = new NetHeadInfo();
 
+            // 使用Span<T>的Slice方法来避免不必要的内存拷贝
             // 读取缓冲区长度
-            netObjectHeadInfo.BufferLen = BitConverter.ToInt32(buffer, readIndex);
-            readIndex += sizeof(int);
-
+            netObjectHeadInfo.BufferLen = BitConverter.ToInt32(span.Slice(0, sizeof(int)));
             // 读取系统ID
-            netObjectHeadInfo.SystemId = BitConverter.ToInt64(buffer, readIndex);
-            readIndex += sizeof(long);
-
+            netObjectHeadInfo.SystemId = BitConverter.ToInt64(span.Slice(sizeof(int), sizeof(long)));
             // 读取对象ID
-            netObjectHeadInfo.ObjectId = BitConverter.ToUInt16(buffer, readIndex);
-            readIndex += sizeof(ushort);
-
+            netObjectHeadInfo.ObjectId = BitConverter.ToUInt16(span.Slice(sizeof(int) + sizeof(long), sizeof(ushort)));
             // 读取对象版本
-            netObjectHeadInfo.ObjectVersion = buffer[readIndex];
-            readIndex += sizeof(byte);
-
+            netObjectHeadInfo.ObjectVersion = span[sizeof(int) + sizeof(long) + sizeof(ushort)];
             // 读取时间戳
-            netObjectHeadInfo.UnixTimeMilliseconds = BitConverter.ToInt64(buffer, readIndex);
-            readIndex += sizeof(long);
+            netObjectHeadInfo.UnixTimeMilliseconds = BitConverter.ToInt64(span.Slice(sizeof(int) + sizeof(long) + sizeof(ushort) + sizeof(byte), sizeof(long)));
 
+            bytesConsumed = PacketHeadLen;
             return true;
         }
 
