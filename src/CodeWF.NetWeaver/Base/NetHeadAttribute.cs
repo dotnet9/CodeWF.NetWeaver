@@ -9,7 +9,7 @@ namespace CodeWF.NetWeaver.Base
 
         public byte Version { get; set; }
 
-        public NetHeadAttribute(byte id, byte version)
+        public NetHeadAttribute(ushort id, byte version)
         {
             Id = id;
             Version = version;
