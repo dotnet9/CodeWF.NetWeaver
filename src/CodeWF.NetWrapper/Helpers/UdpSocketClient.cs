@@ -19,12 +19,12 @@ public class UdpSocketClient
     /// 接收缓冲区队列
     /// </summary>
     private readonly BlockingCollection<SocketCommand> _receivedBuffers = new(new ConcurrentQueue<SocketCommand>());
-    
+
     /// <summary>
     /// UDP客户端对象
     /// </summary>
     private UdpClient? _client;
-    
+
     /// <summary>
     /// 远程端点
     /// </summary>
@@ -41,7 +41,7 @@ public class UdpSocketClient
     /// 获取或设置服务器IP地址
     /// </summary>
     public string? ServerIP { get; private set; }
-    
+
     /// <summary>
     /// 获取或设置服务器端口号
     /// </summary>
@@ -73,15 +73,14 @@ public class UdpSocketClient
 
     #region 公开接口
 
-
     /// <summary>
     /// 连接到UDP服务器
     /// </summary>
     /// <param name="serverMark">服务器标识</param>
     /// <param name="serverIP">服务器IP地址</param>
-    /// <param name="endpoint">本地端点</param>
     /// <param name="serverPort">服务器端口号</param>
-    public async Task ConnectAsync(string serverMark, string serverIP, string endpoint ,int serverPort)
+    /// <param name="endpoint">本地端点</param>
+    public async Task ConnectAsync(string serverMark, string serverIP, int serverPort, string endpoint)
     {
         ServerMark = serverMark;
         ServerIP = serverIP;
@@ -101,7 +100,7 @@ public class UdpSocketClient
             // 任意IP+广播端口，0是任意端口
             _client.Client.Bind(new IPEndPoint(IPAddress.Parse(localIp), ServerPort));
 
-            if(UdpSocketServer.LoopbackIP == ServerIP)
+            if (UdpSocketServer.LoopbackIP == ServerIP)
             {
                 _client.JoinMulticastGroup(IPAddress.Parse(UdpSocketServer.LoopbackSubIP), IPAddress.Parse(localIp!));
             }
@@ -118,7 +117,7 @@ public class UdpSocketClient
         catch (Exception ex)
         {
             IsRunning = false;
-            Logger.Error($"{ServerMark} 连接异常",ex, uiContent: $"{ServerMark} 连接异常：{ex.Message}，详细信息请查看日志文件");
+            Logger.Error($"{ServerMark} 连接异常", ex, uiContent: $"{ServerMark} 连接异常：{ex.Message}，详细信息请查看日志文件");
         }
     }
 
@@ -167,13 +166,13 @@ public class UdpSocketClient
                     var data = _client.Receive(ref _remoteEp);
                     var readIndex = 0;
 
-                    if (!data.ReadHead(ref readIndex, out var headInfo) 
-                     || data.Length < headInfo?.BufferLen)
+                    if (!data.ReadHead(ref readIndex, out var headInfo)
+                        || data.Length < headInfo?.BufferLen)
                     {
                         Logger.Warn($"{ServerMark} 接收到不完整UDP包，接收大小 {data.Length}，错误UDP包基本信息：{headInfo}");
                         continue;
                     }
-                    
+
                     _receivedBuffers.Add(new SocketCommand(headInfo!, data));
                     ReceiveTime = DateTime.Now;
                 }
