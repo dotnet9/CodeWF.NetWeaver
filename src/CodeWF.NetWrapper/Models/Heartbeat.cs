@@ -6,7 +6,7 @@ namespace CodeWF.NetWrapper.Models;
 /// 心跳类，用于 Socket 通信中的心跳检测
 /// </summary>
 [NetHead(SocketConstants.HeartbeatObjectId, 1)]
-internal class Heartbeat : INetObject
+public class Heartbeat : INetObject
 {
     /// <summary>
     /// 获取或设置任务 ID
