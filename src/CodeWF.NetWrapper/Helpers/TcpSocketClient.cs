@@ -122,8 +122,7 @@ public class TcpSocketClient
     public void Stop()
     {
         IsRunning = false;
-        _client.CloseSocket();
-
+        _client?.CloseSocket();
     }
 
     /// <summary>
@@ -151,39 +150,33 @@ public class TcpSocketClient
     /// </summary>
     private async Task ListenForServerAsync()
     {
-        await Task.Run(async () =>
+        while (IsRunning)
         {
-            while (IsRunning)
+            try
             {
-                try
+                var (success, buffer, headInfo) = await _client!.ReadPacketAsync();
+                if (!success)
                 {
-                    while (true)
-                    {
-                        var (success, buffer, headInfo) = await _client!.ReadPacketAsync();
-                        if (!success)
-                        {
-                            break;
-                        }
-                        ReceiveTime = DateTime.Now;
-                        SystemId = headInfo!.SystemId;
-                        _responses.Add(new SocketCommand(headInfo, buffer, _client));
-                    }
+                    break;
                 }
-                catch (SocketException ex)
+                ReceiveTime = DateTime.Now;
+                SystemId = headInfo!.SystemId;
+                _responses.Add(new SocketCommand(headInfo, buffer, _client));
+            }
+            catch (SocketException ex)
+            {
+                Logger.Error($"{ServerMark} 处理接收数据异常", ex, $"{ServerMark} 处理接收数据异常，详细信息请查看日志文件");
+                break;
+            }
+            catch (Exception ex)
+            {
+                if (IsRunning)
                 {
                     Logger.Error($"{ServerMark} 处理接收数据异常", ex, $"{ServerMark} 处理接收数据异常，详细信息请查看日志文件");
-                    break;
                 }
-                catch (Exception ex)
-                {
-                    if (IsRunning)
-                    {
-                        Logger.Error($"{ServerMark} 处理接收数据异常", ex, $"{ServerMark} 处理接收数据异常，详细信息请查看日志文件");
-                    }
-                    break;
-                }
+                break;
             }
-        });
+        }
     }
 
     /// <summary>
@@ -191,21 +184,19 @@ public class TcpSocketClient
     /// </summary>
     private async Task CheckResponseAsync()
     {
-        await Task.Run(async () =>
+        while (!IsRunning)
         {
-            while (!IsRunning)
-            {
-                await Task.Delay(TimeSpan.FromMilliseconds(10));
-            }
+            await Task.Delay(TimeSpan.FromMilliseconds(10));
+        }
 
-            while (IsRunning)
+        while (IsRunning)
+        {
+            while (_responses.TryTake(out var command, TimeSpan.FromMilliseconds(10)))
             {
-                while (_responses.TryTake(out var command, TimeSpan.FromMilliseconds(10)))
-                {
-                    await EventBus.EventBus.Default.PublishAsync(command);
-                }
+                await EventBus.EventBus.Default.PublishAsync(command);
             }
-        });
+            await Task.Delay(TimeSpan.FromMilliseconds(10)); // 添加一个小延迟，避免CPU占用过高
+        }
     }
 
     #endregion

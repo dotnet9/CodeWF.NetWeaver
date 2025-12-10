@@ -236,31 +236,29 @@ public class TcpSocketServer
     /// </summary>
     private async Task ListenForClientsAsync()
     {
-        await Task.Run(async () =>
+        while (IsRunning && _listenTokenSource?.IsCancellationRequested != true)
         {
-            while (IsRunning && _listenTokenSource?.IsCancellationRequested != true)
+            try
             {
-                try
+                var socketClient = await Server!.AcceptAsync();
+                var session = await CacheClientAsync(socketClient);
+                await EventBus.EventBus.Default.PublishAsync(new SocketClientChangedCommand(this));
+
+                var socketClientKey = $"{socketClient.RemoteEndPoint}";
+
+                Logger.Info($"{ServerMark} 客户端({socketClientKey})连接上线");
+
+                // 使用Task.Run启动新的任务来处理客户端，避免阻塞监听
+                _ = Task.Run(() => HandleClientAsync(session));
+            }
+            catch (Exception ex)
+            {
+                if (IsRunning)
                 {
-                    var socketClient = await Server!.AcceptAsync();
-                    var session = await CacheClientAsync(socketClient);
-                    await EventBus.EventBus.Default.PublishAsync(new SocketClientChangedCommand(this));
-
-                    var socketClientKey = $"{socketClient.RemoteEndPoint}";
-
-                    Logger.Info($"{ServerMark} 客户端({socketClientKey})连接上线");
-
-                    await HandleClientAsync(session);
-                }
-                catch (Exception ex)
-                {
-                    if (IsRunning)
-                    {
-                        Logger.Error($"{ServerMark} 处理客户端连接上线异常", ex, uiContent: $"{ServerMark} 处理客户端连接上线异常，详细信息请查看日志文件");
-                    }
+                    Logger.Error($"{ServerMark} 处理客户端连接上线异常", ex, uiContent: $"{ServerMark} 处理客户端连接上线异常，详细信息请查看日志文件");
                 }
             }
-        });
+        }
     }
 
     /// <summary>
@@ -269,43 +267,39 @@ public class TcpSocketServer
     /// <param name="client">客户端会话对象</param>
     private async Task HandleClientAsync(TcpSession client)
     {
-        await Task.Run(async() =>
+        while (IsRunning && _listenTokenSource?.IsCancellationRequested != true &&
+               client.TokenSource?.IsCancellationRequested != true)
         {
-            while (IsRunning && _listenTokenSource?.IsCancellationRequested != true &&
-                   client.TokenSource?.IsCancellationRequested != true)
+            var tcpClientKey = string.Empty;
+            try
             {
-                var tcpClientKey = string.Empty;
-                try
+                tcpClientKey = client.TcpSocket?.RemoteEndPoint?.ToString() ?? string.Empty;
+                var (success, buffer, headInfo) = await client.TcpSocket!.ReadPacketAsync();
+                if (!success)
                 {
-                    tcpClientKey = client.TcpSocket?.RemoteEndPoint?.ToString() ?? string.Empty;
-                    while (true)
-                    {
-                        var (success, buffer, headInfo) = await client.TcpSocket!.ReadPacketAsync();
-                        if (!success)
-                        {
-                            break;
-                        }
-                        if (!_requests.TryGetValue(tcpClientKey, out var value))
-                        {
-                            value = new ConcurrentQueue<SocketCommand>();
-                            _requests[tcpClientKey] = value;
-                        }
-
-                        value.Enqueue(new SocketCommand(headInfo!, buffer, client.TcpSocket));
-                    }
-                }
-                catch (SocketException ex)
-                {
-                    Logger.Error($"{ServerMark} 远程主机({tcpClientKey})异常，将移除该客户端", ex, uiContent: $"{ServerMark} 远程主机({tcpClientKey})异常，将移除该客户端，详细信息请查看日志文件");
-                    await RemoveClientAsync(tcpClientKey);
                     break;
                 }
-                catch (Exception ex)
+                if (!_requests.TryGetValue(tcpClientKey, out var value))
                 {
-                    Logger.Error($"{ServerMark} 接收数据异常", ex, uiContent: $"{ServerMark} 接收数据异常，详细信息请查看日志文件");
+                    value = new ConcurrentQueue<SocketCommand>();
+                    _requests[tcpClientKey] = value;
                 }
+
+                value.Enqueue(new SocketCommand(headInfo!, buffer, client.TcpSocket));
             }
-        });
+            catch (SocketException ex)
+            {
+                Logger.Error($"{ServerMark} 远程主机({tcpClientKey})异常，将移除该客户端", ex, uiContent: $"{ServerMark} 远程主机({tcpClientKey})异常，将移除该客户端，详细信息请查看日志文件");
+                await RemoveClientAsync(tcpClientKey);
+                break;
+            }
+            catch (Exception ex)
+            {
+                Logger.Error($"{ServerMark} 接收数据异常", ex, uiContent: $"{ServerMark} 接收数据异常，详细信息请查看日志文件");
+                // 发生异常时，延迟一段时间后再继续尝试
+                await Task.Delay(TimeSpan.FromMilliseconds(100));
+            }
+        }
     }
 
     #endregion
@@ -317,51 +311,48 @@ public class TcpSocketServer
     /// </summary>
     private async Task ProcessingRequestsAsync()
     {
-        await Task.Run(async () =>
+        while (IsRunning && _listenTokenSource?.IsCancellationRequested != true)
         {
-            while (IsRunning && _listenTokenSource?.IsCancellationRequested != true)
+            try
             {
-                try
+                var needRemoveKeys = new List<string>();
+                foreach (var request in _requests)
                 {
-                    var needRemoveKeys = new List<string>();
-                    foreach (var request in _requests)
+                    var clientKey = request.Key;
+                    if (!_clients.TryGetValue(clientKey, out var client))
                     {
-                        var clientKey = request.Key;
-                        if (!_clients.TryGetValue(clientKey, out var client))
-                        {
-                            needRemoveKeys.Add(clientKey);
-                            continue;
-                        }
-
-                        while (request.Value.TryDequeue(out var command))
-                        {
-                            await EventBus.EventBus.Default.PublishAsync(command);
-
-                            if (command.IsCommand<Heartbeat>())
-                            {
-                                ActiveClient(clientKey);
-                            }
-                        }
+                        needRemoveKeys.Add(clientKey);
+                        continue;
                     }
 
-                    if (needRemoveKeys.Count > 0)
+                    while (request.Value.TryDequeue(out var command))
                     {
-                        foreach (var key in needRemoveKeys)
+                        await EventBus.EventBus.Default.PublishAsync(command);
+
+                        if (command.IsCommand<Heartbeat>())
                         {
-                            await RemoveClientAsync(key);
+                            ActiveClient(clientKey);
                         }
                     }
                 }
-                catch (Exception ex)
+
+                if (needRemoveKeys.Count > 0)
                 {
-                    Logger.Error($"{ServerMark} 处理客户端请求异常", ex, uiContent: $"{ServerMark} 处理客户端请求异常，详细信息请查看日志文件");
-                }
-                finally
-                {
-                    await Task.Delay(TimeSpan.FromMilliseconds(10));
+                    foreach (var key in needRemoveKeys)
+                    {
+                        await RemoveClientAsync(key);
+                    }
                 }
             }
-        });
+            catch (Exception ex)
+            {
+                Logger.Error($"{ServerMark} 处理客户端请求异常", ex, uiContent: $"{ServerMark} 处理客户端请求异常，详细信息请查看日志文件");
+            }
+            finally
+            {
+                await Task.Delay(TimeSpan.FromMilliseconds(10));
+            }
+        }
     }
 
     /// <summary>
@@ -371,7 +362,12 @@ public class TcpSocketServer
     /// <returns>客户端会话对象</returns>
     private async Task<TcpSession> CacheClientAsync(Socket? socket)
     {
-        var key = socket?.RemoteEndPoint?.ToString() ?? string.Empty;
+        if (socket == null)
+        {
+            throw new ArgumentNullException(nameof(socket));
+        }
+
+        var key = socket.RemoteEndPoint?.ToString() ?? string.Empty;
         if (_clients.ContainsKey(key))
         {
             await RemoveClientAsync(key);
@@ -415,7 +411,7 @@ public class TcpSocketServer
         }
         catch (OperationCanceledException)
         {
-
+            // 预期的取消异常，无需处理
         }
         catch (Exception ex)
         {
