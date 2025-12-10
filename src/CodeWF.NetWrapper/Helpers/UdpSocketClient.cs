@@ -81,7 +81,7 @@ public class UdpSocketClient
     /// <param name="serverIP">服务器IP地址</param>
     /// <param name="endpoint">本地端点</param>
     /// <param name="serverPort">服务器端口号</param>
-    public void Connect(string serverMark, string serverIP, string endpoint ,int serverPort)
+    public async Task ConnectAsync(string serverMark, string serverIP, string endpoint ,int serverPort)
     {
         ServerMark = serverMark;
         ServerIP = serverIP;
@@ -112,8 +112,8 @@ public class UdpSocketClient
 
             IsRunning = true;
 
-            ReceiveData();
-            CheckMessage();
+            await ReceiveDataAsync();
+            await CheckMessageAsync();
         }
         catch (Exception ex)
         {
@@ -151,9 +151,9 @@ public class UdpSocketClient
     /// <summary>
     /// 接收数据
     /// </summary>
-    private void ReceiveData()
+    private async Task ReceiveDataAsync()
     {
-        Task.Run(async () =>
+        await Task.Run(async () =>
         {
             while (IsRunning)
                 try
@@ -193,9 +193,9 @@ public class UdpSocketClient
     /// <summary>
     /// 检查消息队列
     /// </summary>
-    private void CheckMessage()
+    private async Task CheckMessageAsync()
     {
-        Task.Run(async () =>
+        await Task.Run(async () =>
         {
             while (!IsRunning)
             {

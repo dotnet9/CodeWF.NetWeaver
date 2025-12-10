@@ -151,31 +151,39 @@ public class TcpSocketClient
     /// </summary>
     private async Task ListenForServerAsync()
     {
-        while (IsRunning)
+        await Task.Run(async () =>
         {
-            try
+            while (IsRunning)
             {
-                while (_client!.ReadPacket(out var buffer, out var headInfo))
+                try
                 {
-                    ReceiveTime = DateTime.Now;
-                    SystemId = headInfo!.SystemId;
-                    _responses.Add(new SocketCommand(headInfo, buffer, _client));
+                    while (true)
+                    {
+                        var (success, buffer, headInfo) = await _client!.ReadPacketAsync();
+                        if (!success)
+                        {
+                            break;
+                        }
+                        ReceiveTime = DateTime.Now;
+                        SystemId = headInfo!.SystemId;
+                        _responses.Add(new SocketCommand(headInfo, buffer, _client));
+                    }
                 }
-            }
-            catch (SocketException ex)
-            {
-                Logger.Error($"{ServerMark} 处理接收数据异常", ex, $"{ServerMark} 处理接收数据异常，详细信息请查看日志文件");
-                break;
-            }
-            catch (Exception ex)
-            {
-                if(IsRunning)
+                catch (SocketException ex)
                 {
                     Logger.Error($"{ServerMark} 处理接收数据异常", ex, $"{ServerMark} 处理接收数据异常，详细信息请查看日志文件");
+                    break;
                 }
-                break;
+                catch (Exception ex)
+                {
+                    if (IsRunning)
+                    {
+                        Logger.Error($"{ServerMark} 处理接收数据异常", ex, $"{ServerMark} 处理接收数据异常，详细信息请查看日志文件");
+                    }
+                    break;
+                }
             }
-        }
+        });
     }
 
     /// <summary>
@@ -183,18 +191,21 @@ public class TcpSocketClient
     /// </summary>
     private async Task CheckResponseAsync()
     {
-        while (!IsRunning)
+        await Task.Run(async () =>
         {
-            await Task.Delay(TimeSpan.FromMilliseconds(10));
-        }
-
-        while (IsRunning)
-        {
-            while (_responses.TryTake(out var command, TimeSpan.FromMilliseconds(10)))
+            while (!IsRunning)
             {
-                await EventBus.EventBus.Default.PublishAsync(command);
+                await Task.Delay(TimeSpan.FromMilliseconds(10));
             }
-        }
+
+            while (IsRunning)
+            {
+                while (_responses.TryTake(out var command, TimeSpan.FromMilliseconds(10)))
+                {
+                    await EventBus.EventBus.Default.PublishAsync(command);
+                }
+            }
+        });
     }
 
     #endregion

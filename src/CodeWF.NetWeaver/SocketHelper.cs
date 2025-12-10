@@ -1,5 +1,7 @@
 using System;
 using System.Net.Sockets;
+using System.Threading;
+using System.Threading.Tasks;
 using CodeWF.NetWeaver.Base;
 
 namespace CodeWF.NetWeaver
@@ -20,43 +22,49 @@ namespace CodeWF.NetWeaver
         /// 数组、列表、字典等数据结构数据量字段大小：如Length、Count
         /// </summary>
         public const int ArrayOrDictionaryCountSize = 4;
-
+        
         /// <summary>
-        /// 从Socket读取数据包
+        /// 异步从Socket读取数据包
         /// </summary>
         /// <param name="socket">Socket对象</param>
-        /// <param name="buffer">输出参数，包含读取的数据包</param>
-        /// <param name="netObject">输出参数，包含解析的网络头信息</param>
-        /// <returns>是否成功读取数据包</returns>
-        public static bool ReadPacket(this Socket socket, out byte[] buffer, out NetHeadInfo netObject)
+        /// <param name="cancellationToken">取消令牌</param>
+        /// <returns>元组，包含是否成功读取数据包、读取的数据包和解析的网络头信息</returns>
+        public static async Task<(bool Success, byte[] Buffer, NetHeadInfo NetObject)> ReadPacketAsync(this Socket socket, CancellationToken cancellationToken = default)
         {
-            var lenBuffer = ReceiveBuffer(socket, 4);
+            var lenBuffer = await ReceiveBufferAsync(socket, 4, cancellationToken);
             var bufferLen = BitConverter.ToInt32(lenBuffer, 0);
 
-            var exceptLenBuffer = ReceiveBuffer(socket, bufferLen - 4);
+            var exceptLenBuffer = await ReceiveBufferAsync(socket, bufferLen - 4, cancellationToken);
 
-            buffer = new byte[bufferLen];
+            var buffer = new byte[bufferLen];
 
             Array.Copy(lenBuffer, buffer, 4);
             Buffer.BlockCopy(exceptLenBuffer, 0, buffer, 4, bufferLen - 4);
 
             var readIndex = 0;
-            return ReadHead(buffer, ref readIndex, out netObject);
+            var success = ReadHead(buffer, ref readIndex, out var netObject);
+            return (success, buffer, netObject);
         }
-
+        
         /// <summary>
-        /// 从Socket接收指定长度的缓冲区数据
+        /// 异步从Socket接收指定长度的缓冲区数据
         /// </summary>
         /// <param name="client">Socket客户端</param>
         /// <param name="count">要接收的数据长度</param>
+        /// <param name="cancellationToken">取消令牌</param>
         /// <returns>包含接收数据的字节数组</returns>
-        private static byte[] ReceiveBuffer(Socket client, int count)
+        private static async Task<byte[]> ReceiveBufferAsync(Socket client, int count, CancellationToken cancellationToken = default)
         {
             var buffer = new byte[count];
             var bytesReadAllCount = 0;
-            while (bytesReadAllCount != count)
-                bytesReadAllCount +=
-                    client.Receive(buffer, bytesReadAllCount, count - bytesReadAllCount, SocketFlags.None);
+            using (var stream = new NetworkStream(client, ownsSocket: false))
+            {
+                while (bytesReadAllCount != count)
+                {
+                    var bytesRead = await stream.ReadAsync(buffer, bytesReadAllCount, count - bytesReadAllCount, cancellationToken);
+                    bytesReadAllCount += bytesRead;
+                }
+            }
 
             return buffer;
         }

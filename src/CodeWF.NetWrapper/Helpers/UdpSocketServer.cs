@@ -70,12 +70,6 @@ public class UdpSocketServer
     /// </summary>
     public DateTime ReceiveTime { get; set; }
 
-
-    /// <summary>
-    ///     Udp单包大小上限
-    /// </summary>
-    public int PacketMaxSize { get; set; } = 65507;
-
     #endregion
 
     #region 公开接口方法
