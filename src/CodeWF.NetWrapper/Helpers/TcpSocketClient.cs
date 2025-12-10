@@ -1,0 +1,162 @@
+﻿using CodeWF.Log.Core;
+using CodeWF.NetWeaver;
+using CodeWF.NetWeaver.Base;
+using CodeWF.NetWrapper.Commands;
+using System;
+using System.Collections.Concurrent;
+using System.Net;
+using System.Net.Sockets;
+using System.Threading.Tasks;
+
+namespace CodeWF.NetWrapper.Helpers;
+
+public class TcpSocketClient
+{
+    private Socket? _client;
+    public long SystemId { get; private set; } // 服务端标识，TCP数据接收时保存，用于UDP数据包识别
+
+    public readonly BlockingCollection<SocketCommand> _responses = new(new ConcurrentQueue<SocketCommand>());
+
+    #region 公开属性
+
+    /// <summary>
+    /// 服务标识，用以区分多个服务
+    /// </summary>
+    public string? ServerMark { get; private set; }
+
+    public string? ServerIP { get; private set; }
+    public int ServerPort { get; private set; }
+
+
+    /// <summary>
+    ///     是否正在运行Tcp服务
+    /// </summary>
+    public bool IsRunning { get; set; }
+
+    private DateTime _sendTime;
+
+    /// <summary>
+    ///     命令发送时间
+    /// </summary>
+    public DateTime SendTime { get; set; }
+
+
+    /// <summary>
+    ///     响应接收时间
+    /// </summary>
+    public DateTime ReceiveTime { get; set; }
+
+
+
+
+    /// <summary>
+    ///     心跳发送时间
+    /// </summary>
+    public DateTime SendHeartbeatTime { get; set; }
+
+
+    /// <summary>
+    ///     心跳响应时间
+    /// </summary>
+    public DateTime ResponseHeartbeatTime { get; set; }
+
+    #endregion
+
+    #region 公开接口
+
+
+    public async Task<(bool IsSuccess, string? ErrorMessage)> ConnectAsync(string serverMark, string serverIP, int serverPort)
+    {
+        ServerMark = serverMark;
+        ServerIP = serverIP;
+        ServerPort = serverPort;
+
+        try
+        {
+            var ipEndPoint = new IPEndPoint(IPAddress.Parse(ServerIP), ServerPort);
+            _client = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+            await _client.ConnectAsync(ipEndPoint);
+
+            IsRunning = true;
+
+            await ListenForServerAsync();
+            await CheckResponseAsync();
+            return (IsSuccess: true, ErrorMessage: null);
+        }
+        catch (Exception ex)
+        {
+            IsRunning = false;
+            Logger.Error($"{ServerMark} 连接异常", ex, uiContent: $"{ServerMark} 连接异常，详细信息请查看日志文件");
+            return (IsSuccess: false, ErrorMessage: $"{ServerMark} 连接异常，异常信息：{ex.Message}");
+        }
+    }
+
+    public void Stop()
+    {
+        IsRunning = false;
+        _client.CloseSocket();
+
+    }
+
+    public async Task SendCommandAsync(INetObject command)
+    {
+        if (!IsRunning || !_client.Connected)
+        {
+            throw new Exception($"{ServerMark} 未连接，无法发送命令");
+        }
+
+        var buffer = command.Serialize(SystemId);
+        await _client!.SendAsync(buffer);
+    }
+
+    #endregion
+
+    #region 连接TCP、接收数据
+
+    private async Task ListenForServerAsync()
+    {
+        while (IsRunning)
+        {
+            try
+            {
+                while (_client!.ReadPacket(out var buffer, out var headInfo))
+                {
+                    ReceiveTime = DateTime.Now;
+                    SystemId = headInfo!.SystemId;
+                    _responses.Add(new SocketCommand(headInfo, buffer, _client));
+                }
+            }
+            catch (SocketException ex)
+            {
+                Logger.Error($"{ServerMark} 处理接收数据异常", ex, $"{ServerMark} 处理接收数据异常，详细信息请查看日志文件");
+                break;
+            }
+            catch (Exception ex)
+            {
+                if(IsRunning)
+                {
+                    Logger.Error($"{ServerMark} 处理接收数据异常", ex, $"{ServerMark} 处理接收数据异常，详细信息请查看日志文件");
+                }
+                break;
+            }
+        }
+    }
+
+    private async Task CheckResponseAsync()
+    {
+        while (!IsRunning)
+        {
+            await Task.Delay(TimeSpan.FromMilliseconds(10));
+        }
+
+        while (IsRunning)
+        {
+            while (_responses.TryTake(out var command, TimeSpan.FromMilliseconds(10)))
+            {
+                await EventBus.EventBus.Default.PublishAsync(command);
+            }
+        }
+    }
+
+    #endregion
+}
