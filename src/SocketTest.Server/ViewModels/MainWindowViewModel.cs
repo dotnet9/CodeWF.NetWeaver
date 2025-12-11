@@ -175,8 +175,17 @@ public class MainWindowViewModel : ReactiveObject
                 {
                     TCPStatus = "TCP服务已启动";
                     IsRunning = true;
-                    await Log("TCP服务已启动", LogType.Info);
-                    await SendMockDataAsync();
+                    await Log("TCP服务已启动");
+                    (isSuccess, errorMessage) = _udpServer.Start("UDP服务端", 1, UDPIP, UDPPort);
+                    if (isSuccess)
+                    {
+                        await Log("UDP组播已启动");
+                        await SendMockDataAsync();
+                    }
+                    else
+                    {
+                        await Log($"UDP组播启动失败：{errorMessage}", LogType.Error);
+                    }
                 }
                 else
                 {
@@ -192,7 +201,7 @@ public class MainWindowViewModel : ReactiveObject
                 UDPStatus = "UDP组播已停止";
                 ClientCount = 0;
                 IsRunning = false;
-                await Log("服务已停止", LogType.Info);
+                await Log("服务已停止");
             }
         }
         catch (Exception ex)
@@ -225,8 +234,6 @@ public class MainWindowViewModel : ReactiveObject
     }
 
     #region 处理Socket信息
-
-    
 
     [EventHandler]
     private async Task ReceiveSocketMessageAsync(SocketCommand message)

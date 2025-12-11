@@ -8,6 +8,8 @@
 		<AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
 		<PublishAot>true</PublishAot>
 		<IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+		<AssemblyTitle>Socket测试客户端</AssemblyTitle>
+		<ApplicationIcon>Assets\logo.ico</ApplicationIcon>
 	</PropertyGroup>
 	<PropertyGroup Condition="$([MSBuild]::IsTargetFrameworkCompatible('$(TargetFramework)', 'net9.0-windows'))">
 		<IsTrimmable>true</IsTrimmable>
@@ -23,6 +25,9 @@
 	</ItemGroup>
 	<ItemGroup>
 		<AvaloniaResource Include="Assets\**" />
+	</ItemGroup>
+	<ItemGroup>
+	  <Content Include="Assets\logo.ico" />
 	</ItemGroup>
 
 	<ItemGroup>

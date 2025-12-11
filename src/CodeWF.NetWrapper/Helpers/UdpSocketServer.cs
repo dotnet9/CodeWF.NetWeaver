@@ -84,7 +84,7 @@ public class UdpSocketServer
     /// <param name="serverPort">服务器端口号</param>
     /// <param name="localIP">本地IP地址</param>
     /// <returns>启动结果和错误信息</returns>
-    public (bool IsSuccess, string? ErrorMessage) Start(string serverMark, long systemId, string serverIP, int serverPort, string localIP)
+    public (bool IsSuccess, string? ErrorMessage) Start(string serverMark, long systemId, string serverIP, int serverPort, string localIP = "0.0.0.0")
     {
         ServerMark = serverMark;
         ServerIP = serverIP;

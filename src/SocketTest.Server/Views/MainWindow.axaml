@@ -3,7 +3,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:codewf="https://codewf.com"
         mc:Ignorable="d" d:DesignWidth="900" d:DesignHeight="700" Width="900" Height="700"
         x:Class="SocketTest.Server.Views.MainWindow" x:DataType="vm:MainWindowViewModel"
-        Icon="/Assets/avalonia-logo.ico" Title="Socket服务端(承载TCP服务和UDP组播)">
+        Icon="/Assets/logo.ico" Title="Socket服务端(承载TCP服务和UDP组播)">
     <Window.Styles>
         <Style Selector="TextBlock">
             <Setter Property="VerticalAlignment" Value="Center" />

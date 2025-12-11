@@ -289,11 +289,11 @@ public class MainWindowViewModel : ReactiveObject
         }
         else if (message.IsCommand<ResponseProcessList>())
         {
-            ReceivedSocketMessage(message.GetCommand<ResponseProcessList>());
+            await ReceivedSocketMessageAsync(message.GetCommand<ResponseProcessList>());
         }
         else if (message.IsCommand<UpdateProcessList>())
         {
-            ReceivedSocketMessage(message.GetCommand<UpdateProcessList>());
+            await ReceivedSocketMessageAsync(message.GetCommand<UpdateProcessList>());
         }
         else if (message.IsCommand<ChangeProcessList>())
         {
@@ -340,6 +340,7 @@ public class MainWindowViewModel : ReactiveObject
         _ = Log($"收到Udp组播地址=》{response.Ip}:{response.Port}");
 
         await _udpClient.ConnectAsync("UDP组播", response.Ip,response.Port, _tcpClient.LocalEndPoint);
+        _udpClient.NewDataResponse -= ReceiveUdpCommand;
         _udpClient.NewDataResponse += ReceiveUdpCommand;
         _ = Log("尝试订阅Udp组播");
     }
@@ -371,7 +372,7 @@ public class MainWindowViewModel : ReactiveObject
         _ = Log("发送请求进程详细信息列表命令");
     }
 
-    private void ReceivedSocketMessage(ResponseProcessList response)
+    private async Task ReceivedSocketMessageAsync(ResponseProcessList response)
     {
         var processes =
             response.Processes?.ConvertAll(process => new ProcessItemModel(process, _timestampStartYear));
@@ -388,7 +389,7 @@ public class MainWindowViewModel : ReactiveObject
             $"{msg}【{response.PageIndex + 1}/{response.PageCount}】进程{processes.Count}条({_receivedProcesses.Count}/{response.TotalSize})");
     }
 
-    private void ReceivedSocketMessage(UpdateProcessList response)
+    private async Task ReceivedSocketMessageAsync(UpdateProcessList response)
     {
         if (_processIdAndItems == null) return;
 
@@ -510,7 +511,7 @@ public class MainWindowViewModel : ReactiveObject
 
     private async Task RequestTargetTypeAsync()
     {
-        await _tcpClient.SendCommandAsync(new RequestTargetType());
+        await _tcpClient.SendCommandAsync(new RequestTargetType(){TaskId = NetHelper.GetTaskId()});
         _ = Log("发送命令查询目标终端类型是否是服务端");
     }
 
