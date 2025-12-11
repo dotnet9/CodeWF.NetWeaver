@@ -120,7 +120,7 @@ public class UdpSocketClient
 
             // 不再使用await，让方法在后台运行
             _ = Task.Run(ReceiveDataAsync);
-            _ = Task.Run(CheckMessageAsync);
+            _ = Task.Run(CheckCommandMeAsync);
         }
         catch (Exception ex)
         {
@@ -203,7 +203,7 @@ public class UdpSocketClient
     /// <summary>
     /// 检查消息队列
     /// </summary>
-    private async Task CheckMessageAsync()
+    private async Task CheckCommandMeAsync()
     {
         while (!IsRunning)
         {
@@ -212,7 +212,7 @@ public class UdpSocketClient
 
         while (IsRunning)
         {
-            while (_receivedBuffers.TryTake(out var message, TimeSpan.FromMilliseconds(10)))
+            if (_receivedBuffers.TryTake(out var message,TimeSpan.FromMilliseconds(10)))
             {
                 Received?.Invoke(this, message);
             }

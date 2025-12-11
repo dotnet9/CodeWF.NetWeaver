@@ -402,9 +402,10 @@ public class MainWindowViewModel : ReactiveObject
             }
 
             var msg = response.TaskId == default ? "收到推送" : "收到请求响应";
-            Logger.Info(
-                $"{msg}【{response.PageIndex + 1}/{response.PageCount}】进程{processes.Count}条({_receivedProcesses.Count}/{response.TotalSize})"
-            );
+            // 减少日志输出频率，只在关键节点记录
+            // Logger.Info(
+            //     $"{msg}【{response.PageIndex + 1}/{response.PageCount}】进程{processes.Count}条({_receivedProcesses.Count}/{response.TotalSize})"
+            // );
         });
     }
 
@@ -467,7 +468,8 @@ public class MainWindowViewModel : ReactiveObject
                 startIndex++;
             }
 
-            Console.WriteLine($"【实时】更新数据{dataCount}条");
+            // 减少实时日志输出频率，只在调试时使用
+            // Console.WriteLine($"【实时】更新数据{dataCount}条");
         }
         catch (Exception ex)
         {
@@ -516,7 +518,8 @@ public class MainWindowViewModel : ReactiveObject
                 startIndex++;
             }
 
-            Console.WriteLine($"【实时】更新一般数据{dataCount}条");
+            // 减少实时日志输出频率，只在调试时使用
+            // Console.WriteLine($"【实时】更新一般数据{dataCount}条");
         }
         catch (Exception ex)
         {
