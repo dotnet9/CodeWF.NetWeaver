@@ -374,19 +374,38 @@ public class MainWindowViewModel : ReactiveObject
 
     private async Task ReceivedSocketMessageAsync(ResponseProcessList response)
     {
-        var processes =
-            response.Processes?.ConvertAll(process => new ProcessItemModel(process, _timestampStartYear));
-        if (!(processes?.Count > 0)) return;
+        // 将耗时的数据处理操作放到后台线程中执行
+        await Task.Run(() =>
+        {
+            var processes = 
+                response.Processes?.ConvertAll(process => new ProcessItemModel(process, _timestampStartYear));
+            if (!(processes?.Count > 0)) return;
 
-        _receivedProcesses.AddRange(processes);
-        var filterData = FilterData(processes);
-        Invoke(()=>DisplayProcesses.AddRange(filterData));
-        if (_receivedProcesses.Count == response.TotalSize)
-            _processIdAndItems = _receivedProcesses.ToDictionary(process => process.PID);
+            // 先更新后台数据
+            lock (_receivedProcesses) // 确保线程安全
+            {
+                _receivedProcesses.AddRange(processes);
+            }
+            
+            var filterData = FilterData(processes);
+            
+            // 只在需要更新UI时才调用Invoke
+            Invoke(() => DisplayProcesses.AddRange(filterData));
+            
+            // 当收到全部数据时构建字典，这个操作也比较耗时，放到后台线程
+            if (_receivedProcesses.Count == response.TotalSize)
+            {
+                lock (_receivedProcesses) // 确保线程安全
+                {
+                    _processIdAndItems = _receivedProcesses.ToDictionary(process => process.PID);
+                }
+            }
 
-        var msg = response.TaskId == default ? "收到推送" : "收到请求响应";
-        Logger.Info(
-            $"{msg}【{response.PageIndex + 1}/{response.PageCount}】进程{processes.Count}条({_receivedProcesses.Count}/{response.TotalSize})");
+            var msg = response.TaskId == default ? "收到推送" : "收到请求响应";
+            Logger.Info(
+                $"{msg}【{response.PageIndex + 1}/{response.PageCount}】进程{processes.Count}条({_receivedProcesses.Count}/{response.TotalSize})"
+            );
+        });
     }
 
     private async Task ReceivedSocketMessageAsync(UpdateProcessList response)

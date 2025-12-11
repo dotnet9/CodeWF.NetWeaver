@@ -23,12 +23,12 @@ public class TcpSocketServer
     /// 客户端会话字典，键为客户端IP和端口
     /// </summary>
     public readonly ConcurrentDictionary<string, TcpSession> _clients = new();
-    
+
     /// <summary>
     /// 请求命令队列字典，键为客户端IP和端口
     /// </summary>
     private readonly ConcurrentDictionary<string, ConcurrentQueue<SocketCommand>> _requests = new();
-    
+
     /// <summary>
     /// 客户端检测定时器
     /// </summary>
@@ -45,7 +45,7 @@ public class TcpSocketServer
     /// 获取或设置TCP服务器Socket对象
     /// </summary>
     public Socket? Server { get; private set; }
-    
+
     /// <summary>
     /// 服务端标识，TCP数据接收时保存，用于UDP数据包识别
     /// </summary>
@@ -60,7 +60,7 @@ public class TcpSocketServer
     /// 获取或设置服务器IP地址
     /// </summary>
     public string? ServerIP { get; private set; }
-    
+
     /// <summary>
     /// 获取或设置服务器端口号
     /// </summary>
@@ -129,8 +129,6 @@ public class TcpSocketServer
             // 使用Task.Run并行运行监听器、请求处理器和心跳检测器
             _ = Task.Run(ListenForClientsAsync);
             _ = Task.Run(ProcessingRequestsAsync);
-
-            _detectionTimer = new PeriodicTimer(TimeSpan.FromSeconds(5));
             _ = Task.Run(DetectionClientsAsync);
 
             return (IsSuccess: true, ErrorMessage: null);
@@ -151,14 +149,15 @@ public class TcpSocketServer
         IsRunning = false;
         _listenTokenSource?.Cancel();
         _detectionTimer?.Dispose();
-        if(!_clients.IsEmpty)
+        if (!_clients.IsEmpty)
         {
             var clientKeys = _clients.Keys.ToList();
-            foreach(var clientKey in clientKeys)
+            foreach (var clientKey in clientKeys)
             {
                 await RemoveClientAsync(clientKey);
             }
         }
+
         Server?.Close(0);
         Server = null;
     }
@@ -172,7 +171,7 @@ public class TcpSocketServer
         }
 
         var buffer = command.Serialize(SystemId);
-        for(var i = _clients.Values.Count - 1; i >= 0; i--)
+        for (var i = _clients.Values.Count - 1; i >= 0; i--)
         {
             var client = _clients.Values.ElementAt(i);
             var clientKey = client.TcpSocket?.RemoteEndPoint?.ToString() ?? string.Empty;
@@ -180,9 +179,10 @@ public class TcpSocketServer
             {
                 await SendCommandAsync(client.TcpSocket, command);
             }
-            catch(SocketException ex)
+            catch (SocketException ex)
             {
-                Logger.Error($"{ServerMark} 发送命令到客户端({clientKey})异常，将移除该客户端", ex, uiContent: $"{ServerMark} 发送命令到客户端({clientKey})异常，将移除该客户端，详细信息请查看日志文件");
+                Logger.Error($"{ServerMark} 发送命令到客户端({clientKey})异常，将移除该客户端", ex,
+                    uiContent: $"{ServerMark} 发送命令到客户端({clientKey})异常，将移除该客户端，详细信息请查看日志文件");
                 await RemoveClientAsync(clientKey);
             }
         }
@@ -196,7 +196,7 @@ public class TcpSocketServer
     public async Task SendCommandAsync(Socket client, INetObject command)
     {
         var buffer = command.Serialize(SystemId);
-        await client.SendAsync(buffer); 
+        await client.SendAsync(buffer);
     }
 
     #endregion
@@ -222,6 +222,7 @@ public class TcpSocketServer
         {
             return;
         }
+
         session.TokenSource?.Cancel();
         session.TcpSocket?.Close();
 
@@ -280,6 +281,7 @@ public class TcpSocketServer
                 {
                     break;
                 }
+
                 if (!_requests.TryGetValue(tcpClientKey, out var value))
                 {
                     value = new ConcurrentQueue<SocketCommand>();
@@ -290,7 +292,8 @@ public class TcpSocketServer
             }
             catch (SocketException ex)
             {
-                Logger.Error($"{ServerMark} 远程主机({tcpClientKey})异常，将移除该客户端", ex, uiContent: $"{ServerMark} 远程主机({tcpClientKey})异常，将移除该客户端，详细信息请查看日志文件");
+                Logger.Error($"{ServerMark} 远程主机({tcpClientKey})异常，将移除该客户端", ex,
+                    uiContent: $"{ServerMark} 远程主机({tcpClientKey})异常，将移除该客户端，详细信息请查看日志文件");
                 await RemoveClientAsync(tcpClientKey);
                 break;
             }
@@ -328,12 +331,8 @@ public class TcpSocketServer
 
                     while (request.Value.TryDequeue(out var command))
                     {
+                        ActiveClient(clientKey);
                         await EventBus.EventBus.Default.PublishAsync(command);
-
-                        if (command.IsCommand<Heartbeat>())
-                        {
-                            ActiveClient(clientKey);
-                        }
                     }
                 }
 
@@ -389,21 +388,24 @@ public class TcpSocketServer
     /// </summary>
     private async Task DetectionClientsAsync()
     {
-        if (_detectionTimer == null || _listenTokenSource == null)
+        if (_listenTokenSource == null)
             return;
 
+        _detectionTimer = new PeriodicTimer(TimeSpan.FromSeconds(5));
         try
         {
             while (await _detectionTimer.WaitForNextTickAsync(_listenTokenSource.Token))
             {
                 var clientKeys = _clients.Keys;
-                foreach (var clientKey in clientKeys) 
+                foreach (var clientKey in clientKeys)
                 {
-                    if(!_clients.TryGetValue(clientKey, out var clientSession))
+                    if (!_clients.TryGetValue(clientKey, out var clientSession))
                     {
                         continue;
                     }
-                    if(!clientSession.ActiveTime.HasValue || DateTime.Now.Subtract(clientSession.ActiveTime.Value).TotalSeconds > TimeOut)
+
+                    if (!clientSession.ActiveTime.HasValue ||
+                        DateTime.Now.Subtract(clientSession.ActiveTime.Value).TotalSeconds > TimeOut)
                     {
                         await RemoveClientAsync(clientKey);
                     }
@@ -426,7 +428,7 @@ public class TcpSocketServer
     /// <param name="clientKey">客户端键（IP和端口）</param>
     private void ActiveClient(string clientKey)
     {
-        if(_clients.TryGetValue(clientKey, out var session))
+        if (_clients.TryGetValue(clientKey, out var session))
         {
             session.ActiveTime = DateTime.Now;
         }

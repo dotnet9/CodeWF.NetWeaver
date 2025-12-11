@@ -95,7 +95,11 @@ public class UdpSocketClient
             // 开启组播回环
             _client.Client.SetSocketOption(SocketOptionLevel.IP, SocketOptionName.MulticastLoopback, true);
 
-            var localIp = endpoint.Split(";").First();
+            var localIp = endpoint.Split(":").First();
+            if (localIp == "127.0.0.1")
+            {
+                localIp = "0.0.0.0";
+            }
 
             // 任意IP+广播端口，0是任意端口
             _client.Client.Bind(new IPEndPoint(IPAddress.Parse(localIp), ServerPort));
@@ -112,8 +116,8 @@ public class UdpSocketClient
             IsRunning = true;
 
             // 不再使用await，让方法在后台运行
-            _ = ReceiveDataAsync();
-            _ = CheckMessageAsync();
+            _ = Task.Run(ReceiveDataAsync);
+            _ = Task.Run(CheckMessageAsync);
         }
         catch (Exception ex)
         {
@@ -153,41 +157,40 @@ public class UdpSocketClient
     /// </summary>
     private async Task ReceiveDataAsync()
     {
-        await Task.Run(async () =>
+        while (IsRunning)
         {
-            while (IsRunning)
-                try
+            try
+            {
+                if (_client?.Client == null || _client.Available < 0)
                 {
-                    if (_client?.Client == null || _client.Available < 0)
-                    {
-                        await Task.Delay(TimeSpan.FromMilliseconds(10));
-                        continue;
-                    }
-
-                    var data = _client.Receive(ref _remoteEp);
-                    var readIndex = 0;
-
-                    if (!data.ReadHead(ref readIndex, out var headInfo)
-                        || data.Length < headInfo?.BufferLen)
-                    {
-                        Logger.Warn($"{ServerMark} 接收到不完整UDP包，接收大小 {data.Length}，错误UDP包基本信息：{headInfo}");
-                        continue;
-                    }
-
-                    _receivedBuffers.Add(new SocketCommand(headInfo!, data));
-                    ReceiveTime = DateTime.Now;
+                    await Task.Delay(TimeSpan.FromMilliseconds(10));
+                    continue;
                 }
-                catch (SocketException ex)
+
+                var data = _client.Receive(ref _remoteEp);
+                var readIndex = 0;
+
+                if (!data.ReadHead(ref readIndex, out var headInfo)
+                    || data.Length < headInfo?.BufferLen)
                 {
-                    Logger.Error(ex.SocketErrorCode == SocketError.Interrupted
-                        ? $"{ServerMark} Udp中断，停止接收数据！"
-                        : $"{ServerMark} 接收Udp数据异常：{ex.Message}");
+                    Logger.Warn($"{ServerMark} 接收到不完整UDP包，接收大小 {data.Length}，错误UDP包基本信息：{headInfo}");
+                    continue;
                 }
-                catch (Exception ex)
-                {
-                    Logger.Error($"接收Udp数据异常：{ex.Message}");
-                }
-        });
+
+                _receivedBuffers.Add(new SocketCommand(headInfo!, data));
+                ReceiveTime = DateTime.Now;
+            }
+            catch (SocketException ex)
+            {
+                Logger.Error(ex.SocketErrorCode == SocketError.Interrupted
+                    ? $"{ServerMark} Udp中断，停止接收数据！"
+                    : $"{ServerMark} 接收Udp数据异常：{ex.Message}");
+            }
+            catch (Exception ex)
+            {
+                Logger.Error($"接收Udp数据异常：{ex.Message}");
+            }
+        }
     }
 
     /// <summary>
@@ -195,21 +198,18 @@ public class UdpSocketClient
     /// </summary>
     private async Task CheckMessageAsync()
     {
-        await Task.Run(async () =>
+        while (!IsRunning)
         {
-            while (!IsRunning)
-            {
-                await Task.Delay(TimeSpan.FromMilliseconds(10));
-            }
+            await Task.Delay(TimeSpan.FromMilliseconds(10));
+        }
 
-            while (IsRunning)
+        while (IsRunning)
+        {
+            while (_receivedBuffers.TryTake(out var message, TimeSpan.FromMilliseconds(10)))
             {
-                while (_receivedBuffers.TryTake(out var message, TimeSpan.FromMilliseconds(10)))
-                {
-                    NewDataResponse?.Invoke(message);
-                }
+                NewDataResponse?.Invoke(message);
             }
-        });
+        }
     }
 
     #endregion
