@@ -1,0 +1,90 @@
+<Window xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:SocketTest.Server.ViewModels" xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:codewf="https://codewf.com"
+        mc:Ignorable="d" d:DesignWidth="900" d:DesignHeight="700" Width="900" Height="700"
+        x:Class="SocketTest.Server.Views.MainWindow" x:DataType="vm:MainWindowViewModel"
+        Icon="/Assets/avalonia-logo.ico" Title="Socket服务端(承载TCP服务和UDP组播)">
+    <Window.Styles>
+        <Style Selector="TextBlock">
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="TextBox.form">
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Height" Value="25" />
+            <Setter Property="Watermark" Value="请输入内容" />
+        </Style>
+        <Style Selector="HeaderedContentControl.form">
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Button">
+            <Setter Property="Height" Value="25" />
+            <Setter Property="Padding" Value="10,3" />
+            <Setter Property="Margin" Value="5,0" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Background" Value="#2196F3" />
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="CornerRadius" Value="4" />
+        </Style>
+        <Style Selector="Button:pointerover">
+            <Setter Property="Background" Value="#1976D2" />
+        </Style>
+    </Window.Styles>
+    <Design.DataContext>
+        <vm:MainWindowViewModel />
+    </Design.DataContext>
+    <Grid Margin="5">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="30" />
+        </Grid.RowDefinitions>
+        <HeaderedContentControl Grid.Row="0" Header="Tcp服务配置">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Margin="0,0,5,0" Text="IP：" />
+                <TextBox Width="150" Text="{Binding TCPIP}" Watermark="输入服务器IP地址" />
+
+                <TextBlock Margin="10,0,5,0" Text="端口：" />
+                <TextBox Width="60" Text="{Binding TCPPort}" Watermark="输入端口号" />
+                <TextBlock Margin="10,0,5,0" Text="模拟总数：" />
+                <TextBox Width="80" Text="{Binding MockCount}" Watermark="输入模拟数量" />
+                <TextBlock Margin="10,0,5,0" Text="单包数据：" />
+                <TextBox Width="60" Text="{Binding MockPageSize}" Watermark="输入单包大小" />
+            </StackPanel>
+        </HeaderedContentControl>
+        <HeaderedContentControl Grid.Row="1" Header="Udp组播配置">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Margin="0,0,5,0" Text="IP：" />
+                <TextBox Width="150" Text="{Binding UDPIP, Mode=TwoWay}" Watermark="输入UDP组播IP" />
+
+                <TextBlock Margin="10,0,5,0" Text="端口：" />
+                <TextBox Width="60" Text="{Binding UDPPort, Mode=TwoWay}" Watermark="输入UDP端口" />
+            </StackPanel>
+        </HeaderedContentControl>
+        <StackPanel Grid.Row="2" Margin="0,5" Orientation="Horizontal">
+            <Button Command="{Binding RunCommand}"
+                    Content="{codewf:If Condition={Binding IsRunning}, True=停止服务, False=启动服务}" />
+            <Button Command="{Binding RefreshCommand}" Content="刷新" Background="#4CAF50" />
+            <Button Command="{Binding UpdateCommand}" Content="更新" Background="#2196F3" />
+        </StackPanel>
+        <HeaderedContentControl Grid.Row="3" Header="日志">
+            <codewf:LogView />
+        </HeaderedContentControl>
+
+        <!-- 状态栏 -->
+        <Border Grid.Row="4" Background="#F5F5F5" BorderBrush="#E0E0E0" BorderThickness="0,1,0,0">
+            <StackPanel Orientation="Horizontal" Margin="10,5,0,0" VerticalAlignment="Center">
+                <TextBlock Margin="0,0,20,0" Text="TCP状态: " FontWeight="Medium" />
+                <TextBlock Text="{Binding TCPStatus}" Foreground="#0066CC" />
+                <TextBlock Margin="20,0,5,0" Text="UDP状态: " FontWeight="Medium" />
+                <TextBlock Text="{Binding UDPStatus}" Foreground="#009933" />
+                <TextBlock Margin="20,0,5,0" Text="客户端数量: " FontWeight="Medium" />
+                <TextBlock Text="{Binding ClientCount}" Foreground="#FF6600" />
+                <TextBlock Margin="20,0,5,0" Text="发送数据包: " FontWeight="Medium" />
+                <TextBlock Text="{Binding SentDataCount}" Foreground="#9933FF" />
+            </StackPanel>
+        </Border>
+    </Grid>
+</Window>
