@@ -111,8 +111,9 @@ public class UdpSocketClient
 
             IsRunning = true;
 
-            await ReceiveDataAsync();
-            await CheckMessageAsync();
+            // 不再使用await，让方法在后台运行
+            _ = ReceiveDataAsync();
+            _ = CheckMessageAsync();
         }
         catch (Exception ex)
         {

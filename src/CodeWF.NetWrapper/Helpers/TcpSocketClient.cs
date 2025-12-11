@@ -108,8 +108,9 @@ public class TcpSocketClient
 
             IsRunning = true;
 
-            await ListenForServerAsync();
-            await CheckResponseAsync();
+            // 使用Task.Run并行运行监听器和响应检查器
+            _ = Task.Run(ListenForServerAsync);
+            _ = Task.Run(CheckResponseAsync);
 
             LocalEndPoint = _client.LocalEndPoint?.ToString();
             return (IsSuccess: true, ErrorMessage: null);

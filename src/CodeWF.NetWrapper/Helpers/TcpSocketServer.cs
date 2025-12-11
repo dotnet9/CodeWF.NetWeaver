@@ -126,11 +126,12 @@ public class TcpSocketServer
 
             _listenTokenSource = new CancellationTokenSource();
 
-            await ListenForClientsAsync();
-            await ProcessingRequestsAsync();
+            // 使用Task.Run并行运行监听器、请求处理器和心跳检测器
+            _ = Task.Run(ListenForClientsAsync);
+            _ = Task.Run(ProcessingRequestsAsync);
 
             _detectionTimer = new PeriodicTimer(TimeSpan.FromSeconds(5));
-            await DetectionClientsAsync();
+            _ = Task.Run(DetectionClientsAsync);
 
             return (IsSuccess: true, ErrorMessage: null);
         }

@@ -3,13 +3,14 @@ using Avalonia.Controls.Notifications;
 using Avalonia.Threading;
 using CodeWF.EventBus;
 using CodeWF.Log.Core;
+using CodeWF.NetWrapper.Commands;
 using CodeWF.NetWrapper.Helpers;
+using CodeWF.NetWrapper.Models;
 using CodeWF.Tools.Extensions;
 using ReactiveUI;
 using SocketDto;
 using SocketDto.AutoCommand;
 using SocketDto.Enums;
-using SocketDto.EventBus;
 using SocketDto.Requests;
 using SocketDto.Response;
 using SocketDto.Udp;
@@ -22,9 +23,7 @@ using System.Reactive;
 using System.Reactive.Linq;
 using System.Threading.Tasks;
 using System.Timers;
-using CodeWF.NetWrapper.Commands;
 using Notification = Avalonia.Controls.Notifications.Notification;
-using CodeWF.NetWrapper.Models;
 
 namespace SocketTest.Client.ViewModels;
 
@@ -146,6 +145,7 @@ public class MainWindowViewModel : ReactiveObject
                 await _tcpClient.ConnectAsync("TCP服务端", IP, Port);
                 IsRunning = true;
                 await Log("连接服务端成功", LogType.Info);
+                await RequestTargetTypeAsync();
             }
         }
         catch (Exception ex)
@@ -250,18 +250,6 @@ public class MainWindowViewModel : ReactiveObject
 
     #region 接收事件
 
-    [EventHandler]
-    private async Task ReceiveTcpStatusMessageAsync(ChangeTCPStatusCommand message)
-    {
-        await _tcpClient.SendCommandAsync(new RequestTargetType());
-        _ = Log("发送命令查询目标终端类型是否是服务端");
-    }
-
-    [EventHandler]
-    private async Task ReceiveUdpStatusMessage(ChangeUDPStatusCommand message)
-    {
-        _ = Log("Udp组播订阅成功！");
-    }
 
     private void ReceiveTcpData()
     {
@@ -517,6 +505,21 @@ public class MainWindowViewModel : ReactiveObject
     }
 
     #endregion
+
+    #region Socket命令发送
+
+    private async Task RequestTargetTypeAsync()
+    {
+        await _tcpClient.SendCommandAsync(new RequestTargetType());
+        _ = Log("发送命令查询目标终端类型是否是服务端");
+    }
+
+    private async Task ReceiveUdpStatusMessage()
+    {
+        _ = Log("Udp组播订阅成功！");
+    }
+
+    #endregion Socket命令发送
 
     private async Task Log(string msg, LogType type = LogType.Info, bool showNotification = true)
     {

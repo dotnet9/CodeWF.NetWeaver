@@ -11,7 +11,6 @@ using ReactiveUI;
 using SocketDto;
 using SocketDto.AutoCommand;
 using SocketDto.Enums;
-using SocketDto.EventBus;
 using SocketDto.Requests;
 using SocketDto.Response;
 using SocketTest.Server.Mock;
@@ -177,6 +176,7 @@ public class MainWindowViewModel : ReactiveObject
                     TCPStatus = "TCP服务已启动";
                     IsRunning = true;
                     await Log("TCP服务已启动", LogType.Info);
+                    await SendMockDataAsync();
                 }
                 else
                 {
@@ -226,19 +226,7 @@ public class MainWindowViewModel : ReactiveObject
 
     #region 处理Socket信息
 
-    [EventHandler]
-    private async Task ReceiveTcpStatusMessageAsync(ChangeTCPStatusCommand message)
-    {
-        _ = Log(message.IsConnect ? "TCP服务已运行" : "TCP服务已停止");
-        if (message.IsConnect)
-        {
-            Task.Run(async () =>
-            {
-                await MockUtil.MockAsync(MockCount);
-                _ = Log("数据模拟完成，客户端可以正常请求数据了");
-            });
-        }
-    }
+    
 
     [EventHandler]
     private async Task ReceiveSocketMessageAsync(SocketCommand message)
@@ -502,6 +490,24 @@ public class MainWindowViewModel : ReactiveObject
     }
 
     #endregion
+
+    #region Socket命令处理
+
+    [EventHandler]
+    private async Task SendMockDataAsync()
+    {
+        _ = Log(_tcpServer.IsRunning ? "TCP服务已运行" : "TCP服务已停止");
+        if (_tcpServer.IsRunning)
+        {
+            await Task.Run(async () =>
+            {
+                await MockUtil.MockAsync(MockCount);
+                _ = Log("数据模拟完成，客户端可以正常请求数据了");
+            });
+        }
+    }
+
+    #endregion Socket命令处理
 
     private void Invoke(Action action)
     {
