@@ -1,0 +1,15 @@
+[
+  {
+    "Name": "多启",
+    "Projects": [
+      {
+        "Path": "src\\SocketTest.Client\\SocketTest.Client.csproj",
+        "Action": "Start"
+      },
+      {
+        "Path": "src\\SocketTest.Server\\SocketTest.Server.csproj",
+        "Action": "Start"
+      }
+    ]
+  }
+]

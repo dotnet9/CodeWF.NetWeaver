@@ -39,13 +39,14 @@ public class MainWindowViewModel : ReactiveObject
     private Dictionary<int, ProcessItemModel>? _processIdAndItems;
 
     private string? _searchKey;
+
     /// <summary>
     ///     搜索关键词
     /// </summary>
     public string? SearchKey
     {
         get => _searchKey;
-        set 
+        set
         {
             this.RaiseAndSetIfChanged(ref _searchKey, value);
             ApplyFilter();
@@ -54,7 +55,7 @@ public class MainWindowViewModel : ReactiveObject
 
     private Timer? _sendDataTimer;
     private int _timestampStartYear;
-    
+
     public MainWindowViewModel()
     {
         DisplayProcesses = new();
@@ -73,6 +74,7 @@ public class MainWindowViewModel : ReactiveObject
     }
 
     #region 属性
+
     public Window? Owner { get; set; }
     public RangObservableCollection<ProcessItemModel> DisplayProcesses { get; }
 
@@ -93,12 +95,13 @@ public class MainWindowViewModel : ReactiveObject
         get;
         set => this.RaiseAndSetIfChanged(ref field, value);
     }
+
     /// <summary>
     ///     基本信息
     /// </summary>
     public string? BaseInfo
     {
-        get ;
+        get;
         set => this.RaiseAndSetIfChanged(ref field, value);
     }
 
@@ -118,7 +121,7 @@ public class MainWindowViewModel : ReactiveObject
     /// </summary>
     public ReactiveCommand<Unit, Unit>? ConnectCommand { get; private set; }
 
-#endregion
+    #endregion
 
 
     public async Task HandleConnectTcpCommandAsync()
@@ -127,11 +130,14 @@ public class MainWindowViewModel : ReactiveObject
         {
             if (IsRunning)
             {
+                // 清理定时器资源
+                StopHeartbeat();
                 _tcpClient.Stop();
                 _udpClient.Stop();
+
                 _udpClient.Received -= ReceiveUdpCommand;
                 IsRunning = false;
-                await Log("已断开与服务端的连接", LogType.Info);
+                await Log("已断开与服务端的连接");
             }
             else
             {
@@ -141,11 +147,19 @@ public class MainWindowViewModel : ReactiveObject
                     await Log("请输入有效的IP地址和端口号", LogType.Error);
                     return;
                 }
-                
-                await _tcpClient.ConnectAsync("TCP服务端", IP, Port);
-                IsRunning = true;
-                await Log("连接服务端成功", LogType.Info);
-                await RequestTargetTypeAsync();
+
+                var (isSuccess, errorMessage) = await _tcpClient.ConnectAsync("TCP服务端", IP, Port);
+                if (isSuccess)
+                {
+                    IsRunning = true;
+                    await Log("连接服务端成功");
+                    StartSendHeartbeat();
+                    await RequestTargetTypeAsync();
+                }
+                else
+                {
+                    await Log($"连接服务端失败：{errorMessage}", LogType.Error);
+                }
             }
         }
         catch (Exception ex)
@@ -185,9 +199,10 @@ public class MainWindowViewModel : ReactiveObject
         return string.IsNullOrWhiteSpace(_searchKey)
             ? processes
             : processes.Where(process =>
-                !string.IsNullOrWhiteSpace(process.Name) && process.Name.Contains(_searchKey, StringComparison.OrdinalIgnoreCase));
+                !string.IsNullOrWhiteSpace(process.Name) &&
+                process.Name.Contains(_searchKey, StringComparison.OrdinalIgnoreCase));
     }
-    
+
     /// <summary>
     ///     应用筛选条件
     /// </summary>
@@ -207,19 +222,34 @@ public class MainWindowViewModel : ReactiveObject
         Invoke(DisplayProcesses.Clear);
     }
 
-    private void SendHeartbeat()
+    private void StartSendHeartbeat()
     {
+        StopHeartbeat();
         _sendDataTimer = new Timer();
-        _sendDataTimer.Interval = 200;
-        _sendDataTimer.Elapsed += MockSendData;
+        _sendDataTimer.Interval = 2000;
+        _sendDataTimer.Elapsed += SendHeartbeat;
         _sendDataTimer.Start();
     }
 
-    private void MockSendData(object? sender, ElapsedEventArgs e)
+    private void StopHeartbeat()
     {
-        if (!_tcpClient.IsRunning) return;
+        _sendDataTimer?.Stop();
+        _sendDataTimer?.Dispose();
+        _sendDataTimer = null;
+    }
 
-        _tcpClient.SendCommandAsync(new Heartbeat());
+    private async void SendHeartbeat(object? sender, ElapsedEventArgs e)
+    {
+        try
+        {
+            if (!_tcpClient.IsRunning) return;
+
+            await _tcpClient.SendCommandAsync(new Heartbeat() { TaskId = NetHelper.GetTaskId() });
+        }
+        catch (Exception ex)
+        {
+            Logger.Error("发送心跳包时发生异常", ex, "发送心跳包时发生异常，详细信息请查看日志文件");
+        }
     }
 
     private void Try(string actionName, Action action, Action<Exception>? exceptionAction = null)
@@ -250,7 +280,6 @@ public class MainWindowViewModel : ReactiveObject
 
     #region 接收事件
 
-
     private void ReceiveTcpData()
     {
         // 开启线程接收数据
@@ -268,9 +297,8 @@ public class MainWindowViewModel : ReactiveObject
     /// <param name="message"></param>
     /// <exception cref="Exception"></exception>
     [EventHandler]
-    private async Task ReceivedSocketCommand(SocketCommand message)
+    private async Task ReceivedSocketCommandAsync(SocketCommand message)
     {
-        Logger.Info($"Dill command: {message}");
         if (message.IsCommand<ResponseTargetType>())
         {
             await ReceivedSocketCommandAsync(message.GetCommand<ResponseTargetType>());
@@ -309,11 +337,11 @@ public class MainWindowViewModel : ReactiveObject
     {
         if (command.IsCommand<UpdateRealtimeProcessList>())
         {
-            Task.Run(()=> ReceivedSocketCommand(command.GetCommand<UpdateRealtimeProcessList>())) ;
+            ReceivedSocketCommand(command.GetCommand<UpdateRealtimeProcessList>());
         }
         else if (command.IsCommand<UpdateGeneralProcessList>())
         {
-            Task.Run(() => ReceivedSocketCommand(command.GetCommand<UpdateGeneralProcessList>()));
+            ReceivedSocketCommand(command.GetCommand<UpdateGeneralProcessList>());
         }
     }
 
@@ -339,7 +367,8 @@ public class MainWindowViewModel : ReactiveObject
     {
         _ = Log($"收到Udp组播地址=》{response.Ip}:{response.Port}");
 
-        await _udpClient.ConnectAsync("UDP组播", response.Ip,response.Port, _tcpClient.LocalEndPoint, _tcpClient.SystemId);
+        await _udpClient.ConnectAsync("UDP组播", response.Ip, response.Port, _tcpClient.LocalEndPoint,
+            _tcpClient.SystemId);
         _udpClient.Received -= ReceiveUdpCommand;
         _udpClient.Received += ReceiveUdpCommand;
         _ = Log("尝试订阅Udp组播");
@@ -377,8 +406,8 @@ public class MainWindowViewModel : ReactiveObject
         // 将耗时的数据处理操作放到后台线程中执行
         await Task.Run(() =>
         {
-            var processes = 
-                response.Processes?.ConvertAll(process => new ProcessItemModel(process, _timestampStartYear));
+            var processes =
+                response.Processes?.Select(process => new ProcessItemModel(process, _timestampStartYear)).ToList();
             if (!(processes?.Count > 0)) return;
 
             // 先更新后台数据
@@ -386,12 +415,12 @@ public class MainWindowViewModel : ReactiveObject
             {
                 _receivedProcesses.AddRange(processes);
             }
-            
+
             var filterData = FilterData(processes);
-            
+
             // 只在需要更新UI时才调用Invoke
             Invoke(() => DisplayProcesses.AddRange(filterData));
-            
+
             // 当收到全部数据时构建字典，这个操作也比较耗时，放到后台线程
             if (_receivedProcesses.Count == response.TotalSize)
             {
@@ -402,10 +431,9 @@ public class MainWindowViewModel : ReactiveObject
             }
 
             var msg = response.TaskId == default ? "收到推送" : "收到请求响应";
-            // 减少日志输出频率，只在关键节点记录
-            // Logger.Info(
-            //     $"{msg}【{response.PageIndex + 1}/{response.PageCount}】进程{processes.Count}条({_receivedProcesses.Count}/{response.TotalSize})"
-            // );
+            Logger.Info(
+                $"{msg}【{response.PageIndex + 1}/{response.PageCount}】进程{processes.Count}条({_receivedProcesses.Count}/{response.TotalSize})"
+            );
         });
     }
 
@@ -533,7 +561,7 @@ public class MainWindowViewModel : ReactiveObject
 
     private async Task RequestTargetTypeAsync()
     {
-        await _tcpClient.SendCommandAsync(new RequestTargetType(){TaskId = NetHelper.GetTaskId()});
+        await _tcpClient.SendCommandAsync(new RequestTargetType() { TaskId = NetHelper.GetTaskId() });
         _ = Log("发送命令查询目标终端类型是否是服务端");
     }
 

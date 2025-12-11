@@ -241,7 +241,6 @@ public class MainWindowViewModel : ReactiveObject
     [EventHandler]
     private async Task ReceiveSocketCommandAsync(SocketCommand message)
     {
-        Logger.Info($"Dill command: {message}");
         if (message.IsCommand<RequestTargetType>())
         {
             await ReceiveSocketCommandAsync(message.Client!, message.GetCommand<RequestTargetType>());
@@ -363,7 +362,7 @@ public class MainWindowViewModel : ReactiveObject
 
     private async Task ReceiveSocketCommandAsync(Socket client, Heartbeat heartbeat)
     {
-        await _tcpServer.SendCommandAsync(client, new Heartbeat());
+        await _tcpServer.SendCommandAsync(client, heartbeat);
         _tcpServer.HeartbeatTime = DateTime.Now;
     }
 
