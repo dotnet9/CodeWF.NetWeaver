@@ -129,7 +129,7 @@ public class MainWindowViewModel : ReactiveObject
             {
                 _tcpClient.Stop();
                 _udpClient.Stop();
-                _udpClient.NewDataResponse -= ReceiveUdpCommand;
+                _udpClient.Received -= ReceiveUdpCommand;
                 IsRunning = false;
                 await Log("已断开与服务端的连接", LogType.Info);
             }
@@ -268,32 +268,32 @@ public class MainWindowViewModel : ReactiveObject
     /// <param name="message"></param>
     /// <exception cref="Exception"></exception>
     [EventHandler]
-    private async Task ReceivedSocketMessage(SocketCommand message)
+    private async Task ReceivedSocketCommand(SocketCommand message)
     {
         Logger.Info($"Dill command: {message}");
         if (message.IsCommand<ResponseTargetType>())
         {
-            await ReceivedSocketMessageAsync(message.GetCommand<ResponseTargetType>());
+            await ReceivedSocketCommandAsync(message.GetCommand<ResponseTargetType>());
         }
         else if (message.IsCommand<ResponseUdpAddress>())
         {
-            await ReceivedSocketMessageAsync(message.GetCommand<ResponseUdpAddress>());
+            await ReceivedSocketCommandAsync(message.GetCommand<ResponseUdpAddress>());
         }
         else if (message.IsCommand<ResponseServiceInfo>())
         {
-            await ReceivedSocketMessageAsync(message.GetCommand<ResponseServiceInfo>());
+            await ReceivedSocketCommandAsync(message.GetCommand<ResponseServiceInfo>());
         }
         else if (message.IsCommand<ResponseProcessIDList>())
         {
-            await ReceivedSocketMessageAsync(message.GetCommand<ResponseProcessIDList>());
+            await ReceivedSocketCommandAsync(message.GetCommand<ResponseProcessIDList>());
         }
         else if (message.IsCommand<ResponseProcessList>())
         {
-            await ReceivedSocketMessageAsync(message.GetCommand<ResponseProcessList>());
+            await ReceivedSocketCommandAsync(message.GetCommand<ResponseProcessList>());
         }
         else if (message.IsCommand<UpdateProcessList>())
         {
-            await ReceivedSocketMessageAsync(message.GetCommand<UpdateProcessList>());
+            await ReceivedSocketCommandAsync(message.GetCommand<UpdateProcessList>());
         }
         else if (message.IsCommand<ChangeProcessList>())
         {
@@ -301,23 +301,23 @@ public class MainWindowViewModel : ReactiveObject
         }
         else if (message.IsCommand<Heartbeat>())
         {
-            ReceivedSocketMessage(message.GetCommand<Heartbeat>());
+            ReceivedSocketCommand(message.GetCommand<Heartbeat>());
         }
     }
 
-    private void ReceiveUdpCommand(SocketCommand command)
+    private void ReceiveUdpCommand(object? sender, SocketCommand? command)
     {
         if (command.IsCommand<UpdateRealtimeProcessList>())
         {
-            ReceivedSocketMessage(command.GetCommand<UpdateRealtimeProcessList>());
+            Task.Run(()=> ReceivedSocketCommand(command.GetCommand<UpdateRealtimeProcessList>())) ;
         }
         else if (command.IsCommand<UpdateGeneralProcessList>())
         {
-            ReceivedSocketMessage(command.GetCommand<UpdateGeneralProcessList>());
+            Task.Run(() => ReceivedSocketCommand(command.GetCommand<UpdateGeneralProcessList>()));
         }
     }
 
-    private async Task ReceivedSocketMessageAsync(ResponseTargetType response)
+    private async Task ReceivedSocketCommandAsync(ResponseTargetType response)
     {
         var type = (TerminalType)Enum.Parse(typeof(TerminalType), response.Type.ToString());
         if (response.Type == (byte)TerminalType.Server)
@@ -335,17 +335,17 @@ public class MainWindowViewModel : ReactiveObject
         }
     }
 
-    private async Task ReceivedSocketMessageAsync(ResponseUdpAddress response)
+    private async Task ReceivedSocketCommandAsync(ResponseUdpAddress response)
     {
         _ = Log($"收到Udp组播地址=》{response.Ip}:{response.Port}");
 
-        await _udpClient.ConnectAsync("UDP组播", response.Ip,response.Port, _tcpClient.LocalEndPoint);
-        _udpClient.NewDataResponse -= ReceiveUdpCommand;
-        _udpClient.NewDataResponse += ReceiveUdpCommand;
+        await _udpClient.ConnectAsync("UDP组播", response.Ip,response.Port, _tcpClient.LocalEndPoint, _tcpClient.SystemId);
+        _udpClient.Received -= ReceiveUdpCommand;
+        _udpClient.Received += ReceiveUdpCommand;
         _ = Log("尝试订阅Udp组播");
     }
 
-    private async Task ReceivedSocketMessageAsync(ResponseServiceInfo response)
+    private async Task ReceivedSocketCommandAsync(ResponseServiceInfo response)
     {
         _timestampStartYear = response.TimestampStartYear;
         var oldBaseInfo = BaseInfo;
@@ -363,7 +363,7 @@ public class MainWindowViewModel : ReactiveObject
         ClearData();
     }
 
-    private async Task ReceivedSocketMessageAsync(ResponseProcessIDList response)
+    private async Task ReceivedSocketCommandAsync(ResponseProcessIDList response)
     {
         _processIdArray = response.IDList!;
         _ = Log($"收到进程ID列表，共{_processIdArray.Length}个进程");
@@ -372,7 +372,7 @@ public class MainWindowViewModel : ReactiveObject
         _ = Log("发送请求进程详细信息列表命令");
     }
 
-    private async Task ReceivedSocketMessageAsync(ResponseProcessList response)
+    private async Task ReceivedSocketCommandAsync(ResponseProcessList response)
     {
         // 将耗时的数据处理操作放到后台线程中执行
         await Task.Run(() =>
@@ -408,7 +408,7 @@ public class MainWindowViewModel : ReactiveObject
         });
     }
 
-    private async Task ReceivedSocketMessageAsync(UpdateProcessList response)
+    private async Task ReceivedSocketCommandAsync(UpdateProcessList response)
     {
         if (_processIdAndItems == null) return;
 
@@ -422,7 +422,7 @@ public class MainWindowViewModel : ReactiveObject
         Logger.Info($"更新数据{response.Processes?.Count}条");
     }
 
-    private void ReceivedSocketMessage(Heartbeat response)
+    private void ReceivedSocketCommand(Heartbeat response)
     {
     }
 
@@ -430,7 +430,7 @@ public class MainWindowViewModel : ReactiveObject
 
     #region 接收Udp数据
 
-    private void ReceivedSocketMessage(UpdateRealtimeProcessList response)
+    private void ReceivedSocketCommand(UpdateRealtimeProcessList response)
     {
         void LogNotExistProcess(int index)
         {
@@ -475,7 +475,7 @@ public class MainWindowViewModel : ReactiveObject
         }
     }
 
-    private void ReceivedSocketMessage(UpdateGeneralProcessList response)
+    private void ReceivedSocketCommand(UpdateGeneralProcessList response)
     {
         void LogNotExistProcess(int index)
         {
@@ -541,7 +541,7 @@ public class MainWindowViewModel : ReactiveObject
 
     #endregion Socket命令发送
 
-    private async Task Log(string msg, LogType type = LogType.Info, bool showNotification = true)
+    private async Task Log(string msg, LogType type = LogType.Info, bool showNotification = false)
     {
         if (type == LogType.Info)
         {

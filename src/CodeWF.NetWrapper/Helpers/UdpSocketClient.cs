@@ -67,7 +67,9 @@ public class UdpSocketClient
     /// <summary>
     /// 新数据通知事件
     /// </summary>
-    public Action<SocketCommand>? NewDataResponse;
+    public EventHandler<SocketCommand>? Received;
+
+    public long SystemId { get; private set; }
 
     #endregion
 
@@ -80,11 +82,12 @@ public class UdpSocketClient
     /// <param name="serverIP">服务器IP地址</param>
     /// <param name="serverPort">服务器端口号</param>
     /// <param name="endpoint">本地端点</param>
-    public async Task ConnectAsync(string serverMark, string serverIP, int serverPort, string endpoint)
+    public async Task ConnectAsync(string serverMark, string serverIP, int serverPort, string endpoint,  long systemId)
     {
         ServerMark = serverMark;
         ServerIP = serverIP;
         ServerPort = serverPort;
+        SystemId = systemId;
 
         try
         {
@@ -161,17 +164,21 @@ public class UdpSocketClient
         {
             try
             {
-                if (_client?.Client == null || _client.Available < 0)
+                if (_client?.Client == null)
                 {
                     await Task.Delay(TimeSpan.FromMilliseconds(10));
                     continue;
                 }
 
-                var data = _client.Receive(ref _remoteEp);
+                var result = await _client.ReceiveAsync();
+                var data = result.Buffer;
                 var readIndex = 0;
-
                 if (!data.ReadHead(ref readIndex, out var headInfo)
-                    || data.Length < headInfo?.BufferLen)
+                    || headInfo.SystemId != SystemId)
+                {
+                    continue;
+                }
+                if (data.Length < headInfo.BufferLen)
                 {
                     Logger.Warn($"{ServerMark} 接收到不完整UDP包，接收大小 {data.Length}，错误UDP包基本信息：{headInfo}");
                     continue;
@@ -207,7 +214,7 @@ public class UdpSocketClient
         {
             while (_receivedBuffers.TryTake(out var message, TimeSpan.FromMilliseconds(10)))
             {
-                NewDataResponse?.Invoke(message);
+                Received?.Invoke(this, message);
             }
         }
     }

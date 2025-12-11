@@ -1,4 +1,4 @@
-﻿using Avalonia.Controls.Notifications;
+using Avalonia.Controls.Notifications;
 using Avalonia.Threading;
 using CodeWF.EventBus;
 using CodeWF.Log.Core;
@@ -41,7 +41,10 @@ public class MainWindowViewModel : ReactiveObject
             UpdateCommand = ReactiveCommand.CreateFromTask(HandleUpdateCommandAsync);
         }
 
-        _tcpServer = new TcpSocketServer();
+        _tcpServer = new TcpSocketServer()
+        {
+            SystemId = DateTime.Now.Ticks
+        };
         _udpServer = new UdpSocketServer();
 
         EventBus.Default.Subscribe(this);
@@ -176,7 +179,7 @@ public class MainWindowViewModel : ReactiveObject
                     TCPStatus = "TCP服务已启动";
                     IsRunning = true;
                     await Log("TCP服务已启动");
-                    (isSuccess, errorMessage) = _udpServer.Start("UDP服务端", 1, UDPIP, UDPPort);
+                    (isSuccess, errorMessage) = _udpServer.Start("UDP服务端", _tcpServer.SystemId, UDPIP, UDPPort);
                     if (isSuccess)
                     {
                         await Log("UDP组播已启动");
@@ -236,40 +239,40 @@ public class MainWindowViewModel : ReactiveObject
     #region 处理Socket信息
 
     [EventHandler]
-    private async Task ReceiveSocketMessageAsync(SocketCommand message)
+    private async Task ReceiveSocketCommandAsync(SocketCommand message)
     {
         Logger.Info($"Dill command: {message}");
         if (message.IsCommand<RequestTargetType>())
         {
-            await ReceiveSocketMessageAsync(message.Client!, message.GetCommand<RequestTargetType>());
+            await ReceiveSocketCommandAsync(message.Client!, message.GetCommand<RequestTargetType>());
         }
         else if (message.IsCommand<RequestUdpAddress>())
         {
-            await ReceiveSocketMessageAsync(message.Client!, message.GetCommand<RequestUdpAddress>());
+            await ReceiveSocketCommandAsync(message.Client!, message.GetCommand<RequestUdpAddress>());
         }
         else if (message.IsCommand<RequestServiceInfo>())
         {
-            await ReceiveSocketMessageAsync(message.Client!, message.GetCommand<RequestServiceInfo>());
+            await ReceiveSocketCommandAsync(message.Client!, message.GetCommand<RequestServiceInfo>());
         }
         else if (message.IsCommand<RequestProcessIDList>())
         {
-            await ReceiveSocketMessageAsync(message.Client!, message.GetCommand<RequestProcessIDList>());
+            await ReceiveSocketCommandAsync(message.Client!, message.GetCommand<RequestProcessIDList>());
         }
         else if (message.IsCommand<RequestProcessList>())
         {
-            await ReceiveSocketMessageAsync(message.Client!, message.GetCommand<RequestProcessList>());
+            await ReceiveSocketCommandAsync(message.Client!, message.GetCommand<RequestProcessList>());
         }
         else if (message.IsCommand<ChangeProcessList>())
         {
-            await ReceiveSocketMessageAsync(message.Client!, message.GetCommand<ChangeProcessList>());
+            await ReceiveSocketCommandAsync(message.Client!, message.GetCommand<ChangeProcessList>());
         }
         else if (message.IsCommand<Heartbeat>())
         {
-            await ReceiveSocketMessageAsync(message.Client!, message.GetCommand<Heartbeat>());
+            await ReceiveSocketCommandAsync(message.Client!, message.GetCommand<Heartbeat>());
         }
     }
 
-    private async Task ReceiveSocketMessageAsync(Socket client, RequestTargetType request)
+    private async Task ReceiveSocketCommandAsync(Socket client, RequestTargetType request)
     {
         _ = Log("收到请求终端类型命令");
         var currentTerminalType = TerminalType.Server;
@@ -284,7 +287,7 @@ public class MainWindowViewModel : ReactiveObject
         _ = Log($"响应请求终端类型命令：当前终端为={currentTerminalType.GetDescription()}");
     }
 
-    private async Task ReceiveSocketMessageAsync(Socket client, RequestUdpAddress request)
+    private async Task ReceiveSocketCommandAsync(Socket client, RequestUdpAddress request)
     {
         _ = Log("收到请求Udp组播地址命令");
 
@@ -299,7 +302,7 @@ public class MainWindowViewModel : ReactiveObject
         _ = Log($"响应请求Udp组播地址命令：{response.Ip}:{response.Port}");
     }
 
-    private async Task ReceiveSocketMessageAsync(Socket client, RequestServiceInfo request)
+    private async Task ReceiveSocketCommandAsync(Socket client, RequestServiceInfo request)
     {
         _ = Log("收到请求基本信息命令");
 
@@ -310,7 +313,7 @@ public class MainWindowViewModel : ReactiveObject
         _ = Log($"响应基本信息命令：当前操作系统版本号={data.OS}，内存大小={data.MemorySize}GB");
     }
 
-    private async Task ReceiveSocketMessageAsync(Socket client, RequestProcessIDList request)
+    private async Task ReceiveSocketCommandAsync(Socket client, RequestProcessIDList request)
     {
         _ = Log("收到请求进程ID列表命令");
 
@@ -324,7 +327,7 @@ public class MainWindowViewModel : ReactiveObject
         _ = Log($"响应进程ID列表命令：{response.IDList?.Length}");
     }
 
-    private async Task ReceiveSocketMessageAsync(Socket client, RequestProcessList request)
+    private async Task ReceiveSocketCommandAsync(Socket client, RequestProcessList request)
     {
         _ = Log("收到请求进程详细信息列表命令");
         await Task.Run(async () =>
@@ -353,12 +356,12 @@ public class MainWindowViewModel : ReactiveObject
         });
     }
 
-    private async Task ReceiveSocketMessageAsync(Socket client, ChangeProcessList changeProcess)
+    private async Task ReceiveSocketCommandAsync(Socket client, ChangeProcessList changeProcess)
     {
         await _tcpServer.SendCommandAsync(changeProcess);
     }
 
-    private async Task ReceiveSocketMessageAsync(Socket client, Heartbeat heartbeat)
+    private async Task ReceiveSocketCommandAsync(Socket client, Heartbeat heartbeat)
     {
         await _tcpServer.SendCommandAsync(client, new Heartbeat());
         _tcpServer.HeartbeatTime = DateTime.Now;
@@ -444,7 +447,7 @@ public class MainWindowViewModel : ReactiveObject
         Logger.Info($"更新模拟实时数据{sw.ElapsedMilliseconds}ms");
     }
 
-    private void MockSendRealtimeDataAsync(object? sender, ElapsedEventArgs e)
+    private async void MockSendRealtimeDataAsync(object? sender, ElapsedEventArgs e)
     {
         if (!_udpServer.IsRunning || !MockUtil.IsInitOver) return;
 
@@ -463,14 +466,14 @@ public class MainWindowViewModel : ReactiveObject
             response.PageCount = pageCount;
             response.PageIndex = pageIndex;
 
-            _udpServer.SendCommand(response, DateTimeOffset.UtcNow);
+            await _udpServer.SendCommandAsync(response, DateTimeOffset.UtcNow);
         }
 
         Logger.Info(
             $"推送实时数据{MockCount}条，单包{pageSize}条分{pageCount}包，{sw.ElapsedMilliseconds}ms");
     }
 
-    private void MockSendGeneralDataAsync(object? sender, ElapsedEventArgs e)
+    private async void MockSendGeneralDataAsync(object? sender, ElapsedEventArgs e)
     {
         if (!_udpServer.IsRunning || !MockUtil.IsInitOver) return;
 
@@ -489,7 +492,7 @@ public class MainWindowViewModel : ReactiveObject
             response.PageCount = pageCount;
             response.PageIndex = pageIndex;
 
-            _udpServer.SendCommand(response, DateTimeOffset.UtcNow);
+            await _udpServer.SendCommandAsync(response, DateTimeOffset.UtcNow);
         }
 
         Logger.Info(
@@ -526,7 +529,7 @@ public class MainWindowViewModel : ReactiveObject
         await Dispatcher.UIThread.InvokeAsync(action.Invoke);
     }
 
-    private async Task Log(string msg, LogType type = LogType.Info, bool showNotification = true)
+    private async Task Log(string msg, LogType type = LogType.Info, bool showNotification = false)
     {
         if (type == LogType.Info)
         {

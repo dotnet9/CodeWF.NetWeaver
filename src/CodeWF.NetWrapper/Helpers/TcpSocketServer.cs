@@ -49,7 +49,7 @@ public class TcpSocketServer
     /// <summary>
     /// 服务端标识，TCP数据接收时保存，用于UDP数据包识别
     /// </summary>
-    public long SystemId { get; }
+    public long SystemId { get; set; } = DateTime.Now.Ticks;
 
     /// <summary>
     /// 服务标识，用以区分多个服务
@@ -170,7 +170,6 @@ public class TcpSocketServer
             return;
         }
 
-        var buffer = command.Serialize(SystemId);
         for (var i = _clients.Values.Count - 1; i >= 0; i--)
         {
             var client = _clients.Values.ElementAt(i);

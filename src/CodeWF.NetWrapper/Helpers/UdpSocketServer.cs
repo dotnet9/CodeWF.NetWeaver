@@ -4,6 +4,7 @@ using CodeWF.NetWeaver.Base;
 using System;
 using System.Net;
 using System.Net.Sockets;
+using System.Threading.Tasks;
 
 namespace CodeWF.NetWrapper.Helpers;
 
@@ -150,12 +151,12 @@ public class UdpSocketServer
     /// </summary>
     /// <param name="command">要发送的网络对象命令</param>
     /// <param name="time">发送时间</param>
-    public void SendCommand(INetObject command, DateTimeOffset time)
+    public async Task SendCommandAsync(INetObject command, DateTimeOffset time)
     {
         if (!IsRunning || _client == null) return;
 
         var buffer = command.Serialize(SystemId, time);
-        var sendCount = _client.Send(buffer, buffer.Length, _udpIpEndPoint);
+        var sendCount = await _client.SendAsync(buffer, buffer.Length, _udpIpEndPoint);
         if (sendCount < buffer.Length)
         {
             Console.WriteLine($"UDP发送失败一包：{buffer.Length}=>{sendCount}");
