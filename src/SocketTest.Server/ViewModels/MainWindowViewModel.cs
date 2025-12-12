@@ -443,7 +443,7 @@ public class MainWindowViewModel : ReactiveObject
 
         sw.Stop();
 
-        Logger.Info($"更新模拟实时数据{sw.ElapsedMilliseconds}ms");
+        //Logger.Info($"更新模拟实时数据{sw.ElapsedMilliseconds}ms");
     }
 
     private async void MockSendRealtimeDataAsync(object? sender, ElapsedEventArgs e)

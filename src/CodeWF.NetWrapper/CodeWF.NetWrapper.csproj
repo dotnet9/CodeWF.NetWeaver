@@ -25,7 +25,7 @@
 	</ItemGroup>
   <ItemGroup>
     <PackageReference Include="CodeWF.EventBus" Version="3.4.5" />
-    <PackageReference Include="CodeWF.Log.Core" Version="11.3.9.4" />
+    <PackageReference Include="CodeWF.Log.Core" Version="11.3.9.7" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\CodeWF.NetWeaver\CodeWF.NetWeaver.csproj" />

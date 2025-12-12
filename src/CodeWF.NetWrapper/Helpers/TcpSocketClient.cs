@@ -190,8 +190,6 @@ public class TcpSocketClient
         {
             while (_responses.TryTake(out var command, TimeSpan.FromMilliseconds(10)))
                 await EventBus.EventBus.Default.PublishAsync(command);
-
-            await Task.Delay(TimeSpan.FromMilliseconds(10)); // 添加一个小延迟，避免CPU占用过高
         }
     }
 

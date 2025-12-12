@@ -1,8 +1,6 @@
-using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Notifications;
 using Avalonia.Interactivity;
-using Avalonia.Threading;
 using SocketTest.Server.ViewModels;
 
 namespace SocketTest.Server.Views;

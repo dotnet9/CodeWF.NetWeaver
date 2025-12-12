@@ -218,12 +218,12 @@ public class ProcessItemModel : ReactiveObject
             Gpu = process.Gpu;
             
             // 安全地进行枚举转换
-            GpuEngine = Enum.IsDefined(typeof(GpuEngine), process.GpuEngine) ? (GpuEngine)process.GpuEngine : GpuEngine.None;
-            PowerUsage = Enum.IsDefined(typeof(PowerUsage), process.PowerUsage) ? (PowerUsage)process.PowerUsage : PowerUsage.Low;
-            PowerUsageTrend = Enum.IsDefined(typeof(PowerUsage), process.PowerUsageTrend) ? (PowerUsage)process.PowerUsageTrend : PowerUsage.Low;
-            Type = Enum.IsDefined(typeof(ProcessType), process.Type) ? (ProcessType)process.Type : ProcessType.Application;
-            Status = Enum.IsDefined(typeof(ProcessStatus), process.ProcessStatus) ? (ProcessStatus)process.ProcessStatus : ProcessStatus.New;
-            AlarmStatus = Enum.IsDefined(typeof(AlarmStatus), process.AlarmStatus) ? (AlarmStatus)process.AlarmStatus : AlarmStatus.Normal;
+            GpuEngine = Enum.IsDefined(typeof(GpuEngine), (int)process.GpuEngine) ? (GpuEngine)process.GpuEngine : GpuEngine.None;
+            PowerUsage = Enum.IsDefined(typeof(PowerUsage), (int)process.PowerUsage) ? (PowerUsage)process.PowerUsage : PowerUsage.Low;
+            PowerUsageTrend = Enum.IsDefined(typeof(PowerUsage), (int)process.PowerUsageTrend) ? (PowerUsage)process.PowerUsageTrend : PowerUsage.Low;
+            Type = Enum.IsDefined(typeof(ProcessType), (int)process.Type) ? (ProcessType)process.Type : ProcessType.Application;
+            Status = Enum.IsDefined(typeof(ProcessStatus), (int)process.ProcessStatus) ? (ProcessStatus)process.ProcessStatus : ProcessStatus.New;
+            AlarmStatus = Enum.IsDefined(typeof(AlarmStatus), (int)process.AlarmStatus) ? (AlarmStatus)process.AlarmStatus : AlarmStatus.Normal;
             
             // 安全地进行时间转换
             try

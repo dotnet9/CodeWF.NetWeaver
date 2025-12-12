@@ -17,40 +17,49 @@ using SocketDto.Udp;
 using SocketTest.Client.Extensions;
 using SocketTest.Client.Models;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Collections.Immutable;
+using System.Collections.ObjectModel;
 using System.Linq;
 using System.Reactive;
 using System.Reactive.Linq;
+using System.Reactive.Subjects;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Timers;
+using DynamicData;
 using Notification = Avalonia.Controls.Notifications.Notification;
+using Timer = System.Timers.Timer;
 
 namespace SocketTest.Client.ViewModels;
 
 public class MainWindowViewModel : ReactiveObject
 {
     public WindowNotificationManager? NotificationManager { get; set; }
-    private readonly List<ProcessItemModel> _receivedProcesses = new();
-    private TcpSocketClient _tcpClient { get; set; } = new();
-    private UdpSocketClient _udpClient { get; set; } = new();
+    private TcpSocketClient TcpClient { get; } = new();
+    private UdpSocketClient UdpClient { get; } = new();
+
+    private readonly Subject<DateTime> _refreshSubject = new();
+    private const int SyncPointsInterval = 1000;
 
 
     private int[]? _processIdArray;
-    private Dictionary<int, ProcessItemModel>? _processIdAndItems;
+    private ObservableAsPropertyHelper<bool> _isEmpty;
+    private ImmutableList<ProcessItemModel> _tempProcesses = [];
+    private readonly Dictionary<int, ProcessItemModel> _processIdAndItems = [];
 
-    private string? _searchKey;
+    private readonly ConcurrentDictionary<int, UpdateGeneralProcessList> _receivedGeneralProcessLists = new();
+    private readonly ConcurrentDictionary<int, UpdateRealtimeProcessList> _receivedRealtimeProcessLists = new();
+
 
     /// <summary>
     ///     搜索关键词
     /// </summary>
     public string? SearchKey
     {
-        get => _searchKey;
-        set
-        {
-            this.RaiseAndSetIfChanged(ref _searchKey, value);
-            ApplyFilter();
-        }
+        get;
+        set => this.RaiseAndSetIfChanged(ref field, value);
     }
 
     private Timer? _sendDataTimer;
@@ -58,8 +67,6 @@ public class MainWindowViewModel : ReactiveObject
 
     public MainWindowViewModel()
     {
-        DisplayProcesses = new();
-
         void RegisterCommand()
         {
             RefreshCommand = ReactiveCommand.CreateFromTask(HandleRefreshCommandAsync);
@@ -71,12 +78,30 @@ public class MainWindowViewModel : ReactiveObject
         RegisterCommand();
 
         Logger.Info("连接服务端后获取数据");
+
+        _itemSourceCache.Connect()
+            .ObserveOn(RxApp.MainThreadScheduler)
+            .Bind(out _displayProcesses)
+            .Subscribe();
+
+        _isEmpty = this.WhenAnyValue(m => m.DisplayProcesses.Count)
+            .Select(count => count == 0)
+            .ToProperty(this, p => p.IsEmpty);
+
+        _refreshSubject
+            .Throttle(TimeSpan.FromMilliseconds(SyncPointsInterval))
+            .Subscribe(_ => ApplyFilter(), onError: ex => Logger.Error("订阅刷新列表事件失败", ex));
     }
 
     #region 属性
 
+    public bool IsEmpty => _isEmpty.Value;
     public Window? Owner { get; set; }
-    public RangObservableCollection<ProcessItemModel> DisplayProcesses { get; }
+    private HashSet<int>? _previousProcessHashSets;
+    private SourceCache<ProcessItemModel, int> _itemSourceCache = new(item => item.PID);
+
+    private readonly ReadOnlyObservableCollection<ProcessItemModel> _displayProcesses;
+    public ReadOnlyObservableCollection<ProcessItemModel> DisplayProcesses => _displayProcesses;
 
     public string? IP
     {
@@ -132,10 +157,12 @@ public class MainWindowViewModel : ReactiveObject
             {
                 // 清理定时器资源
                 StopHeartbeat();
-                _tcpClient.Stop();
-                _udpClient.Stop();
+                StopUpdateDisplayProcesses();
+                TcpClient.Stop();
+                UdpClient.Stop();
 
-                _udpClient.Received -= ReceiveUdpCommand;
+                UdpClient.Received -= ReceiveUdpCommand;
+                ClearData();
                 IsRunning = false;
                 await Log("已断开与服务端的连接");
             }
@@ -148,7 +175,7 @@ public class MainWindowViewModel : ReactiveObject
                     return;
                 }
 
-                var (isSuccess, errorMessage) = await _tcpClient.ConnectAsync("TCP服务端", IP, Port);
+                var (isSuccess, errorMessage) = await TcpClient.ConnectAsync("TCP服务端", IP, Port);
                 if (isSuccess)
                 {
                     IsRunning = true;
@@ -158,6 +185,7 @@ public class MainWindowViewModel : ReactiveObject
                 }
                 else
                 {
+                    ClearData();
                     await Log($"连接服务端失败：{errorMessage}", LogType.Error);
                 }
             }
@@ -171,36 +199,115 @@ public class MainWindowViewModel : ReactiveObject
 
     private async Task HandleRefreshCommandAsync()
     {
-        if (!_tcpClient.IsRunning)
+        if (!TcpClient.IsRunning)
         {
             _ = Log("未连接Tcp服务，无法发送命令", LogType.Error);
             return;
         }
 
         ClearData();
-        await _tcpClient.SendCommandAsync(new RequestServiceInfo { TaskId = NetHelper.GetTaskId() });
+        await TcpClient.SendCommandAsync(new RequestServiceInfo { TaskId = NetHelper.GetTaskId() });
         _ = Log("发送请求服务基本信息命令");
     }
 
     private async Task HandleRefreshAllCommandAsync()
     {
-        if (!_tcpClient.IsRunning)
+        if (!TcpClient.IsRunning)
         {
             Logger.Error("未连接Tcp服务，无法发送命令");
             return;
         }
 
-        await _tcpClient.SendCommandAsync(new ChangeProcessList());
+        await TcpClient.SendCommandAsync(new ChangeProcessList());
         Logger.Info("发送刷新所有客户端命令");
     }
 
-    private IEnumerable<ProcessItemModel> FilterData(IEnumerable<ProcessItemModel> processes)
+    private CancellationTokenSource? _updateDisplayProcessesToken;
+
+    private void StartUpdateDisplayProcesses()
     {
-        return string.IsNullOrWhiteSpace(_searchKey)
-            ? processes
-            : processes.Where(process =>
-                !string.IsNullOrWhiteSpace(process.Name) &&
-                process.Name.Contains(_searchKey, StringComparison.OrdinalIgnoreCase));
+        if (_updateDisplayProcessesToken is null || _updateDisplayProcessesToken.IsCancellationRequested)
+        {
+            _updateDisplayProcessesToken?.Dispose();
+            _updateDisplayProcessesToken = new();
+        }
+        else
+        {
+            return;
+        }
+
+        Task.Factory.StartNew(async () => await UpdateDisplayProcessesAsync(_updateDisplayProcessesToken.Token),
+            TaskCreationOptions.LongRunning);
+    }
+
+    private void StopUpdateDisplayProcesses()
+    {
+        if (_updateDisplayProcessesToken is null || _updateDisplayProcessesToken.IsCancellationRequested)
+        {
+            return;
+        }
+
+        _updateDisplayProcessesToken.Cancel();
+        try
+        {
+            _updateDisplayProcessesToken.Token.WaitHandle.WaitOne();
+        }
+        catch (Exception ex)
+        {
+            Logger.Error("停止刷新数据异常", ex);
+        }
+        finally
+        {
+            _updateDisplayProcessesToken?.Dispose();
+            _updateDisplayProcessesToken = null;
+        }
+    }
+
+    private async Task UpdateDisplayProcessesAsync(CancellationToken? token)
+    {
+        while (token is { IsCancellationRequested: false })
+        {
+            ApplyFilter();
+
+            if (_tempProcesses.Count <= 100000)
+            {
+                await Task.Delay(TimeSpan.FromMilliseconds(1000));
+            }
+            else
+            {
+                await Task.Delay(TimeSpan.FromMilliseconds(1500));
+            }
+        }
+    }
+
+    private void FilterData(List<ProcessItemModel> processes)
+    {
+        var currentHashSet = new HashSet<int>(processes.Select(p => p.PID));
+        if (_previousProcessHashSets != null && currentHashSet.SetEquals(_previousProcessHashSets))
+        {
+            return;
+        }
+
+        var toAdd = processes.Where(p => _previousProcessHashSets == null || !_previousProcessHashSets.Contains(p.PID))
+            .ToList();
+        var toRemove = _itemSourceCache.Keys.Where(pid => !currentHashSet.Contains(pid)).ToList();
+
+        var removeCount = toRemove?.Count ?? 0;
+        var addCount = toAdd?.Count ?? 0;
+        _itemSourceCache.Edit(m =>
+        {
+            if (removeCount > 0)
+            {
+                m.RemoveKeys(toRemove);
+            }
+
+            if (addCount > 0)
+            {
+                m.AddOrUpdate(toAdd);
+            }
+        });
+
+        _previousProcessHashSets = currentHashSet;
     }
 
     /// <summary>
@@ -208,18 +315,32 @@ public class MainWindowViewModel : ReactiveObject
     /// </summary>
     private void ApplyFilter()
     {
-        var filteredProcesses = FilterData(_receivedProcesses);
-        Invoke(() =>
+        var query = _tempProcesses.AsParallel();
+        if (!string.IsNullOrWhiteSpace(SearchKey))
         {
-            DisplayProcesses.Clear();
-            DisplayProcesses.AddRange(filteredProcesses);
-        });
+            query = query.Where(process => !string.IsNullOrWhiteSpace(process.Name) &&
+                                           process.Name.Contains(SearchKey, StringComparison.OrdinalIgnoreCase));
+        }
+
+        var queryResult = query.ToList();
+        FilterData(queryResult);
     }
 
     private void ClearData()
     {
-        _receivedProcesses.Clear();
-        Invoke(DisplayProcesses.Clear);
+        ClearTempProcesses();
+        _processIdAndItems.Clear();
+        _receivedGeneralProcessLists.Clear();
+        _receivedRealtimeProcessLists.Clear();
+        _previousProcessHashSets = null;
+        _itemSourceCache.Clear();
+    }
+
+    private void ClearTempProcesses()
+    {
+        var builder = _tempProcesses.ToBuilder();
+        builder.Clear();
+        _tempProcesses = builder.ToImmutable();
     }
 
     private void StartSendHeartbeat()
@@ -242,9 +363,9 @@ public class MainWindowViewModel : ReactiveObject
     {
         try
         {
-            if (!_tcpClient.IsRunning) return;
+            if (!TcpClient.IsRunning) return;
 
-            await _tcpClient.SendCommandAsync(new Heartbeat() { TaskId = NetHelper.GetTaskId() });
+            await TcpClient.SendCommandAsync(new Heartbeat() { TaskId = NetHelper.GetTaskId() });
         }
         catch (Exception ex)
         {
@@ -285,7 +406,7 @@ public class MainWindowViewModel : ReactiveObject
         // 开启线程接收数据
         Task.Run(async () =>
         {
-            while (!_tcpClient.IsRunning) await Task.Delay(TimeSpan.FromMilliseconds(10));
+            while (!TcpClient.IsRunning) await Task.Delay(TimeSpan.FromMilliseconds(10));
 
             await HandleRefreshCommandAsync();
         });
@@ -297,39 +418,39 @@ public class MainWindowViewModel : ReactiveObject
     /// <param name="message"></param>
     /// <exception cref="Exception"></exception>
     [EventHandler]
-    private async Task ReceivedSocketCommandAsync(SocketCommand message)
+    private async Task ReceivedSocketCommandAsync(SocketCommand command)
     {
-        if (message.IsCommand<ResponseTargetType>())
+        if (command.IsCommand<ResponseTargetType>())
         {
-            await ReceivedSocketCommandAsync(message.GetCommand<ResponseTargetType>());
+            await ReceivedSocketCommandAsync(command.GetCommand<ResponseTargetType>());
         }
-        else if (message.IsCommand<ResponseUdpAddress>())
+        else if (command.IsCommand<ResponseUdpAddress>())
         {
-            await ReceivedSocketCommandAsync(message.GetCommand<ResponseUdpAddress>());
+            await ReceivedSocketCommandAsync(command.GetCommand<ResponseUdpAddress>());
         }
-        else if (message.IsCommand<ResponseServiceInfo>())
+        else if (command.IsCommand<ResponseServiceInfo>())
         {
-            await ReceivedSocketCommandAsync(message.GetCommand<ResponseServiceInfo>());
+            await ReceivedSocketCommandAsync(command.GetCommand<ResponseServiceInfo>());
         }
-        else if (message.IsCommand<ResponseProcessIDList>())
+        else if (command.IsCommand<ResponseProcessIDList>())
         {
-            await ReceivedSocketCommandAsync(message.GetCommand<ResponseProcessIDList>());
+            await ReceivedSocketCommandAsync(command.GetCommand<ResponseProcessIDList>());
         }
-        else if (message.IsCommand<ResponseProcessList>())
+        else if (command.IsCommand<ResponseProcessList>())
         {
-            await ReceivedSocketCommandAsync(message.GetCommand<ResponseProcessList>());
+            await ReceivedSocketCommandAsync(command.GetCommand<ResponseProcessList>());
         }
-        else if (message.IsCommand<UpdateProcessList>())
+        else if (command.IsCommand<UpdateProcessList>())
         {
-            await ReceivedSocketCommandAsync(message.GetCommand<UpdateProcessList>());
+            await ReceivedSocketCommandAsync(command.GetCommand<UpdateProcessList>());
         }
-        else if (message.IsCommand<ChangeProcessList>())
+        else if (command.IsCommand<ChangeProcessList>())
         {
             await HandleRefreshCommandAsync();
         }
-        else if (message.IsCommand<Heartbeat>())
+        else if (command.IsCommand<Heartbeat>())
         {
-            ReceivedSocketCommand(message.GetCommand<Heartbeat>());
+            ReceivedSocketCommand(command.GetCommand<Heartbeat>());
         }
     }
 
@@ -352,10 +473,11 @@ public class MainWindowViewModel : ReactiveObject
         {
             _ = Log($"正确连接{type.GetDescription()}，程序正常运行");
 
-            await _tcpClient.SendCommandAsync(new RequestUdpAddress());
+            await TcpClient.SendCommandAsync(new RequestUdpAddress());
             _ = Log("发送命令获取Udp组播地址");
 
             await HandleRefreshCommandAsync();
+            StartUpdateDisplayProcesses();
         }
         else
         {
@@ -367,10 +489,10 @@ public class MainWindowViewModel : ReactiveObject
     {
         _ = Log($"收到Udp组播地址=》{response.Ip}:{response.Port}");
 
-        await _udpClient.ConnectAsync("UDP组播", response.Ip, response.Port, _tcpClient.LocalEndPoint,
-            _tcpClient.SystemId);
-        _udpClient.Received -= ReceiveUdpCommand;
-        _udpClient.Received += ReceiveUdpCommand;
+        await UdpClient.ConnectAsync("UDP组播", response.Ip, response.Port, TcpClient.LocalEndPoint,
+            TcpClient.SystemId);
+        UdpClient.Received -= ReceiveUdpCommand;
+        UdpClient.Received += ReceiveUdpCommand;
         _ = Log("尝试订阅Udp组播");
     }
 
@@ -386,7 +508,7 @@ public class MainWindowViewModel : ReactiveObject
         Logger.Info($"【新】{BaseInfo}");
         _ = Log(BaseInfo);
 
-        await _tcpClient.SendCommandAsync(new RequestProcessIDList() { TaskId = NetHelper.GetTaskId() });
+        await TcpClient.SendCommandAsync(new RequestProcessIDList() { TaskId = NetHelper.GetTaskId() });
         _ = Log("发送请求进程ID列表命令");
 
         ClearData();
@@ -397,44 +519,23 @@ public class MainWindowViewModel : ReactiveObject
         _processIdArray = response.IDList!;
         _ = Log($"收到进程ID列表，共{_processIdArray.Length}个进程");
 
-        await _tcpClient.SendCommandAsync(new RequestProcessList { TaskId = NetHelper.GetTaskId() });
+        await TcpClient.SendCommandAsync(new RequestProcessList { TaskId = NetHelper.GetTaskId() });
         _ = Log("发送请求进程详细信息列表命令");
     }
 
     private async Task ReceivedSocketCommandAsync(ResponseProcessList response)
     {
-        // 将耗时的数据处理操作放到后台线程中执行
-        await Task.Run(() =>
-        {
-            var processes =
-                response.Processes?.Select(process => new ProcessItemModel(process, _timestampStartYear)).ToList();
-            if (!(processes?.Count > 0)) return;
+        var processes =
+            response.Processes?.Select(process => new ProcessItemModel(process, _timestampStartYear)).ToList();
+        var builder = _tempProcesses.ToBuilder();
+        builder.AddRange(processes!);
+        _tempProcesses = builder.ToImmutable();
+        processes.ForEach(process => { _processIdAndItems[process.PID] = process; });
 
-            // 先更新后台数据
-            lock (_receivedProcesses) // 确保线程安全
-            {
-                _receivedProcesses.AddRange(processes);
-            }
-
-            var filterData = FilterData(processes);
-
-            // 只在需要更新UI时才调用Invoke
-            Invoke(() => DisplayProcesses.AddRange(filterData));
-
-            // 当收到全部数据时构建字典，这个操作也比较耗时，放到后台线程
-            if (_receivedProcesses.Count == response.TotalSize)
-            {
-                lock (_receivedProcesses) // 确保线程安全
-                {
-                    _processIdAndItems = _receivedProcesses.ToDictionary(process => process.PID);
-                }
-            }
-
-            var msg = response.TaskId == default ? "收到推送" : "收到请求响应";
-            Logger.Info(
-                $"{msg}【{response.PageIndex + 1}/{response.PageCount}】进程{processes.Count}条({_receivedProcesses.Count}/{response.TotalSize})"
-            );
-        });
+        var msg = response.TaskId == default ? "收到推送" : "收到请求响应";
+        Logger.Info(
+            $"{msg}【{response.PageIndex + 1}/{response.PageCount}】进程{processes.Count}条({_tempProcesses.Count}/{response.TotalSize})"
+        );
     }
 
     private async Task ReceivedSocketCommandAsync(UpdateProcessList response)
@@ -460,6 +561,45 @@ public class MainWindowViewModel : ReactiveObject
     #region 接收Udp数据
 
     private void ReceivedSocketCommand(UpdateRealtimeProcessList response)
+    {
+        _receivedRealtimeProcessLists[response.PageIndex] = response;
+        UpdateRealtimeProcessList();
+    }
+
+
+    private void ReceivedSocketCommand(UpdateGeneralProcessList response)
+    {
+        _receivedGeneralProcessLists[response.PageIndex] = response;
+        UpdateGeneralProcessList();
+    }
+
+    private bool _isUpdateRealtimeProcessList = false;
+    private const int _dillRealtimeDuration = 500;
+
+    private void UpdateRealtimeProcessList()
+    {
+        if (_isUpdateRealtimeProcessList)
+        {
+            return;
+        }
+
+        _isUpdateRealtimeProcessList = true;
+
+        Task.Run(async () =>
+        {
+            while (true)
+            {
+                foreach (var response in _receivedRealtimeProcessLists)
+                {
+                    UpdateRealtimeProcessList(response.Value);
+                }
+
+                await Task.Delay(TimeSpan.FromMilliseconds(_dillRealtimeDuration));
+            }
+        });
+    }
+
+    private void UpdateRealtimeProcessList(UpdateRealtimeProcessList response)
     {
         void LogNotExistProcess(int index)
         {
@@ -505,7 +645,33 @@ public class MainWindowViewModel : ReactiveObject
         }
     }
 
-    private void ReceivedSocketCommand(UpdateGeneralProcessList response)
+    private bool _isUpdateGeneralProcessList = false;
+    private const int _dillGeneralDuration = 1000;
+
+    private void UpdateGeneralProcessList()
+    {
+        if (_isUpdateGeneralProcessList)
+        {
+            return;
+        }
+
+        _isUpdateGeneralProcessList = true;
+
+        Task.Run(async () =>
+        {
+            while (true)
+            {
+                foreach (var response in _receivedGeneralProcessLists)
+                {
+                    UpdateGeneralProcessList(response.Value);
+                }
+
+                await Task.Delay(TimeSpan.FromMilliseconds(_dillGeneralDuration));
+            }
+        });
+    }
+
+    private void UpdateGeneralProcessList(UpdateGeneralProcessList response)
     {
         void LogNotExistProcess(int index)
         {
@@ -561,7 +727,7 @@ public class MainWindowViewModel : ReactiveObject
 
     private async Task RequestTargetTypeAsync()
     {
-        await _tcpClient.SendCommandAsync(new RequestTargetType() { TaskId = NetHelper.GetTaskId() });
+        await TcpClient.SendCommandAsync(new RequestTargetType() { TaskId = NetHelper.GetTaskId() });
         _ = Log("发送命令查询目标终端类型是否是服务端");
     }
 
