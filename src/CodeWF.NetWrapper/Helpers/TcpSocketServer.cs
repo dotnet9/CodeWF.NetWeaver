@@ -2,7 +2,6 @@ using CodeWF.Log.Core;
 using CodeWF.NetWeaver;
 using CodeWF.NetWeaver.Base;
 using CodeWF.NetWrapper.Commands;
-using CodeWF.NetWrapper.Models;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -75,24 +74,6 @@ public class TcpSocketServer
     ///     是否正在运行Tcp服务
     /// </summary>
     public bool IsRunning { get; set; }
-
-
-    /// <summary>
-    ///     命令发送时间
-    /// </summary>
-    public DateTime SendTime { get; set; }
-
-
-    /// <summary>
-    ///     响应接收时间
-    /// </summary>
-    public DateTime ReceiveTime { get; set; }
-
-
-    /// <summary>
-    ///     心跳时间
-    /// </summary>
-    public DateTime HeartbeatTime { get; set; }
 
     #endregion
 
@@ -250,7 +231,7 @@ public class TcpSocketServer
                 Logger.Info($"{ServerMark} 客户端({socketClientKey})连接上线");
 
                 // 使用Task.Run启动新的任务来处理客户端，避免阻塞监听
-                _ = Task.Run(() => HandleClientAsync(session));
+                _ = Task.Run(async () => await HandleClientAsync(session));
             }
             catch (Exception ex)
             {
@@ -268,13 +249,12 @@ public class TcpSocketServer
     /// <param name="client">客户端会话对象</param>
     private async Task HandleClientAsync(TcpSession client)
     {
+        var tcpClientKey = client.TcpSocket?.RemoteEndPoint?.ToString() ?? string.Empty;
         while (IsRunning && _listenTokenSource?.IsCancellationRequested != true &&
                client.TokenSource?.IsCancellationRequested != true)
         {
-            var tcpClientKey = string.Empty;
             try
             {
-                tcpClientKey = client.TcpSocket?.RemoteEndPoint?.ToString() ?? string.Empty;
                 var (success, buffer, headInfo) = await client.TcpSocket!.ReadPacketAsync();
                 if (!success)
                 {

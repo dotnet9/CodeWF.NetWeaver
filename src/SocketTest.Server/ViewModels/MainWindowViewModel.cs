@@ -363,7 +363,6 @@ public class MainWindowViewModel : ReactiveObject
     private async Task ReceiveSocketCommandAsync(Socket client, Heartbeat heartbeat)
     {
         await _tcpServer.SendCommandAsync(client, heartbeat);
-        _tcpServer.HeartbeatTime = DateTime.Now;
     }
 
     #endregion

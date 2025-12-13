@@ -51,33 +51,6 @@ public class TcpSocketClient
     public bool IsRunning { get; set; }
 
     /// <summary>
-    ///     发送时间
-    /// </summary>
-    private DateTime _sendTime;
-
-    /// <summary>
-    ///     命令发送时间
-    /// </summary>
-    public DateTime SendTime { get; set; }
-
-
-    /// <summary>
-    ///     响应接收时间
-    /// </summary>
-    public DateTime ReceiveTime { get; set; }
-
-
-    /// <summary>
-    ///     获取或设置心跳发送时间
-    /// </summary>
-    public DateTime SendHeartbeatTime { get; set; }
-
-    /// <summary>
-    ///     获取或设置心跳响应时间
-    /// </summary>
-    public DateTime ResponseHeartbeatTime { get; set; }
-
-    /// <summary>
     /// 本地端点连接信息
     /// </summary>
     public string? LocalEndPoint { get; set; }
@@ -162,7 +135,6 @@ public class TcpSocketClient
                 var (success, buffer, headInfo) = await _client!.ReadPacketAsync();
                 if (!success) break;
 
-                ReceiveTime = DateTime.Now;
                 SystemId = headInfo!.SystemId;
                 _responses.Add(new SocketCommand(headInfo, buffer, _client));
             }

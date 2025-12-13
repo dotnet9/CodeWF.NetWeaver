@@ -60,17 +60,6 @@ public class UdpSocketServer
     /// </summary>
     public bool IsRunning { get; set; }
 
-    /// <summary>
-    ///     命令发送时间
-    /// </summary>
-    public DateTime SendTime { get; set; }
-
-
-    /// <summary>
-    ///     响应接收时间
-    /// </summary>
-    public DateTime ReceiveTime { get; set; }
-
     #endregion
 
     #region 公开接口方法

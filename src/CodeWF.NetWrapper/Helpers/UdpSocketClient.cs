@@ -54,17 +54,6 @@ public class UdpSocketClient
     public bool IsRunning { get; set; }
 
     /// <summary>
-    ///     命令发送时间
-    /// </summary>
-    public DateTime SendTime { get; set; }
-
-
-    /// <summary>
-    ///     响应接收时间
-    /// </summary>
-    public DateTime ReceiveTime { get; set; }
-
-    /// <summary>
     /// 新数据通知事件
     /// </summary>
     public EventHandler<SocketCommand>? Received;
@@ -185,7 +174,6 @@ public class UdpSocketClient
                 }
 
                 _receivedBuffers.Add(new SocketCommand(headInfo!, data));
-                ReceiveTime = DateTime.Now;
             }
             catch (SocketException ex)
             {
