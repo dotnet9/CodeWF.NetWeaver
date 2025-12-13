@@ -22,10 +22,6 @@ public class TcpSocketClient
 
     private Socket? _client;
 
-    /// <summary>
-    ///     服务端标识，TCP数据接收时保存，用于UDP数据包识别
-    /// </summary>
-    public long SystemId { get; private set; }
 
     #region 公开属性
 
@@ -33,6 +29,11 @@ public class TcpSocketClient
     ///     服务标识，用以区分多个服务
     /// </summary>
     public string? ServerMark { get; private set; }
+
+    /// <summary>
+    ///     服务端标识，TCP数据接收时保存，用于UDP数据包识别
+    /// </summary>
+    public long SystemId { get; private set; }
 
     /// <summary>
     ///     获取或设置服务器IP地址

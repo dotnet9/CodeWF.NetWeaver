@@ -25,10 +25,6 @@ public class UdpSocketClient
     /// </summary>
     private UdpClient? _client;
 
-    /// <summary>
-    /// 远程端点
-    /// </summary>
-    private IPEndPoint _remoteEp = new(IPAddress.Any, 0);
 
     #region 公开属性
 
@@ -71,7 +67,7 @@ public class UdpSocketClient
     /// <param name="serverIP">服务器IP地址</param>
     /// <param name="serverPort">服务器端口号</param>
     /// <param name="endpoint">本地端点</param>
-    public async Task ConnectAsync(string serverMark, string serverIP, int serverPort, string endpoint,  long systemId)
+    public async Task ConnectAsync(string serverMark, string serverIP, int serverPort, string endpoint, long systemId)
     {
         ServerMark = serverMark;
         ServerIP = serverIP;
@@ -167,6 +163,7 @@ public class UdpSocketClient
                 {
                     continue;
                 }
+
                 if (data.Length < headInfo.BufferLen)
                 {
                     Logger.Warn($"{ServerMark} 接收到不完整UDP包，接收大小 {data.Length}，错误UDP包基本信息：{headInfo}");
@@ -200,7 +197,7 @@ public class UdpSocketClient
 
         while (IsRunning)
         {
-            if (_receivedBuffers.TryTake(out var message,TimeSpan.FromMilliseconds(10)))
+            if (_receivedBuffers.TryTake(out var message, TimeSpan.FromMilliseconds(10)))
             {
                 Received?.Invoke(this, message);
             }

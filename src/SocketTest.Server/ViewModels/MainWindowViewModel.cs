@@ -501,18 +501,13 @@ public class MainWindowViewModel : ReactiveObject
 
     #region Socket命令处理
 
-    [EventHandler]
     private async Task SendMockDataAsync()
     {
-        _ = Log(_tcpServer.IsRunning ? "TCP服务已运行" : "TCP服务已停止");
-        if (_tcpServer.IsRunning)
+        await Task.Run(async () =>
         {
-            await Task.Run(async () =>
-            {
-                await MockUtil.MockAsync(MockCount);
-                _ = Log("数据模拟完成，客户端可以正常请求数据了");
-            });
-        }
+            await MockUtil.MockAsync(MockCount);
+            _ = Log("数据模拟完成，客户端可以正常请求数据了");
+        });
     }
 
     #endregion Socket命令处理
