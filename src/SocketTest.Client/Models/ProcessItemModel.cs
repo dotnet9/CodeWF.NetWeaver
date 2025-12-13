@@ -41,6 +41,30 @@ public class ProcessItemModel : ReactiveObject
 
     private DateTime _updateTime;
 
+    // 用于批量更新的标志
+    private bool _isUpdating;
+
+    /// <summary>
+    /// 开始批量更新，暂停UI通知
+    /// </summary>
+    public void BeginUpdate()
+    {
+        _isUpdating = true;
+    }
+
+    /// <summary>
+    /// 结束批量更新，恢复UI通知
+    /// </summary>
+    public void EndUpdate()
+    {
+        _isUpdating = false;
+        // 触发一次属性更改通知，通知UI更新
+        this.RaisePropertyChanged(nameof(Cpu));
+        this.RaisePropertyChanged(nameof(Memory));
+        this.RaisePropertyChanged(nameof(Disk));
+        this.RaisePropertyChanged(nameof(Network));
+    }
+
     public ProcessItemModel()
     {
     }
@@ -117,7 +141,12 @@ public class ProcessItemModel : ReactiveObject
     public short Cpu
     {
         get => _cpu;
-        set => this.RaiseAndSetIfChanged(ref _cpu, value);
+        set
+        {
+            _cpu = value;
+            if (!_isUpdating)
+                this.RaisePropertyChanged(nameof(Cpu));
+        }
     }
 
     /// <summary>
@@ -126,7 +155,12 @@ public class ProcessItemModel : ReactiveObject
     public short Memory
     {
         get => _memory;
-        set => this.RaiseAndSetIfChanged(ref _memory, value);
+        set
+        {
+            _memory = value;
+            if (!_isUpdating)
+                this.RaisePropertyChanged(nameof(Memory));
+        }
     }
 
     /// <summary>
@@ -135,7 +169,12 @@ public class ProcessItemModel : ReactiveObject
     public short Disk
     {
         get => _disk;
-        set => this.RaiseAndSetIfChanged(ref _disk, value);
+        set
+        {
+            _disk = value;
+            if (!_isUpdating)
+                this.RaisePropertyChanged(nameof(Disk));
+        }
     }
 
     /// <summary>
@@ -144,7 +183,12 @@ public class ProcessItemModel : ReactiveObject
     public short Network
     {
         get => _network;
-        set => this.RaiseAndSetIfChanged(ref _network, value);
+        set
+        {
+            _network = value;
+            if (!_isUpdating)
+                this.RaisePropertyChanged(nameof(Network));
+        }
     }
 
     /// <summary>
@@ -216,7 +260,7 @@ public class ProcessItemModel : ReactiveObject
             Disk = process.Disk;
             Network = process.Network;
             Gpu = process.Gpu;
-            
+
             // 安全地进行枚举转换
             GpuEngine = Enum.IsDefined(typeof(GpuEngine), (int)process.GpuEngine) ? (GpuEngine)process.GpuEngine : GpuEngine.None;
             PowerUsage = Enum.IsDefined(typeof(PowerUsage), (int)process.PowerUsage) ? (PowerUsage)process.PowerUsage : PowerUsage.Low;
@@ -224,7 +268,7 @@ public class ProcessItemModel : ReactiveObject
             Type = Enum.IsDefined(typeof(ProcessType), (int)process.Type) ? (ProcessType)process.Type : ProcessType.Application;
             Status = Enum.IsDefined(typeof(ProcessStatus), (int)process.ProcessStatus) ? (ProcessStatus)process.ProcessStatus : ProcessStatus.New;
             AlarmStatus = Enum.IsDefined(typeof(AlarmStatus), (int)process.AlarmStatus) ? (AlarmStatus)process.AlarmStatus : AlarmStatus.Normal;
-            
+
             // 安全地进行时间转换
             try
             {
@@ -246,10 +290,19 @@ public class ProcessItemModel : ReactiveObject
 
     public void Update(short cpu, short memory, short disk, short network)
     {
-        Cpu = cpu;
-        Memory = memory;
-        Disk = disk;
-        Network = network;
+        // 使用批量更新减少UI通知次数
+        BeginUpdate();
+        try
+        {
+            Cpu = cpu;
+            Memory = memory;
+            Disk = disk;
+            Network = network;
+        }
+        finally
+        {
+            EndUpdate();
+        }
     }
 
     public void Update(int timestampStartYear, byte processStatus, byte alarmStatus, short gpu, byte gpuEngine, byte powerUsage, byte powerUsageTrend, uint updateTime)
@@ -263,9 +316,9 @@ public class ProcessItemModel : ReactiveObject
             GpuEngine = Enum.IsDefined(typeof(GpuEngine), gpuEngine) ? (GpuEngine)gpuEngine : GpuEngine.None;
             PowerUsage = Enum.IsDefined(typeof(PowerUsage), powerUsage) ? (PowerUsage)powerUsage : PowerUsage.Low;
             PowerUsageTrend = Enum.IsDefined(typeof(PowerUsage), powerUsageTrend) ? (PowerUsage)powerUsageTrend : PowerUsage.Low;
-            
+
             LastUpdateTime = UpdateTime;
-            
+
             // 安全地进行时间转换
             try
             {

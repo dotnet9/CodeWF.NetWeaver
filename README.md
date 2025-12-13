@@ -125,3 +125,7 @@ public void Test_SerializeResponseProcessList_Success()
 
 - https://github.com/dotnet9/CsharpSocketTest
 - https://github.com/dotnet9/CodeWF.EventBus.Socket
+
+**注意**
+
+测试程序有性能问题，还在优化

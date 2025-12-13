@@ -158,6 +158,7 @@ public class MainWindowViewModel : ReactiveObject
                 // 清理定时器资源
                 StopHeartbeat();
                 StopUpdateDisplayProcesses();
+                StopUpdateProcesses(); // 停止UDP数据更新任务
                 TcpClient.Stop();
                 UdpClient.Stop();
 
@@ -181,6 +182,7 @@ public class MainWindowViewModel : ReactiveObject
                     IsRunning = true;
                     await Log("连接服务端成功");
                     StartSendHeartbeat();
+                    StartUpdateProcesses(); // 启动UDP数据更新任务
                     await RequestTargetTypeAsync();
                 }
                 else
@@ -223,6 +225,8 @@ public class MainWindowViewModel : ReactiveObject
     }
 
     private CancellationTokenSource? _updateDisplayProcessesToken;
+    private CancellationTokenSource? _updateRealtimeProcessListToken;
+    private CancellationTokenSource? _updateGeneralProcessListToken;
 
     private void StartUpdateDisplayProcesses()
     {
@@ -263,21 +267,139 @@ public class MainWindowViewModel : ReactiveObject
         }
     }
 
-    private async Task UpdateDisplayProcessesAsync(CancellationToken? token)
+    private void StartUpdateProcesses()
     {
-        while (token is { IsCancellationRequested: false })
+        // 启动实时进程更新任务
+        if (_updateRealtimeProcessListToken is null || _updateRealtimeProcessListToken.IsCancellationRequested)
         {
-            ApplyFilter();
+            _updateRealtimeProcessListToken?.Dispose();
+            _updateRealtimeProcessListToken = new();
+        }
+        else
+        {
+            return;
+        }
 
-            if (_tempProcesses.Count <= 100000)
+        Task.Factory.StartNew(async () => await UpdateRealtimeProcessListAsync(_updateRealtimeProcessListToken.Token),
+            TaskCreationOptions.LongRunning);
+
+        // 启动一般进程更新任务
+        if (_updateGeneralProcessListToken is null || _updateGeneralProcessListToken.IsCancellationRequested)
+        {
+            _updateGeneralProcessListToken?.Dispose();
+            _updateGeneralProcessListToken = new();
+        }
+        else
+        {
+            return;
+        }
+
+        Task.Factory.StartNew(async () => await UpdateGeneralProcessListAsync(_updateGeneralProcessListToken.Token),
+            TaskCreationOptions.LongRunning);
+    }
+
+    private void StopUpdateProcesses()
+    {
+        // 停止实时进程更新任务
+        if (_updateRealtimeProcessListToken is not null && !_updateRealtimeProcessListToken.IsCancellationRequested)
+        {
+            _updateRealtimeProcessListToken.Cancel();
+            try
             {
-                await Task.Delay(TimeSpan.FromMilliseconds(1000));
+                _updateRealtimeProcessListToken.Token.WaitHandle.WaitOne();
             }
-            else
+            catch (Exception ex)
             {
-                await Task.Delay(TimeSpan.FromMilliseconds(1500));
+                Logger.Error("停止实时进程更新异常", ex);
+            }
+            finally
+            {
+                _updateRealtimeProcessListToken?.Dispose();
+                _updateRealtimeProcessListToken = null;
             }
         }
+
+        // 停止一般进程更新任务
+        if (_updateGeneralProcessListToken is not null && !_updateGeneralProcessListToken.IsCancellationRequested)
+        {
+            _updateGeneralProcessListToken.Cancel();
+            try
+            {
+                _updateGeneralProcessListToken.Token.WaitHandle.WaitOne();
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("停止一般进程更新异常", ex);
+            }
+            finally
+            {
+                _updateGeneralProcessListToken?.Dispose();
+                _updateGeneralProcessListToken = null;
+            }
+        }
+    }
+
+    private async Task UpdateDisplayProcessesAsync(CancellationToken? token)
+    {
+        // 记录上次更新的进程数量和哈希值，用于检测数据是否真正变化
+        int lastProcessCount = -1;
+        long lastProcessHash = 0;
+
+        while (token is { IsCancellationRequested: false })
+        {
+            try
+            {
+                // 只在数据真正变化时才更新UI
+                int currentProcessCount = _tempProcesses.Count;
+                long currentProcessHash = CalculateProcessListHash(_tempProcesses);
+
+                if (currentProcessCount != lastProcessCount || currentProcessHash != lastProcessHash)
+                {
+                    ApplyFilter();
+                    lastProcessCount = currentProcessCount;
+                    lastProcessHash = currentProcessHash;
+                }
+
+                // 动态调整延迟时间，根据进程数量优化性能
+                int delayMs = currentProcessCount <= 1000 ? 1000 :
+                             currentProcessCount <= 10000 ? 2000 : 3000;
+
+                await Task.Delay(TimeSpan.FromMilliseconds(delayMs), token.Value);
+            }
+            catch (OperationCanceledException)
+            {
+                // 任务被取消，正常退出循环
+                break;
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("更新显示进程异常", ex);
+                await Task.Delay(TimeSpan.FromMilliseconds(5000), token.Value); // 出现异常时延迟5秒再重试
+            }
+        }
+    }
+
+    /// <summary>
+    /// 计算进程列表的哈希值，用于快速检测数据是否变化
+    /// </summary>
+    private long CalculateProcessListHash(ImmutableList<ProcessItemModel> processes)
+    {
+        if (processes == null || processes.Count == 0)
+        {
+            return 0;
+        }
+
+        // 使用进程数量和最新进程的哈希值组合计算
+        long hash = processes.Count;
+        var latestProcess = processes.LastOrDefault();
+        if (latestProcess != null)
+        {
+            hash = hash * 31 + latestProcess.PID;
+            hash = hash * 31 + latestProcess.Cpu;
+            hash = hash * 31 + latestProcess.Memory;
+        }
+
+        return hash;
     }
 
     private void FilterData(List<ProcessItemModel> processes)
@@ -563,40 +685,50 @@ public class MainWindowViewModel : ReactiveObject
     private void ReceivedSocketCommand(UpdateRealtimeProcessList response)
     {
         _receivedRealtimeProcessLists[response.PageIndex] = response;
-        UpdateRealtimeProcessList();
     }
 
 
     private void ReceivedSocketCommand(UpdateGeneralProcessList response)
     {
         _receivedGeneralProcessLists[response.PageIndex] = response;
-        UpdateGeneralProcessList();
     }
 
-    private bool _isUpdateRealtimeProcessList = false;
     private const int _dillRealtimeDuration = 500;
+
+    private async Task UpdateRealtimeProcessListAsync(CancellationToken token)
+    {
+        try
+        {
+            // 持续处理接收到的UDP数据
+            while (!token.IsCancellationRequested)
+            {
+                if (_receivedRealtimeProcessLists.Count > 0)
+                {
+                    // 处理当前接收到的所有响应
+                    foreach (var response in _receivedRealtimeProcessLists.Values.ToList())
+                    {
+                        UpdateRealtimeProcessList(response);
+                    }
+
+                    // 清空已处理的响应
+                    _receivedRealtimeProcessLists.Clear();
+                }
+                await Task.Delay(TimeSpan.FromMilliseconds(_dillRealtimeDuration), token);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // 任务被取消，正常退出
+        }
+        catch (Exception ex)
+        {
+            Logger.Error($"处理实时进程列表更新异常：{ex.Message}");
+        }
+    }
 
     private void UpdateRealtimeProcessList()
     {
-        if (_isUpdateRealtimeProcessList)
-        {
-            return;
-        }
-
-        _isUpdateRealtimeProcessList = true;
-
-        Task.Run(async () =>
-        {
-            while (true)
-            {
-                foreach (var response in _receivedRealtimeProcessLists)
-                {
-                    UpdateRealtimeProcessList(response.Value);
-                }
-
-                await Task.Delay(TimeSpan.FromMilliseconds(_dillRealtimeDuration));
-            }
-        });
+        // 此方法已被UpdateRealtimeProcessListAsync替代
     }
 
     private void UpdateRealtimeProcessList(UpdateRealtimeProcessList response)
@@ -610,6 +742,10 @@ public class MainWindowViewModel : ReactiveObject
         {
             var startIndex = response.PageIndex * response.PageSize;
             var dataCount = response.Cpus.Length / 2;
+
+            // 批量更新所有进程，减少UI通知次数
+            var batchUpdatedProcesses = new List<ProcessItemModel>();
+
             for (var i = 0; i < dataCount; i++)
             {
                 if (_processIdArray?.Length > startIndex && _processIdAndItems?.Count > startIndex)
@@ -617,6 +753,10 @@ public class MainWindowViewModel : ReactiveObject
                     var processId = _processIdArray[startIndex];
                     if (_processIdAndItems.TryGetValue(processId, out var process))
                     {
+                        // 开始批量更新
+                        process.BeginUpdate();
+                        batchUpdatedProcesses.Add(process);
+
                         var cpu = BitConverter.ToInt16(response.Cpus, i * sizeof(Int16));
                         var memory = BitConverter.ToInt16(response.Memories, i * sizeof(Int16));
                         var disk = BitConverter.ToInt16(response.Disks, i * sizeof(Int16));
@@ -636,6 +776,12 @@ public class MainWindowViewModel : ReactiveObject
                 startIndex++;
             }
 
+            // 结束所有进程的批量更新
+            foreach (var process in batchUpdatedProcesses)
+            {
+                process.EndUpdate();
+            }
+
             // 减少实时日志输出频率，只在调试时使用
             // Console.WriteLine($"【实时】更新数据{dataCount}条");
         }
@@ -645,30 +791,42 @@ public class MainWindowViewModel : ReactiveObject
         }
     }
 
-    private bool _isUpdateGeneralProcessList = false;
     private const int _dillGeneralDuration = 1000;
+
+    private async Task UpdateGeneralProcessListAsync(CancellationToken token)
+    {
+        try
+        {
+            // 持续处理接收到的UDP数据
+            while (!token.IsCancellationRequested)
+            {
+                if (_receivedGeneralProcessLists.Count > 0)
+                {
+                    // 处理当前接收到的所有响应
+                    foreach (var response in _receivedGeneralProcessLists.Values.ToList())
+                    {
+                        UpdateGeneralProcessList(response);
+                    }
+
+                    // 清空已处理的响应
+                    _receivedGeneralProcessLists.Clear();
+                }
+                await Task.Delay(TimeSpan.FromMilliseconds(_dillGeneralDuration), token);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // 任务被取消，正常退出
+        }
+        catch (Exception ex)
+        {
+            Logger.Error($"处理一般进程列表更新异常：{ex.Message}");
+        }
+    }
 
     private void UpdateGeneralProcessList()
     {
-        if (_isUpdateGeneralProcessList)
-        {
-            return;
-        }
-
-        _isUpdateGeneralProcessList = true;
-
-        Task.Run(async () =>
-        {
-            while (true)
-            {
-                foreach (var response in _receivedGeneralProcessLists)
-                {
-                    UpdateGeneralProcessList(response.Value);
-                }
-
-                await Task.Delay(TimeSpan.FromMilliseconds(_dillGeneralDuration));
-            }
-        });
+        // 此方法已被UpdateGeneralProcessListAsync替代
     }
 
     private void UpdateGeneralProcessList(UpdateGeneralProcessList response)
@@ -682,6 +840,10 @@ public class MainWindowViewModel : ReactiveObject
         {
             var startIndex = response.PageIndex * response.PageSize;
             var dataCount = response.ProcessStatuses.Length;
+
+            // 批量更新所有进程，减少UI通知次数
+            var batchUpdatedProcesses = new List<ProcessItemModel>();
+
             for (var i = 0; i < dataCount; i++)
             {
                 if (_processIdArray?.Length > startIndex && _processIdAndItems?.Count > startIndex)
@@ -689,6 +851,10 @@ public class MainWindowViewModel : ReactiveObject
                     var processId = _processIdArray[startIndex];
                     if (_processIdAndItems.TryGetValue(processId, out var process))
                     {
+                        // 开始批量更新
+                        process.BeginUpdate();
+                        batchUpdatedProcesses.Add(process);
+
                         var processStatus = response.ProcessStatuses[i];
                         var alarmStatus = response.AlarmStatuses[i];
                         var gpu = BitConverter.ToInt16(response.Gpus, i * sizeof(short));
@@ -710,6 +876,12 @@ public class MainWindowViewModel : ReactiveObject
                 }
 
                 startIndex++;
+            }
+
+            // 结束所有进程的批量更新
+            foreach (var process in batchUpdatedProcesses)
+            {
+                process.EndUpdate();
             }
 
             // 减少实时日志输出频率，只在调试时使用
