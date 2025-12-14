@@ -115,7 +115,7 @@ public class TcpSocketClient
     /// <exception cref="Exception">当客户端未连接时抛出</exception>
     public async Task SendCommandAsync(INetObject command)
     {
-        if (!IsRunning || !_client.Connected) throw new Exception($"{ServerMark} 未连接，无法发送命令");
+        if (!IsRunning || _client?.Connected != true) throw new Exception($"{ServerMark} 未连接，无法发送命令");
 
         var buffer = command.Serialize(SystemId);
         await _client!.SendAsync(buffer);
@@ -130,13 +130,14 @@ public class TcpSocketClient
     /// </summary>
     private async Task ListenForServerAsync()
     {
-        while (IsRunning)
+        while (IsRunning && _client?.Connected == true)
+        {
             try
             {
                 var (success, buffer, headInfo) = await _client!.ReadPacketAsync();
                 if (!success) break;
 
-                SystemId = headInfo!.SystemId;
+                SystemId = headInfo.SystemId;
                 _responses.Add(new SocketCommand(headInfo, buffer, _client));
             }
             catch (SocketException ex)
@@ -150,6 +151,7 @@ public class TcpSocketClient
 
                 break;
             }
+        }
     }
 
     /// <summary>

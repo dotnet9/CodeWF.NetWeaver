@@ -6,6 +6,7 @@
         xmlns:codewf="https://codewf.com"
         xmlns:converters="clr-namespace:SocketTest.Client.Converters"
         mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+        Width="1000" Height="800"
         x:Class="SocketTest.Client.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Icon="/Assets/logo.ico"
