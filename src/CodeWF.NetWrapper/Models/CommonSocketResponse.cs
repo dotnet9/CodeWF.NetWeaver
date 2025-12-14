@@ -11,7 +11,7 @@ public class CommonSocketResponse : INetObject
     /// <summary>
     /// 获取或设置任务 ID
     /// </summary>
-    public string TaskId { get; set; } = null!;
+    public int TaskId { get; set; }
 
     /// <summary>
     /// 获取或设置响应状态
