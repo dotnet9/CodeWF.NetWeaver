@@ -1,4 +1,4 @@
-using CodeWF.Tools.Extensions;
+﻿using CodeWF.Tools.Extensions;
 using ReactiveUI;
 using SocketDto.Enums;
 using SocketDto.Response;
@@ -11,60 +11,6 @@ namespace SocketTest.Client.Models;
 /// </summary>
 public class ProcessItemModel : ReactiveObject
 {
-    private string? _commandLine;
-
-    private short _cpu;
-
-    private short _disk;
-
-    private short _gpu;
-
-    private GpuEngine _gpuEngine;
-
-    private DateTime _lastUpdateTime;
-
-    private short _memory;
-
-    private string? _name;
-
-    private short _network;
-
-    private PowerUsage _powerUsage;
-
-    private PowerUsage _powerUsageTrend;
-
-    private string? _publisher;
-
-    private ProcessStatus _status;
-
-    private ProcessType _type;
-
-    private DateTime _updateTime;
-
-    // 用于批量更新的标志
-    private bool _isUpdating;
-
-    /// <summary>
-    /// 开始批量更新，暂停UI通知
-    /// </summary>
-    public void BeginUpdate()
-    {
-        _isUpdating = true;
-    }
-
-    /// <summary>
-    /// 结束批量更新，恢复UI通知
-    /// </summary>
-    public void EndUpdate()
-    {
-        _isUpdating = false;
-        // 触发一次属性更改通知，通知UI更新
-        this.RaisePropertyChanged(nameof(Cpu));
-        this.RaisePropertyChanged(nameof(Memory));
-        this.RaisePropertyChanged(nameof(Disk));
-        this.RaisePropertyChanged(nameof(Network));
-    }
-
     public ProcessItemModel()
     {
     }
@@ -84,8 +30,8 @@ public class ProcessItemModel : ReactiveObject
     /// </summary>
     public string? Name
     {
-        get => _name;
-        set => this.RaiseAndSetIfChanged(ref _name, value);
+        get;
+        set => this.RaiseAndSetIfChanged(ref field, value);
     }
 
     /// <summary>
@@ -93,8 +39,8 @@ public class ProcessItemModel : ReactiveObject
     /// </summary>
     public ProcessType Type
     {
-        get => _type;
-        set => this.RaiseAndSetIfChanged(ref _type, value);
+        get;
+        set => this.RaiseAndSetIfChanged(ref field, value);
     }
 
     /// <summary>
@@ -102,8 +48,8 @@ public class ProcessItemModel : ReactiveObject
     /// </summary>
     public ProcessStatus Status
     {
-        get => _status;
-        set => this.RaiseAndSetIfChanged(ref _status, value);
+        get;
+        set => this.RaiseAndSetIfChanged(ref field, value);
     }
 
     private AlarmStatus _alarmStatus;
@@ -122,8 +68,8 @@ public class ProcessItemModel : ReactiveObject
     /// </summary>
     public string? Publisher
     {
-        get => _publisher;
-        set => this.RaiseAndSetIfChanged(ref _publisher, value);
+        get;
+        set => this.RaiseAndSetIfChanged(ref field, value);
     }
 
     /// <summary>
@@ -131,8 +77,8 @@ public class ProcessItemModel : ReactiveObject
     /// </summary>
     public string? CommandLine
     {
-        get => _commandLine;
-        set => this.RaiseAndSetIfChanged(ref _commandLine, value);
+        get;
+        set => this.RaiseAndSetIfChanged(ref field, value);
     }
 
     /// <summary>
@@ -140,13 +86,8 @@ public class ProcessItemModel : ReactiveObject
     /// </summary>
     public short Cpu
     {
-        get => _cpu;
-        set
-        {
-            _cpu = value;
-            if (!_isUpdating)
-                this.RaisePropertyChanged(nameof(Cpu));
-        }
+        get;
+        set => this.RaiseAndSetIfChanged(ref field, value);
     }
 
     /// <summary>
@@ -154,13 +95,8 @@ public class ProcessItemModel : ReactiveObject
     /// </summary>
     public short Memory
     {
-        get => _memory;
-        set
-        {
-            _memory = value;
-            if (!_isUpdating)
-                this.RaisePropertyChanged(nameof(Memory));
-        }
+        get;
+        set => this.RaiseAndSetIfChanged(ref field, value);
     }
 
     /// <summary>
@@ -168,13 +104,8 @@ public class ProcessItemModel : ReactiveObject
     /// </summary>
     public short Disk
     {
-        get => _disk;
-        set
-        {
-            _disk = value;
-            if (!_isUpdating)
-                this.RaisePropertyChanged(nameof(Disk));
-        }
+        get;
+        set => this.RaiseAndSetIfChanged(ref field, value);
     }
 
     /// <summary>
@@ -182,13 +113,8 @@ public class ProcessItemModel : ReactiveObject
     /// </summary>
     public short Network
     {
-        get => _network;
-        set
-        {
-            _network = value;
-            if (!_isUpdating)
-                this.RaisePropertyChanged(nameof(Network));
-        }
+        get;
+        set => this.RaiseAndSetIfChanged(ref field, value);
     }
 
     /// <summary>
@@ -196,8 +122,8 @@ public class ProcessItemModel : ReactiveObject
     /// </summary>
     public short Gpu
     {
-        get => _gpu;
-        set => this.RaiseAndSetIfChanged(ref _gpu, value);
+        get;
+        set => this.RaiseAndSetIfChanged(ref field, value);
     }
 
     /// <summary>
@@ -205,8 +131,8 @@ public class ProcessItemModel : ReactiveObject
     /// </summary>
     public GpuEngine GpuEngine
     {
-        get => _gpuEngine;
-        set => this.RaiseAndSetIfChanged(ref _gpuEngine, value);
+        get;
+        set => this.RaiseAndSetIfChanged(ref field, value);
     }
 
     /// <summary>
@@ -214,8 +140,8 @@ public class ProcessItemModel : ReactiveObject
     /// </summary>
     public PowerUsage PowerUsage
     {
-        get => _powerUsage;
-        set => this.RaiseAndSetIfChanged(ref _powerUsage, value);
+        get;
+        set => this.RaiseAndSetIfChanged(ref field, value);
     }
 
     /// <summary>
@@ -223,8 +149,8 @@ public class ProcessItemModel : ReactiveObject
     /// </summary>
     public PowerUsage PowerUsageTrend
     {
-        get => _powerUsageTrend;
-        set => this.RaiseAndSetIfChanged(ref _powerUsageTrend, value);
+        get;
+        set => this.RaiseAndSetIfChanged(ref field, value);
     }
 
     /// <summary>
@@ -232,8 +158,8 @@ public class ProcessItemModel : ReactiveObject
     /// </summary>
     public DateTime LastUpdateTime
     {
-        get => _lastUpdateTime;
-        set => this.RaiseAndSetIfChanged(ref _lastUpdateTime, value);
+        get;
+        set => this.RaiseAndSetIfChanged(ref field, value);
     }
 
     /// <summary>
@@ -241,98 +167,50 @@ public class ProcessItemModel : ReactiveObject
     /// </summary>
     public DateTime UpdateTime
     {
-        get => _updateTime;
-        set => this.RaiseAndSetIfChanged(ref _updateTime, value);
+        get;
+        set => this.RaiseAndSetIfChanged(ref field, value);
     }
 
     public void Update(ProcessItem process, int timestampStartYear)
     {
-        try
-        {
-            PID = process.Pid;
+        PID = process.Pid;
 
-            Name = process.Name ?? "未知进程";
-            Publisher = process.Publisher ?? "未知发布者";
-            CommandLine = process.CommandLine ?? "";
+        Name = process.Name;
+        Publisher = process.Publisher;
+        CommandLine = process.CommandLine;
 
-            Cpu = process.Cpu;
-            Memory = process.Memory;
-            Disk = process.Disk;
-            Network = process.Network;
-            Gpu = process.Gpu;
-
-            // 安全地进行枚举转换
-            GpuEngine = Enum.IsDefined(typeof(GpuEngine), (int)process.GpuEngine) ? (GpuEngine)process.GpuEngine : GpuEngine.None;
-            PowerUsage = Enum.IsDefined(typeof(PowerUsage), (int)process.PowerUsage) ? (PowerUsage)process.PowerUsage : PowerUsage.Low;
-            PowerUsageTrend = Enum.IsDefined(typeof(PowerUsage), (int)process.PowerUsageTrend) ? (PowerUsage)process.PowerUsageTrend : PowerUsage.Low;
-            Type = Enum.IsDefined(typeof(ProcessType), (int)process.Type) ? (ProcessType)process.Type : ProcessType.Application;
-            Status = Enum.IsDefined(typeof(ProcessStatus), (int)process.ProcessStatus) ? (ProcessStatus)process.ProcessStatus : ProcessStatus.New;
-            AlarmStatus = Enum.IsDefined(typeof(AlarmStatus), (int)process.AlarmStatus) ? (AlarmStatus)process.AlarmStatus : AlarmStatus.Normal;
-
-            // 安全地进行时间转换
-            try
-            {
-                LastUpdateTime = process.LastUpdateTime.FromSpecialUnixTimeSecondsToDateTime(timestampStartYear);
-                UpdateTime = process.UpdateTime.FromSpecialUnixTimeSecondsToDateTime(timestampStartYear);
-            }
-            catch (Exception)
-            {
-                LastUpdateTime = DateTime.Now;
-                UpdateTime = DateTime.Now;
-            }
-        }
-        catch (Exception ex)
-        {
-            // 记录错误但不中断程序
-            System.Diagnostics.Debug.WriteLine($"更新进程信息失败: {ex.Message}");
-        }
+        Cpu = process.Cpu;
+        Memory = process.Memory;
+        Disk = process.Disk;
+        Network = process.Network;
+        Gpu = process.Gpu;
+        GpuEngine = (GpuEngine)Enum.Parse(typeof(GpuEngine), process.GpuEngine.ToString());
+        PowerUsage = (PowerUsage)Enum.Parse(typeof(PowerUsage), process.PowerUsage.ToString());
+        PowerUsageTrend = (PowerUsage)Enum.Parse(typeof(PowerUsage), process.PowerUsageTrend.ToString());
+        Type = (ProcessType)Enum.Parse(typeof(ProcessType), process.Type.ToString());
+        Status = (ProcessStatus)Enum.Parse(typeof(ProcessStatus), process.ProcessStatus.ToString());
+        LastUpdateTime = process.LastUpdateTime.FromSpecialUnixTimeSecondsToDateTime(timestampStartYear);
+        UpdateTime = process.UpdateTime.FromSpecialUnixTimeSecondsToDateTime(timestampStartYear);
     }
 
     public void Update(short cpu, short memory, short disk, short network)
     {
-        // 使用批量更新减少UI通知次数
-        BeginUpdate();
-        try
-        {
-            Cpu = cpu;
-            Memory = memory;
-            Disk = disk;
-            Network = network;
-        }
-        finally
-        {
-            EndUpdate();
-        }
+        Cpu = cpu;
+        Memory = memory;
+        Disk = disk;
+        Network = network;
     }
 
-    public void Update(int timestampStartYear, byte processStatus, byte alarmStatus, short gpu, byte gpuEngine, byte powerUsage, byte powerUsageTrend, uint updateTime)
+    public void Update(int timestampStartYear, byte processStatus, byte alarmStatus, short gpu, byte gpuEngine,
+        byte powerUsage, byte powerUsageTrend, uint updateTime)
     {
-        try
-        {
-            // 安全地进行枚举转换
-            Status = Enum.IsDefined(typeof(ProcessStatus), processStatus) ? (ProcessStatus)processStatus : ProcessStatus.New;
-            AlarmStatus = Enum.IsDefined(typeof(AlarmStatus), alarmStatus) ? (AlarmStatus)alarmStatus : AlarmStatus.Normal;
-            Gpu = gpu;
-            GpuEngine = Enum.IsDefined(typeof(GpuEngine), gpuEngine) ? (GpuEngine)gpuEngine : GpuEngine.None;
-            PowerUsage = Enum.IsDefined(typeof(PowerUsage), powerUsage) ? (PowerUsage)powerUsage : PowerUsage.Low;
-            PowerUsageTrend = Enum.IsDefined(typeof(PowerUsage), powerUsageTrend) ? (PowerUsage)powerUsageTrend : PowerUsage.Low;
-
-            LastUpdateTime = UpdateTime;
-
-            // 安全地进行时间转换
-            try
-            {
-                UpdateTime = updateTime.FromSpecialUnixTimeSecondsToDateTime(timestampStartYear);
-            }
-            catch (Exception)
-            {
-                UpdateTime = DateTime.Now;
-            }
-        }
-        catch (Exception ex)
-        {
-            // 记录错误但不中断程序
-            System.Diagnostics.Debug.WriteLine($"更新进程一般信息失败: {ex.Message}");
-        }
+        Status = (ProcessStatus)Enum.Parse(typeof(ProcessStatus), processStatus.ToString());
+        AlarmStatus = (AlarmStatus)Enum.Parse(typeof(AlarmStatus), alarmStatus.ToString());
+        Gpu = gpu;
+        GpuEngine = (GpuEngine)Enum.Parse(typeof(GpuEngine), gpuEngine.ToString());
+        PowerUsage = (PowerUsage)Enum.Parse(typeof(PowerUsage), powerUsage.ToString());
+        PowerUsageTrend = (PowerUsage)Enum.Parse(typeof(PowerUsage), powerUsageTrend.ToString());
+        LastUpdateTime = UpdateTime;
+        UpdateTime = updateTime.FromSpecialUnixTimeSecondsToDateTime(timestampStartYear);
     }
 }

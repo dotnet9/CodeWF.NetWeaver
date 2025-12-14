@@ -5,12 +5,11 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:codewf="https://codewf.com"
         xmlns:converters="clr-namespace:SocketTest.Client.Converters"
-        mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="800"
+        mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
         x:Class="SocketTest.Client.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Icon="/Assets/logo.ico"
-        Title="Socket客户端(实时进程监控)">
-
+        Title="SocketTest.Client">
     <Window.Resources>
         <converters:ProcessPowerUsageToForegroundConverter x:Key="ProcessPowerUsageToForegroundConverter" />
         <converters:EnumToDescriptionConverter x:Key="EnumToDescriptionConverter" />
@@ -25,23 +24,18 @@
         <Style Selector="TextBlock">
             <Setter Property="VerticalAlignment" Value="Center" />
         </Style>
-        <Style Selector="TextBox">
+        <Style Selector="TextBox.form">
             <Setter Property="VerticalContentAlignment" Value="Center" />
-            <Setter Property="Height" Value="25" />
-            <Setter Property="Watermark" Value="请输入内容" />
+            <Setter Property="Height" Value="23" />
+        </Style>
+        <Style Selector="HeaderedContentControl.form">
+            <Setter Property="VerticalAlignment" Value="Center" />
         </Style>
         <Style Selector="Button">
-            <Setter Property="Height" Value="25" />
-            <Setter Property="Padding" Value="10,3" />
-            <Setter Property="Margin" Value="5,0" />
+            <Setter Property="Height" Value="30" />
+            <Setter Property="Padding" Value="15,2" />
+            <Setter Property="Margin" Value="10,0" />
             <Setter Property="VerticalAlignment" Value="Center" />
-            <Setter Property="Background" Value="#2196F3" />
-            <Setter Property="Foreground" Value="White" />
-            <Setter Property="BorderThickness" Value="0" />
-            <Setter Property="CornerRadius" Value="4" />
-        </Style>
-        <Style Selector="Button:pointerover">
-            <Setter Property="Background" Value="#1976D2" />
         </Style>
     </Window.Styles>
     <Design.DataContext>
@@ -57,29 +51,25 @@
             <RowDefinition Height="30" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
-        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,5">
+        <StackPanel Orientation="Horizontal">
             <TextBlock Margin="0,0,5,0" Text="服务端IP：" />
-            <TextBox Width="150" Text="{Binding IP}" Watermark="输入服务器IP地址" />
+            <TextBox Width="150"
+                     Text="{Binding TcpIp, Mode=TwoWay}" />
 
             <TextBlock Margin="10,0,5,0" Text="端口：" />
-            <TextBox Width="60" Text="{Binding Port}" Watermark="输入端口号" />
-            <Button Command="{Binding ConnectCommand}" Content="{codewf:If Condition={Binding IsRunning}, True=断开服务, False=连接服务}" />
-            <Button Command="{Binding RefreshCommand}" Content="刷新" Background="#4CAF50" />
-            <Button Command="{Binding RefreshAllCommand}" Content="刷新所有客户端" Background="#2196F3" />
-            
-            <!-- 搜索框 -->
-            <StackPanel Orientation="Horizontal" Margin="20,0,0,0" VerticalAlignment="Center">
-                <TextBlock Margin="0,0,5,0" Text="搜索：" />
-                <TextBox Width="200" 
-                         Watermark="输入进程名称进行搜索"
-                         Text="{Binding SearchKey, Mode=TwoWay}" />
-            </StackPanel>
+            <TextBox Width="60"
+                     Text="{Binding TcpPort, Mode=TwoWay}" />
+            <Button
+                Command="{Binding HandleConnectTcpCommandAsync}"
+                Content="{codewf:If Condition={Binding IsRunning}, True=断开服务, False=连接服务}" />
+            <Button Command="{Binding RefreshCommand}" Content="刷新" />
+            <Button Command="{Binding RefreshAllCommand}" Content="刷新所有客户端" />
         </StackPanel>
         <HeaderedContentControl Header="实时进程信息" Grid.Row="1">
             <DataGrid CanUserReorderColumns="True" CanUserResizeColumns="True" CanUserSortColumns="True"
                       GridLinesVisibility="All" ScrollViewer.AllowAutoHide="False" FontSize="12"
-                      HeadersVisibility="Column" IsReadOnly="True" BorderThickness="1" BorderBrush="#E0E0E0"
-                      ItemsSource="{Binding DisplayProcesses, Mode=OneWay}" Background="White">
+                      HeadersVisibility="Column" IsReadOnly="True" BorderThickness="1" BorderBrush="#33000000"
+                      ItemsSource="{Binding DisplayProcesses, Mode=OneWay}">
                 <DataGrid.Columns>
                     <DataGridTextColumn
                         Width="70"
@@ -207,14 +197,22 @@
             <codewf:LogView />
         </HeaderedContentControl>
 
-        <!-- 状态栏 -->
-        <Border Grid.Row="4" Background="#F5F5F5" BorderBrush="#E0E0E0" BorderThickness="0,1,0,0">
-            <StackPanel Orientation="Horizontal" Margin="10,5,0,0" VerticalAlignment="Center">
-                <TextBlock Margin="0,0,20,0" Text="连接状态: " FontWeight="Medium" />
-                <TextBlock Text="{Binding BaseInfo}" Foreground="#0066CC" />
-                <TextBlock Margin="20,0,5,0" Text="进程数量: " FontWeight="Medium" />
-                <TextBlock Text="{Binding DisplayProcesses.Count}" Foreground="#FF6600" />
-            </StackPanel>
-        </Border>
+        <StackPanel
+            Grid.Row="4"
+            VerticalAlignment="Center"
+            Orientation="Horizontal">
+            <TextBlock Text="{Binding BaseInfo}" />
+        </StackPanel>
+        <StackPanel
+            Grid.Row="5"
+            Margin="0,8"
+            VerticalAlignment="Center">
+            <TextBlock>
+                <Run Text="UDP组播：" />
+                <Run Text="{Binding UdpIp,Mode=OneWay}" />
+                <Run Text=":" />
+                <Run Text="{Binding UdpPort,Mode=OneWay}" />
+            </TextBlock>
+        </StackPanel>
     </Grid>
 </Window>

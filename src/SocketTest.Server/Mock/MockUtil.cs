@@ -1,4 +1,5 @@
-﻿using CodeWF.NetWeaver;
+﻿using CodeWF.Log.Core;
+using CodeWF.NetWeaver;
 using CodeWF.Tools.Extensions;
 using LoremNET;
 using SocketDto.Enums;
@@ -9,8 +10,6 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
-using CodeWF.Log.Core;
-using CodeWF.LogViewer.Avalonia;
 using ProcessItem = SocketDto.Response.ProcessItem;
 
 namespace SocketTest.Server.Mock;
@@ -55,7 +54,7 @@ public static class MockUtil
 
     public static async Task<ResponseServiceInfo?> GetBaseInfoAsync()
     {
-        return await Task.FromResult(_mockResponseBase);
+        return _mockResponseBase;
     }
 
     public static async Task<int[]?> GetProcessIdListAsync()
@@ -76,7 +75,6 @@ public static class MockUtil
             TimestampStartYear = TimestampStartYear,
             LastUpdateTime = DateTime.Now.GetSpecialUnixTimeSeconds(TimestampStartYear)
         };
-        await Task.CompletedTask;
     }
 
     private static async Task MockProcessIdListAsync()
@@ -120,9 +118,9 @@ public static class MockUtil
         return await Task.FromResult(true);
     }
 
-    public static async Task<List<ProcessItem>?> MockProcessesAsync(int pageSize, int pageIndex)
+    public static async Task<List<ProcessItem>> MockProcessesAsync(int pageSize, int pageIndex)
     {
-        return _mockProcesses?.Skip(pageIndex * pageSize).Take(pageSize).ToList();
+        return await Task.FromResult(_mockProcesses!.Skip(pageIndex * pageSize).Take(pageSize).ToList());
     }
 
 

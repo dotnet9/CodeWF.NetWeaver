@@ -1,4 +1,4 @@
-using Avalonia.Controls.Notifications;
+﻿using Avalonia.Controls.Notifications;
 using Avalonia.Threading;
 using CodeWF.EventBus;
 using CodeWF.Log.Core;
@@ -27,25 +27,18 @@ namespace SocketTest.Server.ViewModels;
 public class MainWindowViewModel : ReactiveObject
 {
     public WindowNotificationManager? NotificationManager { get; set; }
-    private TcpSocketServer _tcpServer { get; set; }
-    private UdpSocketServer _udpServer { get; set; }
-
+    private string? _runCommandContent = "开启服务";
 
     public MainWindowViewModel()
     {
         void RegisterCommand()
         {
-            // 仍然使用WhenAnyValue来创建基于IsRunning状态的命令
-            RunCommand = ReactiveCommand.CreateFromTask(HandleRunCommandCommandAsync);
             RefreshCommand = ReactiveCommand.CreateFromTask(HandleRefreshCommandAsync);
             UpdateCommand = ReactiveCommand.CreateFromTask(HandleUpdateCommandAsync);
         }
 
-        _tcpServer = new TcpSocketServer()
-        {
-            SystemId = DateTime.Now.Ticks
-        };
-        _udpServer = new UdpSocketServer();
+        TcpHelper = new TcpSocketServer();
+        UdpHelper = new UdpSocketServer();
 
         EventBus.Default.Subscribe(this);
         RegisterCommand();
@@ -58,72 +51,51 @@ public class MainWindowViewModel : ReactiveObject
 
     #region 属性
 
-    public string? TCPIP
+    public TcpSocketServer TcpHelper { get; set; }
+    public UdpSocketServer UdpHelper { get; set; }
+
+    /// <summary>
+    ///     Tcp服务IP
+    /// </summary>
+    public string? TcpIp
     {
         get;
         set => this.RaiseAndSetIfChanged(ref field, value);
     } = "127.0.0.1";
 
-    public int TCPPort
+    /// <summary>
+    ///     Tcp服务端口
+    /// </summary>
+    public int TcpPort
     {
         get;
         set => this.RaiseAndSetIfChanged(ref field, value);
     } = 5000;
 
-    public string? UDPIP
+    /// <summary>
+    ///     UDP组播IP
+    /// </summary>
+    public string? UdpIp
     {
         get;
         set => this.RaiseAndSetIfChanged(ref field, value);
     } = "224.0.0.0";
 
-    public int UDPPort
+    /// <summary>
+    ///     UDP组播端口
+    /// </summary>
+    public int UdpPort
     {
         get;
         set => this.RaiseAndSetIfChanged(ref field, value);
     } = 9540;
 
-    public bool IsRunning
+    public string? RunCommandContent
     {
-        get;
-        set => this.RaiseAndSetIfChanged(ref field, value);
+        get => _runCommandContent;
+        set => this.RaiseAndSetIfChanged(ref _runCommandContent, value);
     }
 
-
-    /// <summary>
-    ///     连接的客户端数量
-    /// </summary>
-    public int ClientCount
-    {
-        get;
-        set => this.RaiseAndSetIfChanged(ref field, value);
-    } = 0;
-
-    /// <summary>
-    ///     TCP服务状态
-    /// </summary>
-    public string TCPStatus
-    {
-        get;
-        set => this.RaiseAndSetIfChanged(ref field, value);
-    } = "TCP服务未运行";
-
-    /// <summary>
-    ///     UDP组播状态
-    /// </summary>
-    public string UDPStatus
-    {
-        get;
-        set => this.RaiseAndSetIfChanged(ref field, value);
-    } = "UDP组播未运行";
-
-    /// <summary>
-    ///     发送的数据包数量
-    /// </summary>
-    public int SentDataCount
-    {
-        get;
-        set => this.RaiseAndSetIfChanged(ref field, value);
-    } = 0;
 
     /// <summary>
     ///     模拟数据总量
@@ -144,6 +116,24 @@ public class MainWindowViewModel : ReactiveObject
     } = 5000;
 
     /// <summary>
+    ///     心跳时间
+    /// </summary>
+    public DateTime HeartbeatTime
+    {
+        get;
+        set => this.RaiseAndSetIfChanged(ref field, value);
+    }
+
+    /// <summary>
+    ///     是否正在运行Tcp服务
+    /// </summary>
+    public bool IsRunning
+    {
+        get;
+        set => this.RaiseAndSetIfChanged(ref field, value);
+    }
+
+    /// <summary>
     ///     刷新数据
     /// </summary>
     public ReactiveCommand<Unit, Unit>? RefreshCommand { get; private set; }
@@ -153,70 +143,30 @@ public class MainWindowViewModel : ReactiveObject
     /// </summary>
     public ReactiveCommand<Unit, Unit>? UpdateCommand { get; private set; }
 
-    /// <summary>
-    ///     运行命令
-    /// </summary>
-    public ReactiveCommand<Unit, Unit>? RunCommand { get; private set; }
+    public async Task HandleRunCommandCommandAsync()
+    {
+        if (!TcpHelper.IsRunning)
+        {
+            await TcpHelper.StartAsync("TCP服务端", TcpIp, TcpPort);
+            UdpHelper.Start("UDP服务端", TcpHelper.SystemId, UdpIp, UdpPort);
+            await SendMockDataAsync();
+            IsRunning = true;
+        }
+        else
+        {
+            await TcpHelper.StopAsync();
+            UdpHelper.Stop();
+            IsRunning = false;
+        }
+
+        await Task.CompletedTask;
+    }
 
     #endregion 属性
 
-    public async Task HandleRunCommandCommandAsync()
-    {
-        try
-        {
-            if (!_tcpServer.IsRunning)
-            {
-                // 验证IP和端口格式
-                if (string.IsNullOrWhiteSpace(TCPIP) || TCPPort <= 0 || TCPPort > 65535)
-                {
-                    await Log("请输入有效的IP地址和端口号", LogType.Error);
-                    return;
-                }
-
-                var (isSuccess, errorMessage) = await _tcpServer.StartAsync("TCP服务端", TCPIP, TCPPort);
-                if (isSuccess)
-                {
-                    TCPStatus = "TCP服务已启动";
-                    IsRunning = true;
-                    await Log("TCP服务已启动");
-                    (isSuccess, errorMessage) = _udpServer.Start("UDP服务端", _tcpServer.SystemId, UDPIP, UDPPort);
-                    if (isSuccess)
-                    {
-                        await Log("UDP组播已启动");
-                        await SendMockDataAsync();
-                    }
-                    else
-                    {
-                        await Log($"UDP组播启动失败：{errorMessage}", LogType.Error);
-                    }
-                }
-                else
-                {
-                    TCPStatus = "TCP服务启动失败";
-                    await Log($"TCP服务启动失败：{errorMessage}", LogType.Error);
-                }
-            }
-            else
-            {
-                await _tcpServer.StopAsync();
-                _udpServer.Stop();
-                TCPStatus = "TCP服务已停止";
-                UDPStatus = "UDP组播已停止";
-                ClientCount = 0;
-                IsRunning = false;
-                await Log("服务已停止");
-            }
-        }
-        catch (Exception ex)
-        {
-            IsRunning = false;
-            await Log($"操作失败：{ex.Message}", LogType.Error);
-        }
-    }
-
     private async Task HandleRefreshCommandAsync()
     {
-        if (!_tcpServer.IsRunning)
+        if (!TcpHelper.IsRunning)
         {
             Logger.Error("未运行Tcp服务，无法发送命令");
             return;
@@ -227,7 +177,7 @@ public class MainWindowViewModel : ReactiveObject
 
     private async Task HandleUpdateCommandAsync()
     {
-        if (!_tcpServer.IsRunning)
+        if (!TcpHelper.IsRunning)
         {
             Logger.Error("未运行Tcp服务，无法发送命令");
             return;
@@ -238,9 +188,19 @@ public class MainWindowViewModel : ReactiveObject
 
     #region 处理Socket信息
 
-    [EventHandler]
-    private async Task ReceiveSocketCommandAsync(SocketCommand message)
+    private async Task SendMockDataAsync()
     {
+        Task.Run(async () =>
+        {
+            await MockUtil.MockAsync(MockCount);
+            _ = Log("数据模拟完成，客户端可以正常请求数据了");
+        });
+    }
+
+    [EventHandler]
+    private async Task ReceiveSocketMessageAsync(SocketCommand message)
+    {
+        Logger.Info($"Dill command: {message}");
         if (message.IsCommand<RequestTargetType>())
         {
             await ReceiveSocketCommandAsync(message.Client!, message.GetCommand<RequestTargetType>());
@@ -281,7 +241,7 @@ public class MainWindowViewModel : ReactiveObject
             TaskId = request.TaskId,
             Type = (byte)currentTerminalType
         };
-        await _tcpServer.SendCommandAsync(client, response);
+        await TcpHelper.SendCommandAsync(client, response);
 
         _ = Log($"响应请求终端类型命令：当前终端为={currentTerminalType.GetDescription()}");
     }
@@ -293,10 +253,10 @@ public class MainWindowViewModel : ReactiveObject
         var response = new ResponseUdpAddress()
         {
             TaskId = request.TaskId,
-            Ip = _udpServer.ServerIP,
-            Port = _udpServer.ServerPort,
+            Ip = UdpIp,
+            Port = UdpPort,
         };
-        await _tcpServer.SendCommandAsync(client, response);
+        await TcpHelper.SendCommandAsync(client, response);
 
         _ = Log($"响应请求Udp组播地址命令：{response.Ip}:{response.Port}");
     }
@@ -307,7 +267,7 @@ public class MainWindowViewModel : ReactiveObject
 
         var data = MockUtil.GetBaseInfoAsync().Result!;
         data.TaskId = request.TaskId;
-        await _tcpServer.SendCommandAsync(client, data);
+        await TcpHelper.SendCommandAsync(client, data);
 
         _ = Log($"响应基本信息命令：当前操作系统版本号={data.OS}，内存大小={data.MemorySize}GB");
     }
@@ -321,7 +281,7 @@ public class MainWindowViewModel : ReactiveObject
             TaskId = request.TaskId,
             IDList = MockUtil.GetProcessIdListAsync().Result
         };
-        await _tcpServer.SendCommandAsync(client, response);
+        await TcpHelper.SendCommandAsync(client, response);
 
         _ = Log($"响应进程ID列表命令：{response.IDList?.Length}");
     }
@@ -345,7 +305,7 @@ public class MainWindowViewModel : ReactiveObject
                     Processes = await MockUtil.MockProcessesAsync(MockPageSize, pageIndex)
                 };
                 sendCount += response.Processes.Count;
-                await _tcpServer.SendCommandAsync(client, response);
+                await TcpHelper.SendCommandAsync(client, response);
                 await Task.Delay(TimeSpan.FromMilliseconds(10));
 
                 var msg = response.TaskId == default ? "推送" : "响应请求";
@@ -357,12 +317,13 @@ public class MainWindowViewModel : ReactiveObject
 
     private async Task ReceiveSocketCommandAsync(Socket client, ChangeProcessList changeProcess)
     {
-        await _tcpServer.SendCommandAsync(changeProcess);
+        await TcpHelper.SendCommandAsync(changeProcess);
     }
 
     private async Task ReceiveSocketCommandAsync(Socket client, Heartbeat heartbeat)
     {
-        await _tcpServer.SendCommandAsync(client, heartbeat);
+        await TcpHelper.SendCommandAsync(client, new Heartbeat());
+        HeartbeatTime = DateTime.Now;
     }
 
     #endregion
@@ -391,12 +352,12 @@ public class MainWindowViewModel : ReactiveObject
     {
         if (_isUpdateAll)
         {
-            _tcpServer.SendCommandAsync(new ChangeProcessList());
+            await TcpHelper.SendCommandAsync(new ChangeProcessList());
             Logger.Info("====TCP推送结构变化通知====");
             return;
         }
 
-        _tcpServer.SendCommandAsync(new UpdateProcessList
+        await TcpHelper.SendCommandAsync(new UpdateProcessList
         {
             Processes = await MockUtil.MockProcessesAsync(MockCount, MockPageSize)
         });
@@ -434,7 +395,7 @@ public class MainWindowViewModel : ReactiveObject
 
     private async void MockUpdateDataAsync(object? sender, ElapsedEventArgs e)
     {
-        if (!_udpServer.IsRunning || !MockUtil.IsInitOver) return;
+        if (!UdpHelper.IsRunning || !MockUtil.IsInitOver) return;
 
         var sw = Stopwatch.StartNew();
 
@@ -442,12 +403,12 @@ public class MainWindowViewModel : ReactiveObject
 
         sw.Stop();
 
-        //Logger.Info($"更新模拟实时数据{sw.ElapsedMilliseconds}ms");
+        Logger.Info($"更新模拟实时数据{sw.ElapsedMilliseconds}ms");
     }
 
     private async void MockSendRealtimeDataAsync(object? sender, ElapsedEventArgs e)
     {
-        if (!_udpServer.IsRunning || !MockUtil.IsInitOver) return;
+        if (!UdpHelper.IsRunning || !MockUtil.IsInitOver) return;
 
         var sw = Stopwatch.StartNew();
 
@@ -456,15 +417,14 @@ public class MainWindowViewModel : ReactiveObject
 
         for (var pageIndex = 0; pageIndex < pageCount; pageIndex++)
         {
-            if (!_udpServer.IsRunning) break;
+            if (!UdpHelper.IsRunning) break;
 
             var response = MockUtil.MockUpdateRealtimeProcessList(pageSize, pageIndex);
             response.TotalSize = MockCount;
             response.PageSize = pageSize;
             response.PageCount = pageCount;
             response.PageIndex = pageIndex;
-
-            await _udpServer.SendCommandAsync(response, DateTimeOffset.UtcNow);
+            await UdpHelper.SendCommandAsync(response, DateTimeOffset.UtcNow);
         }
 
         Logger.Info(
@@ -473,7 +433,7 @@ public class MainWindowViewModel : ReactiveObject
 
     private async void MockSendGeneralDataAsync(object? sender, ElapsedEventArgs e)
     {
-        if (!_udpServer.IsRunning || !MockUtil.IsInitOver) return;
+        if (!UdpHelper.IsRunning || !MockUtil.IsInitOver) return;
 
         var sw = Stopwatch.StartNew();
 
@@ -482,7 +442,7 @@ public class MainWindowViewModel : ReactiveObject
 
         for (var pageIndex = 0; pageIndex < pageCount; pageIndex++)
         {
-            if (!_udpServer.IsRunning) break;
+            if (!UdpHelper.IsRunning) break;
 
             var response = MockUtil.MockUpdateGeneralProcessList(pageSize, pageIndex);
             response.TotalSize = MockCount;
@@ -490,7 +450,7 @@ public class MainWindowViewModel : ReactiveObject
             response.PageCount = pageCount;
             response.PageIndex = pageIndex;
 
-            await _udpServer.SendCommandAsync(response, DateTimeOffset.UtcNow);
+            await UdpHelper.SendCommandAsync(response, DateTimeOffset.UtcNow);
         }
 
         Logger.Info(
@@ -498,19 +458,6 @@ public class MainWindowViewModel : ReactiveObject
     }
 
     #endregion
-
-    #region Socket命令处理
-
-    private async Task SendMockDataAsync()
-    {
-        await Task.Run(async () =>
-        {
-            await MockUtil.MockAsync(MockCount);
-            _ = Log("数据模拟完成，客户端可以正常请求数据了");
-        });
-    }
-
-    #endregion Socket命令处理
 
     private void Invoke(Action action)
     {
@@ -522,7 +469,7 @@ public class MainWindowViewModel : ReactiveObject
         await Dispatcher.UIThread.InvokeAsync(action.Invoke);
     }
 
-    private async Task Log(string msg, LogType type = LogType.Info, bool showNotification = false)
+    private async Task Log(string msg, LogType type = LogType.Info, bool showNotification = true)
     {
         if (type == LogType.Info)
         {
