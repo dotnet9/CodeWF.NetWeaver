@@ -22,4 +22,24 @@ public class CommonSocketResponse : INetObject
     /// 获取或设置响应消息
     /// </summary>
     public string? Message { get; set; }
+
+    public static CommonSocketResponse Success(int taskId, string message = "Success")
+    {
+        return new CommonSocketResponse()
+        {
+            TaskId = taskId,
+            Status = (byte)TcpResponseStatus.Success,
+            Message = message
+        };
+    }
+
+    public static CommonSocketResponse Fail(int taskId, string message = "Fail")
+    {
+        return new CommonSocketResponse()
+        {
+            TaskId = taskId,
+            Status = (byte)TcpResponseStatus.Fail,
+            Message = message
+        };
+    }
 }
