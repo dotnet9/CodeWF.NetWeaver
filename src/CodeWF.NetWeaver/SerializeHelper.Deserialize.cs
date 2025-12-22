@@ -99,8 +99,15 @@ public partial class SerializeHelper
             if (property.GetCustomAttribute(typeof(NetIgnoreMemberAttribute)) is NetIgnoreMemberAttribute _)
                 continue;
 
-            var value = DeserializeValue(reader, property.PropertyType);
-            property.SetValue(data, value);
+            try
+            {
+                var value = DeserializeValue(reader, property.PropertyType);
+                property.SetValue(data, value);
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Analyze \"{property.Name}\" property anomaly", ex);
+            }
         }
     }
 
@@ -113,6 +120,7 @@ public partial class SerializeHelper
     private static object DeserializeValue(BinaryReader reader, Type propertyType)
     {
         object value;
+
         if (propertyType.IsPrimitive || propertyType == typeof(string) || propertyType.IsEnum)
             value = DeserializeBaseValue(reader, propertyType);
         else if (propertyType.IsArray)

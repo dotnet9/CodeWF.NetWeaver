@@ -33,6 +33,13 @@ public class SocketCommand(NetHeadInfo netHeadInfo, byte[] buffer, Socket? clien
     public bool IsCommand<T>() => HeadInfo.IsNetObject<T>();
 
     /// <summary>
+    /// 检查是否为指定类型的命令，但版本号不同
+    /// </summary>
+    /// <typeparam name="T">命令类型</typeparam>
+    /// <returns>是否为指定类型的命令</returns>
+    public bool IsCommandDiffVersion<T>() => HeadInfo.IsNetObjectDiffVersion<T>();
+
+    /// <summary>
     /// 获取命令对象
     /// </summary>
     /// <typeparam name="T">命令类型</typeparam>

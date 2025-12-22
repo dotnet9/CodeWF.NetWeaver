@@ -61,6 +61,20 @@ public partial class SerializeHelper
     }
 
     /// <summary>
+    /// 获取网络对象的头部信息
+    /// </summary>
+    /// <param name="netObjectType">网络对象类型</param>
+    /// <returns>网络对象头部属性</returns>
+    /// <exception cref="Exception">当类型未标记 NetHeadAttribute 时抛出异常</exception>
+    public static NetHeadAttribute GetNetObjectHead<T>()
+    {
+        var netObjectType = typeof(T);
+        var attribute = netObjectType.GetCustomAttribute<NetHeadAttribute>();
+        return attribute ?? throw new Exception(
+            $"{netObjectType.Name} has not been marked with the attribute {nameof(NetHeadAttribute)}");
+    }
+
+    /// <summary>
     /// 从字节数组中读取网络对象头部信息
     /// </summary>
     /// <param name="buffer">字节数组</param>
@@ -122,5 +136,18 @@ public partial class SerializeHelper
         var netObjectAttribute = GetNetObjectHead(typeof(T));
         return netObjectAttribute.Id == netObjectHeadInfo.ObjectId &&
                netObjectAttribute.Version == netObjectHeadInfo.ObjectVersion;
+    }
+
+    /// <summary>
+    /// 检查网络对象头部信息是否匹配指定的类型，但版本号不同
+    /// </summary>
+    /// <typeparam name="T">要检查的类型</typeparam>
+    /// <param name="netObjectHeadInfo">网络对象头部信息</param>
+    /// <returns>是否匹配</returns>
+    public static bool IsNetObjectDiffVersion<T>(this NetHeadInfo netObjectHeadInfo)
+    {
+        var netObjectAttribute = GetNetObjectHead(typeof(T));
+        return netObjectAttribute.Id == netObjectHeadInfo.ObjectId &&
+               netObjectAttribute.Version != netObjectHeadInfo.ObjectVersion;
     }
 }

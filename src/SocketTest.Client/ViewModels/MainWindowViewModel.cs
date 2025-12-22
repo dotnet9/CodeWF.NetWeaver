@@ -23,6 +23,7 @@ using System.Reactive;
 using System.Reactive.Linq;
 using System.Threading.Tasks;
 using System.Timers;
+using SocketTest.Client.Dtos;
 using Notification = Avalonia.Controls.Notifications.Notification;
 
 namespace SocketTest.Client.ViewModels;
@@ -46,6 +47,9 @@ public class MainWindowViewModel : ReactiveObject
         {
             RefreshCommand = ReactiveCommand.CreateFromTask(HandleRefreshCommandAsync);
             RefreshAllCommand = ReactiveCommand.CreateFromTask(HandleRefreshAllCommandAsync);
+            SendCorrectCommand = ReactiveCommand.CreateFromTask(HandleSendCorrectCommandAsync);
+            SendDiffVersionCommand = ReactiveCommand.CreateFromTask(HandleSendDiffVersionCommandAsync);
+            SendDiffPropsCommand = ReactiveCommand.CreateFromTask(HandleSendDiffPropsCommandAsync);
         }
 
         EventBus.Default.Subscribe(this);
@@ -131,6 +135,10 @@ public class MainWindowViewModel : ReactiveObject
     /// </summary>
     public ReactiveCommand<Unit, Unit>? RefreshAllCommand { get; private set; }
 
+    public ReactiveCommand<Unit, Unit>? SendCorrectCommand { get; private set; }
+    public ReactiveCommand<Unit, Unit>? SendDiffVersionCommand { get; private set; }
+    public ReactiveCommand<Unit, Unit>? SendDiffPropsCommand { get; private set; }
+
     #endregion 属性
 
     public async Task HandleConnectTcpCommandAsync()
@@ -175,6 +183,42 @@ public class MainWindowViewModel : ReactiveObject
 
         await TcpHelper.SendCommandAsync(new ChangeProcessList());
         Logger.Info("发送刷新所有客户端命令");
+    }
+
+    private async Task HandleSendCorrectCommandAsync()
+    {
+        if (!TcpHelper.IsRunning)
+        {
+            Logger.Error("未连接Tcp服务，无法发送命令");
+            return;
+        }
+
+        await TcpHelper.SendCommandAsync(new RequestStudentListCorrect { TaskId = NetHelper.GetTaskId() });
+        Logger.Info("发送模拟正确数据包命令");
+    }
+
+    private async Task HandleSendDiffVersionCommandAsync()
+    {
+        if (!TcpHelper.IsRunning)
+        {
+            Logger.Error("未连接Tcp服务，无法发送命令");
+            return;
+        }
+
+        await TcpHelper.SendCommandAsync(new RequestStudentListDiffVersion { TaskId = NetHelper.GetTaskId() });
+        Logger.Info("发送模拟相同数据包、不同版本数据包命令");
+    }
+
+    private async Task HandleSendDiffPropsCommandAsync()
+    {
+        if (!TcpHelper.IsRunning)
+        {
+            Logger.Error("未连接Tcp服务，无法发送命令");
+            return;
+        }
+
+        await TcpHelper.SendCommandAsync(new RequestStudentListDiffProps { TaskId = "DiffID", Class = "Math" });
+        Logger.Info("发送模拟相同数据包、相同版本、不同定义数据包（错误数据包）命令");
     }
 
     private IEnumerable<ProcessItemModel> FilterData(IEnumerable<ProcessItemModel> processes)
@@ -297,6 +341,10 @@ public class MainWindowViewModel : ReactiveObject
         {
             ReceivedSocketMessage(message.GetCommand<Heartbeat>());
         }
+        else if (message.IsCommand<CommonSocketResponse>())
+        {
+            await ReceivedSocketMessageAsync(message.GetCommand<CommonSocketResponse>());
+        }
     }
 
     private void ReceiveUdpCommand(object? sender, SocketCommand command)
@@ -401,6 +449,18 @@ public class MainWindowViewModel : ReactiveObject
 
     private void ReceivedSocketMessage(Heartbeat response)
     {
+    }
+
+    private async Task ReceivedSocketMessageAsync(CommonSocketResponse response)
+    {
+        if (response.Status == (byte)TcpResponseStatus.Success)
+        {
+            await Log(response.Message, LogType.Info);
+        }
+        else
+        {
+            await Log(response.Message, LogType.Error);
+        }
     }
 
     #endregion

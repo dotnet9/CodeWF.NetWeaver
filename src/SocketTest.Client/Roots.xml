@@ -4,4 +4,5 @@
 	<assembly fullname="SocketDto" preserve="All" />
 	<assembly fullname="CodeWF.EventBus" preserve="All" />
 	<assembly fullname="CodeWF.NetWeaver" preserve="All" />
+	<assembly fullname="CodeWF.NetWrapper" preserve="All" />
 </linker>

@@ -65,6 +65,10 @@
                 Content="{codewf:If Condition={Binding IsRunning}, True=断开服务, False=连接服务}" />
             <Button Command="{Binding RefreshCommand}" Content="刷新" />
             <Button Command="{Binding RefreshAllCommand}" Content="刷新所有客户端" />
+            <TextBlock Text="测试：" />
+            <Button Content="正常包" Command="{Binding SendCorrectCommand}" />
+            <Button Content="包版本不同" Command="{Binding SendDiffVersionCommand}" />
+            <Button Content="包定义不同" Command="{Binding SendDiffPropsCommand}" />
         </StackPanel>
         <HeaderedContentControl Header="实时进程信息" Grid.Row="1">
             <DataGrid CanUserReorderColumns="True" CanUserResizeColumns="True" CanUserSortColumns="True"

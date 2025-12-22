@@ -20,6 +20,7 @@ using System.Net.Sockets;
 using System.Reactive;
 using System.Threading.Tasks;
 using System.Timers;
+using SocketTest.Server.Dtos;
 using Notification = Avalonia.Controls.Notifications.Notification;
 
 namespace SocketTest.Server.ViewModels;
@@ -27,7 +28,6 @@ namespace SocketTest.Server.ViewModels;
 public class MainWindowViewModel : ReactiveObject
 {
     public WindowNotificationManager? NotificationManager { get; set; }
-    private string? _runCommandContent = "开启服务";
 
     public MainWindowViewModel()
     {
@@ -92,9 +92,9 @@ public class MainWindowViewModel : ReactiveObject
 
     public string? RunCommandContent
     {
-        get => _runCommandContent;
-        set => this.RaiseAndSetIfChanged(ref _runCommandContent, value);
-    }
+        get;
+        set => this.RaiseAndSetIfChanged(ref field, value);
+    } = "开启服务";
 
 
     /// <summary>
@@ -198,35 +198,47 @@ public class MainWindowViewModel : ReactiveObject
     }
 
     [EventHandler]
-    private async Task ReceiveSocketMessageAsync(SocketCommand message)
+    private async Task ReceiveSocketMessageAsync(SocketCommand request)
     {
-        if (message.IsCommand<RequestTargetType>())
+        if (request.IsCommand<RequestTargetType>())
         {
-            await ReceiveSocketCommandAsync(message.Client!, message.GetCommand<RequestTargetType>());
+            await ReceiveSocketCommandAsync(request.Client!, request.GetCommand<RequestTargetType>());
         }
-        else if (message.IsCommand<RequestUdpAddress>())
+        else if (request.IsCommand<RequestUdpAddress>())
         {
-            await ReceiveSocketCommandAsync(message.Client!, message.GetCommand<RequestUdpAddress>());
+            await ReceiveSocketCommandAsync(request.Client!, request.GetCommand<RequestUdpAddress>());
         }
-        else if (message.IsCommand<RequestServiceInfo>())
+        else if (request.IsCommand<RequestServiceInfo>())
         {
-            await ReceiveSocketCommandAsync(message.Client!, message.GetCommand<RequestServiceInfo>());
+            await ReceiveSocketCommandAsync(request.Client!, request.GetCommand<RequestServiceInfo>());
         }
-        else if (message.IsCommand<RequestProcessIDList>())
+        else if (request.IsCommand<RequestProcessIDList>())
         {
-            await ReceiveSocketCommandAsync(message.Client!, message.GetCommand<RequestProcessIDList>());
+            await ReceiveSocketCommandAsync(request.Client!, request.GetCommand<RequestProcessIDList>());
         }
-        else if (message.IsCommand<RequestProcessList>())
+        else if (request.IsCommand<RequestProcessList>())
         {
-            await ReceiveSocketCommandAsync(message.Client!, message.GetCommand<RequestProcessList>());
+            await ReceiveSocketCommandAsync(request.Client!, request.GetCommand<RequestProcessList>());
         }
-        else if (message.IsCommand<ChangeProcessList>())
+        else if (request.IsCommand<ChangeProcessList>())
         {
-            await ReceiveSocketCommandAsync(message.Client!, message.GetCommand<ChangeProcessList>());
+            await ReceiveSocketCommandAsync(request.Client!, request.GetCommand<ChangeProcessList>());
         }
-        else if (message.IsCommand<Heartbeat>())
+        else if (request.IsCommand<Heartbeat>())
         {
-            await ReceiveSocketCommandAsync(message.Client!, message.GetCommand<Heartbeat>());
+            await ReceiveSocketCommandAsync(request.Client!, request.GetCommand<Heartbeat>());
+        }
+        else if (request.IsCommand<RequestStudentListCorrect>())
+        {
+            await ReceiveRequestStudentListCorrectAsync(request.Client!, request);
+        }
+        else if(request.IsCommandDiffVersion<RequestStudentListDiffVersion>())
+        {
+            await ReceiveRequestStudentListDiffVersionAsync(request.Client!, request);
+        }
+        else
+        {
+            await ReceiveSocketCommandAsync(request.Client!, request);
         }
     }
 
@@ -323,6 +335,58 @@ public class MainWindowViewModel : ReactiveObject
     {
         await TcpHelper.SendCommandAsync(client, new Heartbeat());
         HeartbeatTime = DateTime.Now;
+    }
+    private async Task ReceiveRequestStudentListCorrectAsync(Socket client, SocketCommand request)
+    {
+        try
+        {
+            var command = request.GetCommand<RequestStudentListCorrect>();
+            Logger.Info($"收到正确对象测试：{request.HeadInfo}");
+            await TcpHelper.SendCommandAsync(client, CommonSocketResponse.Success(command.TaskId));
+        }
+        catch (Exception ex)
+        {
+            Logger.Error($"收到错误对象测试：{request.HeadInfo}");
+            await TcpHelper.SendCommandAsync(client, CommonSocketResponse.Fail(default, $"{request.HeadInfo}"));
+        }
+    }
+    private async Task ReceiveRequestStudentListDiffVersionAsync(Socket client, SocketCommand request)
+    {
+        try
+        {
+            var currentNetHead = SerializeHelper.GetNetObjectHead<RequestStudentListDiffVersion>();
+            var errorMessage = $"命令版本异常：命令ID: {request.HeadInfo.ObjectId}，服务端版本{currentNetHead.Version}，客户端版本{request.HeadInfo.ObjectVersion}，服务端不能正常解析";
+            await TcpHelper.SendCommandAsync(client, CommonSocketResponse.Fail(default, errorMessage));
+        }
+        catch (Exception ex)
+        {
+            Logger.Error($"收到错误对象测试：{request.HeadInfo}");
+            await TcpHelper.SendCommandAsync(client, CommonSocketResponse.Fail(default, $"{request.HeadInfo}"));
+        }
+    }
+    private async Task ReceiveSocketCommandAsync(Socket client, SocketCommand request)
+    {
+        try
+        {
+            var currentNetHead = SerializeHelper.GetNetObjectHead<RequestStudentListDiffProps>();
+            if (currentNetHead.Id == request.HeadInfo.ObjectId &&
+                currentNetHead.Version == request.HeadInfo.ObjectVersion)
+            {
+                Logger.Info($"{nameof(RequestStudentListDiffProps)}对象ID({currentNetHead.Id})与版本({currentNetHead.Version})相同，尝试解析：");
+                var data = request.GetCommand<RequestStudentListDiffProps>();
+                Logger.Info($"按理说这里就不会打印，上面获取代码会抛出异常");
+            }
+            else
+            {
+                Logger.Error($"收到错误对象测试：{request.HeadInfo}");
+                await TcpHelper.SendCommandAsync(client, CommonSocketResponse.Fail(default, $"{request.HeadInfo}"));
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.Error($"收到错误对象测试：{request.HeadInfo}", ex);
+            await TcpHelper.SendCommandAsync(client, CommonSocketResponse.Fail(default, $"{request.HeadInfo}：{ex}"));
+        }
     }
 
     #endregion
