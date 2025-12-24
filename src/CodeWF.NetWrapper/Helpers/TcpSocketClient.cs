@@ -93,8 +93,8 @@ public class TcpSocketClient
         {
             IsRunning = false;
             LocalEndPoint = null;
-            Logger.Error($"{ServerMark} 连接异常", ex, $"{ServerMark} 连接异常，详细信息请查看日志文件");
-            return (IsSuccess: false, ErrorMessage: $"{ServerMark} 连接异常，异常信息：{ex.Message}");
+            Logger.Error($"{ServerMark} 连接异常 {ServerIP}:{ServerPort}", ex, $"{ServerMark} 连接异常 {ServerIP}:{ServerPort}，详细信息请查看日志文件");
+            return (IsSuccess: false, ErrorMessage: $"{ServerMark} 连接异常 {ServerIP}:{ServerPort}，原因：{ex.Message}");
         }
     }
 
