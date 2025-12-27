@@ -46,7 +46,9 @@ public class TcpSocketServer
     public Socket? Server { get; private set; }
 
     /// <summary>
-    /// 服务端标识，TCP数据接收时保存，用于UDP数据包识别
+    /// 服务端标识
+    /// 1、TCP客户端接收TCP数据包时，数据包头部提供了该标识，接收时需要保存
+    /// 2、UDP客户端接收UDP包时，数据包头部也提供了相同的标识，如果标识相同，则认为是同一服务端发出的UDP数据包，此时可解析，否则丢弃该UDP数据包
     /// </summary>
     public long SystemId { get; set; } = DateTime.Now.Ticks;
 
@@ -141,6 +143,8 @@ public class TcpSocketServer
 
         Server?.Close(0);
         Server = null;
+        _listenTokenSource = null;
+        _detectionTimer = null;
     }
 
     public async Task SendCommandAsync(INetObject command)
@@ -210,7 +214,7 @@ public class TcpSocketServer
 
         await EventBus.EventBus.Default.PublishAsync(new SocketClientChangedCommand(this));
         _requests.TryRemove(key, out _);
-        Logger.Warn($"已清除客户端信息{key}");
+        Logger.Warn($"{ServerMark} 已清除客户端信息{key}");
     }
 
     /// <summary>
@@ -218,11 +222,11 @@ public class TcpSocketServer
     /// </summary>
     private async Task ListenForClientsAsync()
     {
-        while (IsRunning && _listenTokenSource?.IsCancellationRequested != true)
+        while (IsRunning && _listenTokenSource?.IsCancellationRequested != true && Server != null)
         {
             try
             {
-                var socketClient = await Server!.AcceptAsync();
+                var socketClient = await Server.AcceptAsync();
                 var session = await CacheClientAsync(socketClient);
                 await EventBus.EventBus.Default.PublishAsync(new SocketClientChangedCommand(this));
 
