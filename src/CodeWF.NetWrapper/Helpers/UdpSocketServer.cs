@@ -59,6 +59,10 @@ public class UdpSocketServer
     ///     是否正在运行udp组播订阅
     /// </summary>
     public bool IsRunning { get; set; }
+    /// <summary>
+    /// 是否允许发送命令
+    /// </summary>
+    public bool CanSend => _client != null  && IsRunning;
 
     #endregion
 
@@ -105,14 +109,14 @@ public class UdpSocketServer
 
             IsRunning = true;
 
-            Logger.Info($"{ServerIP} 组播启动成功，组播地址：{ServerIP}:{ServerPort}");
+            Logger.Info($"{ServerMark} {ServerIP} 组播启动成功，组播地址：{ServerIP}:{ServerPort}");
             return (IsSuccess: true, ErrorMessage: null);
         }
         catch (Exception ex)
         {
             IsRunning = false;
-            Logger.Error($"{ServerIP} 组播启动失败，组播地址：{ServerIP}:{ServerPort}", ex, $"{ServerIP} 组播启动失败，组播地址：{ServerIP}:{ServerPort}，详细信息请查看日志文件");
-            return (IsSuccess: false, ErrorMessage: $"{ServerIP} 组播启动失败，组播地址：{ServerIP}:{ServerPort}，异常信息：{ex.Message}");
+            Logger.Error($"{ServerMark} {ServerIP} 组播启动失败，组播地址：{ServerIP}:{ServerPort}", ex, $"{ServerMark} {ServerIP} 组播启动失败，组播地址：{ServerIP}:{ServerPort}，详细信息请查看日志文件");
+            return (IsSuccess: false, ErrorMessage: $"{ServerMark} {ServerIP} 组播启动失败，组播地址：{ServerIP}:{ServerPort}，异常信息：{ex.Message}");
         }
     }
 
@@ -125,11 +129,11 @@ public class UdpSocketServer
         {
             _client?.Close();
             _client = null;
-            Logger.Info($"{ServerIP} 组播停止");
+            Logger.Info($"{ServerMark} {ServerIP} 组播停止");
         }
         catch (Exception ex)
         {
-            Logger.Error($"{ServerIP} 组播停止Udp异常",ex, $"{ServerIP} 组播停止Udp异常，详细信息请查看日志文件");
+            Logger.Error($"{ServerMark} {ServerIP} 组播停止Udp异常",ex, $"{ServerIP} 组播停止Udp异常，详细信息请查看日志文件");
         }
 
         IsRunning = false;
@@ -142,10 +146,11 @@ public class UdpSocketServer
     /// <param name="time">发送时间</param>
     public async Task SendCommandAsync(INetObject command, DateTimeOffset time)
     {
-        if (!IsRunning || _client == null) return;
+        var netObjInfo = command.GetType().GetNetObjectHead();
+        if (!CanSend) throw new Exception($"{ServerMark} 未连接，无法发送命令【ID：{netObjInfo.Id}，Version：{netObjInfo.Version}】");
 
         var buffer = command.Serialize(SystemId, time);
-        var sendCount = await _client.SendAsync(buffer, buffer.Length, _udpIpEndPoint);
+        var sendCount = await _client!.SendAsync(buffer, buffer.Length, _udpIpEndPoint);
         if (sendCount < buffer.Length)
         {
             Console.WriteLine($"UDP发送失败一包：{buffer.Length}=>{sendCount}");

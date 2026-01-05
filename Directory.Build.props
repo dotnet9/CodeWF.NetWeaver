@@ -1,9 +1,9 @@
 <Project>
 	<PropertyGroup>
 		<BaseIntermediateOutputPath>$(MSBuildThisFileDirectory).vs\$(SolutionName)\Intermediate\$(MSBuildProjectName)\</BaseIntermediateOutputPath>
-		<OutputPath>$(MSBuildThisFileDirectory)\Output\</OutputPath>
+		<OutputPath>$(MSBuildThisFileDirectory)Output</OutputPath>
 		<AppendTargetFrameworkToOutputPath>True</AppendTargetFrameworkToOutputPath>
-		<Version>2.0.14</Version>
+		<Version>2.0.20</Version>
 		<AvaloniaVersion>11.3.10</AvaloniaVersion>
 	</PropertyGroup>
 </Project>

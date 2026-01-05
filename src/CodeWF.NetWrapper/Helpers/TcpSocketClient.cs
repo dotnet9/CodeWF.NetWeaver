@@ -56,6 +56,11 @@ public class TcpSocketClient
     /// </summary>
     public string? LocalEndPoint { get; set; }
 
+    /// <summary>
+    /// 是否允许发送命令
+    /// </summary>
+    public bool CanSend => _client is { Connected: true } && IsRunning;
+
     #endregion
 
     #region 公开接口
@@ -108,6 +113,7 @@ public class TcpSocketClient
         LocalEndPoint = null;
     }
 
+
     /// <summary>
     ///     异步发送命令到服务器
     /// </summary>
@@ -115,7 +121,8 @@ public class TcpSocketClient
     /// <exception cref="Exception">当客户端未连接时抛出</exception>
     public async Task SendCommandAsync(INetObject command)
     {
-        if (!IsRunning || _client?.Connected != true) throw new Exception($"{ServerMark} 未连接，无法发送命令");
+        var netObjInfo = command.GetType().GetNetObjectHead();
+        if (!CanSend) throw new Exception($"{ServerMark} 未连接，无法发送命令【ID：{netObjInfo.Id}，Version：{netObjInfo.Version}】");
 
         var buffer = command.Serialize(SystemId);
         await _client!.SendAsync(buffer);
