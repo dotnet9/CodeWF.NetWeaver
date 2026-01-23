@@ -149,12 +149,19 @@ public class TcpSocketClient
             }
             catch (SocketException ex)
             {
-                Logger.Error($"{ServerMark} 处理接收数据异常", ex, $"{ServerMark} 处理接收数据异常，详细信息请查看日志文件");
+                var msg = $"{ServerMark} 处理接收数据异常，当前客户端地址：{_client?.LocalEndPoint}";
+                Logger.Error(msg, ex, $"{msg}，详细信息请查看日志文件");
+                await EventBus.EventBus.Default.PublishAsync(new TcpClientErrorCommand(this, msg));
                 break;
             }
             catch (Exception ex)
             {
-                if (IsRunning) Logger.Error($"{ServerMark} 处理接收数据异常", ex, $"{ServerMark} 处理接收数据异常，详细信息请查看日志文件");
+                var msg = $"{ServerMark} 处理接收数据异常，当前客户端地址：{_client?.LocalEndPoint}";
+                if (IsRunning)
+                {
+                    Logger.Error(msg, ex, $"{msg}，详细信息请查看日志文件");
+                }
+                await EventBus.EventBus.Default.PublishAsync(new TcpClientErrorCommand(this, msg));
 
                 break;
             }
