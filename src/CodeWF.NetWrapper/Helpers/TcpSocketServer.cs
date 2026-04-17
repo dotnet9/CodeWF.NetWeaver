@@ -11,6 +11,8 @@ using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
 
+using System.Threading.Channels;
+
 namespace CodeWF.NetWrapper.Helpers;
 
 /// <summary>
@@ -24,9 +26,10 @@ public class TcpSocketServer
     public readonly ConcurrentDictionary<string, TcpSession> _clients = new();
 
     /// <summary>
-    /// 请求命令队列字典，键为客户端IP和端口
+    /// 请求命令通道，包含客户端键和命令对象
     /// </summary>
-    private readonly ConcurrentDictionary<string, ConcurrentQueue<SocketCommand>> _requests = new();
+    private readonly Channel<(string ClientKey, SocketCommand Command)> _requests =
+        Channel.CreateUnbounded<(string, SocketCommand)>();
 
     /// <summary>
     /// 客户端检测定时器
@@ -213,7 +216,6 @@ public class TcpSocketServer
         _clients.TryRemove(key, out _);
 
         await EventBus.EventBus.Default.PublishAsync(new SocketClientChangedCommand(this));
-        _requests.TryRemove(key, out _);
         Logger.Warn($"{ServerMark} 已清除客户端信息{key}");
     }
 
@@ -265,13 +267,7 @@ public class TcpSocketServer
                     break;
                 }
 
-                if (!_requests.TryGetValue(tcpClientKey, out var value))
-                {
-                    value = new ConcurrentQueue<SocketCommand>();
-                    _requests[tcpClientKey] = value;
-                }
-
-                value.Enqueue(new SocketCommand(headInfo!, buffer, client.TcpSocket));
+                await _requests.Writer.WriteAsync((tcpClientKey, new SocketCommand(headInfo!, buffer, client.TcpSocket)));
             }
             catch (SocketException ex)
             {
@@ -283,7 +279,6 @@ public class TcpSocketServer
             catch (Exception ex)
             {
                 Logger.Error($"{ServerMark} 接收数据异常", ex, uiContent: $"{ServerMark} 接收数据异常，详细信息请查看日志文件");
-                // 发生异常时，延迟一段时间后再继续尝试
                 await Task.Delay(TimeSpan.FromMilliseconds(100));
             }
         }
@@ -298,42 +293,22 @@ public class TcpSocketServer
     /// </summary>
     private async Task ProcessingRequestsAsync()
     {
-        while (IsRunning && _listenTokenSource?.IsCancellationRequested != true)
+        await foreach (var (clientKey, command) in _requests.Reader.ReadAllAsync())
         {
+            if (!_clients.TryGetValue(clientKey, out var client))
+            {
+                continue;
+            }
+
             try
             {
-                var needRemoveKeys = new List<string>();
-                foreach (var request in _requests)
-                {
-                    var clientKey = request.Key;
-                    if (!_clients.TryGetValue(clientKey, out var client))
-                    {
-                        needRemoveKeys.Add(clientKey);
-                        continue;
-                    }
-
-                    while (request.Value.TryDequeue(out var command))
-                    {
-                        ActiveClient(clientKey);
-                        await EventBus.EventBus.Default.PublishAsync(command);
-                    }
-                }
-
-                if (needRemoveKeys.Count > 0)
-                {
-                    foreach (var key in needRemoveKeys)
-                    {
-                        await RemoveClientAsync(key);
-                    }
-                }
+                ActiveClient(clientKey);
+                await EventBus.EventBus.Default.PublishAsync(command);
             }
             catch (Exception ex)
             {
-                Logger.Error($"{ServerMark} 处理客户端请求异常", ex, uiContent: $"{ServerMark} 处理客户端请求异常，详细信息请查看日志文件");
-            }
-            finally
-            {
-                await Task.Delay(TimeSpan.FromMilliseconds(10));
+                Logger.Error($"{ServerMark} 处理客户端请求异常", ex,
+                    uiContent: $"{ServerMark} 处理客户端请求异常，详细信息请查看日志文件");
             }
         }
     }

@@ -4,9 +4,16 @@
 [![NuGet](https://img.shields.io/nuget/dt/CodeWF.NetWeaver.svg)](https://www.nuget.org/packages/CodeWF.NetWeaver/)
 [![License](https://img.shields.io/github/license/dotnet9/CodeWF.NetWeaver)](LICENSE)
 
-CodeWF.NetWeaver 是一个简洁而强大的C#库，支持AOT，用于处理TCP和UDP数据包的组包和解包操作。
+CodeWF.NetWeaver 是一个简洁而强大的 C# 核心序列化库，支持 AOT，用于处理 TCP 和 UDP 数据包的组包和解包操作。
 
-CodeWF.NetWeaver is a concise and powerful C# library that supports AOT for handling TCP and UDP packet grouping and unpacking operations. 
+CodeWF.NetWeaver is a concise and powerful C# core serialization library that supports AOT for handling TCP and UDP packet grouping and unpacking operations.
+
+## 框架组成
+
+| 项目 | 说明 |
+|------|------|
+| **CodeWF.NetWeaver** | 核心序列化库，负责数据包的组包和解包（本文档） |
+| **CodeWF.NetWrapper** | TCP/UDP Socket 封装库，基于 NetWeaver 实现高级网络通信功能 |
 
 ## 安装(Installer)
 
@@ -14,23 +21,40 @@ CodeWF.NetWeaver is a concise and powerful C# library that supports AOT for hand
 NuGet\Install-Package CodeWF.NetWeaver -Version 1.3.0
 ```
 
-## 定义通信对象(Define net object)
+## 核心概念
 
-定义数据包如下（来自单元测试`CodeWF.NetWeaver.Tests`），`ResponseProcessList`类继承自`INetObject`, `NetHead`配置数据包标识和版本
+### 数据包结构
+
+```
+┌────────────────────────────────────────────┐
+│  Header (23 bytes)                         │
+│  ├── BufferLen: int                        │
+│  ├── SystemId: long                        │
+│  ├── ObjectId: ushort                      │
+│  ├── ObjectVersion: byte                   │
+│  └── UnixTimeMs: long                      │
+├────────────────────────────────────────────┤
+│  Body (可变长度)                            │
+└────────────────────────────────────────────┘
+```
+
+### 特性系统
+
+| 特性 | 用途 |
+|------|------|
+| `NetHead(id, version)` | 标记网络对象类型和版本 |
+| `NetIgnoreMember` | 序列化时忽略该成员 |
+| `NetFieldOffset(offset, size)` | 位字段打包 |
+
+## 定义通信对象(Define Net Object)
 
 ```csharp
-[NetHead(10, 1)]
+[NetHead(10, 1)]  // ObjectId = 10, Version = 1
 public class ResponseProcessList : INetObject
 {
     public int TaskId { get; set; }
 
     public int TotalSize { get; set; }
-
-    public int PageSize { get; set; }
-
-    public int PageCount { get; set; }
-
-    public int PageIndex { get; set; }
 
     public List<ProcessItem>? Processes { get; set; }
 }
@@ -43,85 +67,55 @@ public record ProcessItem
 
     public byte Type { get; set; }
 
-    public byte ProcessStatus { get; set; }
-
-    public byte AlarmStatus { get; set; }
-
-    public string? Publisher { get; set; }
-
-    public string? CommandLine { get; set; }
-
-    public short Cpu { get; set; }
-
-    public short Memory { get; set; }
-
-    public short Disk { get; set; }
-
-    public short Network { get; set; }
-
-    public short Gpu { get; set; }
-
-    public byte GpuEngine { get; set; }
-
-    public byte PowerUsage { get; set; }
-
-    public byte PowerUsageTrend { get; set; }
-
     public uint LastUpdateTime { get; set; }
-
-    public uint UpdateTime { get; set; }
 }
 ```
 
-## 使用(Use)
+## 使用(Usage)
 
-单元测试数据组包与解包：
+### 序列化
 
 ```csharp
-[Fact]
-public void Test_SerializeResponseProcessList_Success()
+var netObject = new ResponseProcessList
 {
-    var netObject = new ResponseProcessList
+    TaskId = 3,
+    TotalSize = 200,
+    Processes = new List<ProcessItem>
     {
-        TaskId = 3,
-        TotalSize = 200,
-        PageSize = 3,
-        PageCount = 67,
-        PageIndex = 1,
-        Processes = new List<ProcessItem>()
-    };
-    var processItem = new ProcessItem
-    {
-        Pid = 1,
-        Name = "CodeWF.NetWeaver",
-        Type = (byte)ProcessType.Application,
-        ProcessStatus = (byte)ProcessStatus.Running,
-        Publisher = "沙漠尽头的狼",
-        CommandLine = "dotnet CodeWF.com",
-        Cpu = 112,
-        Memory = 325,
-        Disk = 23,
-        Network = 593,
-        Gpu = 253,
-        GpuEngine = (byte)GpuEngine.None,
-        PowerUsage = (byte)PowerUsage.Low,
-        PowerUsageTrend = (byte)PowerUsage.Low,
-        LastUpdateTime = 23,
-        UpdateTime = 53
-    };
-    netObject.Processes.Add(processItem);
+        new ProcessItem { Pid = 1, Name = "CodeWF.NetWeaver", Type = 1 }
+    }
+};
 
-    var buffer = netObject.Serialize(32);
-    var desObject = buffer.Deserialize<ResponseProcessList>();
-
-    Assert.Equal(netObject.TotalSize, desObject.TotalSize);
-    Assert.NotNull(desObject.Processes);
-    Assert.Equal(processItem.Cpu, desObject.Processes[0].Cpu);
-    Assert.Equal(processItem.LastUpdateTime, desObject.Processes[0].LastUpdateTime);
-}
+// 序列化：对象 -> 字节数组
+var buffer = netObject.Serialize(systemId: 32);
 ```
 
-## 参考
+### 反序列化
 
-- https://github.com/dotnet9/CsharpSocketTest
-- https://github.com/dotnet9/CodeWF.EventBus.Socket
+```csharp
+// 反序列化：字节数组 -> 对象
+var desObject = buffer.Deserialize<ResponseProcessList>();
+
+Assert.Equal(netObject.TotalSize, desObject.TotalSize);
+```
+
+## 与 CodeWF.NetWrapper 的关系
+
+```csharp
+// CodeWF.NetWeaver 只负责序列化和反序列化
+var buffer = myObject.Serialize(systemId);
+var obj = buffer.Deserialize<MyObject>();
+
+// CodeWF.NetWrapper 提供完整的 TCP/UDP Socket 封装
+var server = new TcpSocketServer();
+await server.StartAsync("Server", "0.0.0.0", 8888);
+
+// Socket 收到数据后自动序列化为对象
+EventBus.Default.Subscribe<SocketCommand>(async (sender, cmd) =>
+{
+    var myObject = cmd.GetCommand<MyObject>();
+    // 处理业务逻辑
+});
+```
+
+详细设计原理请参阅：[CodeWF-NetWeaver-Design-Principles.md](CodeWF-NetWeaver-Design-Principles.md)

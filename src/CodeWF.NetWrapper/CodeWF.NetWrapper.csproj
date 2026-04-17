@@ -23,8 +23,8 @@
 		<None Include="..\..\logo.png" Pack="true" PackagePath="" />
 	</ItemGroup>
   <ItemGroup>
-    <PackageReference Include="CodeWF.EventBus" Version="3.4.5" />
-    <PackageReference Include="CodeWF.Log.Core" Version="11.3.12.1" />
+    <PackageReference Include="CodeWF.EventBus" Version="3.4.5.1" />
+    <PackageReference Include="CodeWF.Log.Core" Version="11.3.14" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\CodeWF.NetWeaver\CodeWF.NetWeaver.csproj" />

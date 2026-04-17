@@ -1,8 +1,8 @@
 using System;
-using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading.Tasks;
+using System.Threading.Channels;
 using CodeWF.Log.Core;
 using CodeWF.NetWeaver;
 using CodeWF.NetWeaver.Base;
@@ -16,9 +16,9 @@ namespace CodeWF.NetWrapper.Helpers;
 public class TcpSocketClient
 {
     /// <summary>
-    ///     响应命令队列，用于存储接收到的响应命令
+    ///     响应命令通道，用于存储接收到的响应命令
     /// </summary>
-    public readonly BlockingCollection<SocketCommand> _responses = new(new ConcurrentQueue<SocketCommand>());
+    private readonly Channel<SocketCommand> _responses = Channel.CreateUnbounded<SocketCommand>();
 
     private Socket? _client;
 
@@ -109,6 +109,7 @@ public class TcpSocketClient
     public void Stop()
     {
         IsRunning = false;
+        _responses.Writer.Complete();
         _client?.CloseSocket();
         LocalEndPoint = null;
     }
@@ -145,7 +146,7 @@ public class TcpSocketClient
                 if (!success) break;
 
                 SystemId = headInfo.SystemId;
-                _responses.Add(new SocketCommand(headInfo, buffer, _client));
+                await _responses.Writer.WriteAsync(new SocketCommand(headInfo, buffer, _client));
             }
             catch (SocketException ex)
             {
@@ -169,16 +170,13 @@ public class TcpSocketClient
     }
 
     /// <summary>
-    ///     检查响应命令队列
+    ///     检查响应命令通道
     /// </summary>
     private async Task CheckResponseAsync()
     {
-        while (!IsRunning) await Task.Delay(TimeSpan.FromMilliseconds(10));
-
-        while (IsRunning)
+        await foreach (var command in _responses.Reader.ReadAllAsync())
         {
-            while (_responses.TryTake(out var command, TimeSpan.FromMilliseconds(10)))
-                await EventBus.EventBus.Default.PublishAsync(command);
+            await EventBus.EventBus.Default.PublishAsync(command);
         }
     }
 

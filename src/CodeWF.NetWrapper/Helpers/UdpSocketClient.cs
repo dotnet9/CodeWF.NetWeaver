@@ -2,10 +2,10 @@ using CodeWF.Log.Core;
 using CodeWF.NetWeaver;
 using CodeWF.NetWrapper.Commands;
 using System;
-using System.Collections.Concurrent;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
+using System.Threading.Channels;
 using System.Threading.Tasks;
 
 namespace CodeWF.NetWrapper.Helpers;
@@ -16,9 +16,9 @@ namespace CodeWF.NetWrapper.Helpers;
 public class UdpSocketClient
 {
     /// <summary>
-    /// 接收缓冲区队列
+    /// 接收缓冲区通道
     /// </summary>
-    private readonly BlockingCollection<SocketCommand> _receivedBuffers = new(new ConcurrentQueue<SocketCommand>());
+    private readonly Channel<SocketCommand> _receivedBuffers = Channel.CreateUnbounded<SocketCommand>();
 
     /// <summary>
     /// UDP客户端对象
@@ -122,6 +122,7 @@ public class UdpSocketClient
     {
         try
         {
+            _receivedBuffers.Writer.Complete();
             _client?.Close();
             _client = null;
             Logger.Info($"{ServerMark} 停止");
@@ -170,7 +171,7 @@ public class UdpSocketClient
                     continue;
                 }
 
-                _receivedBuffers.Add(new SocketCommand(headInfo!, data));
+                _receivedBuffers.Writer.TryWrite(new SocketCommand(headInfo!, data));
             }
             catch (SocketException ex)
             {
@@ -186,7 +187,7 @@ public class UdpSocketClient
     }
 
     /// <summary>
-    /// 检查消息队列
+    /// 检查消息通道
     /// </summary>
     private async Task CheckCommandMeAsync()
     {
@@ -195,12 +196,9 @@ public class UdpSocketClient
             await Task.Delay(TimeSpan.FromMilliseconds(10));
         }
 
-        while (IsRunning)
+        await foreach (var message in _receivedBuffers.Reader.ReadAllAsync())
         {
-            if (_receivedBuffers.TryTake(out var message, TimeSpan.FromMilliseconds(10)))
-            {
-                Received?.Invoke(this, message);
-            }
+            Received?.Invoke(this, message);
         }
     }
 
