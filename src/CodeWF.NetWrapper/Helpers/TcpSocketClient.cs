@@ -86,6 +86,7 @@ public class TcpSocketClient
             await _client.ConnectAsync(ipEndPoint);
 
             IsRunning = true;
+            Logger.Info($"{ServerMark} 连接成功，服务地址是： {ServerIP}:{ServerPort}，当前客户端地址：{_client.LocalEndPoint}");
 
             // 使用Task.Run并行运行监听器和响应检查器
             _ = Task.Run(ListenForServerAsync);

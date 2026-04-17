@@ -133,7 +133,7 @@ public class UdpSocketServer
         }
         catch (Exception ex)
         {
-            Logger.Error($"{ServerMark} {ServerIP} 组播停止Udp异常",ex, $"{ServerIP} 组播停止Udp异常，详细信息请查看日志文件");
+            Logger.Error($"{ServerMark} {ServerIP} 组播停止Udp异常",ex, $"{ServerMark} {ServerIP} 组播停止Udp异常，详细信息请查看日志文件");
         }
 
         IsRunning = false;
