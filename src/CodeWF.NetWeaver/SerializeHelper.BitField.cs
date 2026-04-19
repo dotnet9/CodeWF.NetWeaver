@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Reflection;
 using CodeWF.NetWeaver.Base;
 
@@ -10,6 +12,62 @@ namespace CodeWF.NetWeaver;
 public partial class SerializeHelper
 {
     /// <summary>
+    /// 位字段属性信息结构，包含属性及其偏移量属性
+    /// </summary>
+    private class BitFieldPropertyInfo
+    {
+        /// <summary>
+        /// 属性信息
+        /// </summary>
+        public required PropertyInfo Property { get; init; }
+
+        /// <summary>
+        /// 位偏移量
+        /// </summary>
+        public required NetFieldOffsetAttribute OffsetAttribute { get; init; }
+    }
+
+    /// <summary>
+    /// 缓存位字段属性信息的字典，键为类型名称，提高反射效率
+    /// </summary>
+    private static readonly ConcurrentDictionary<string, BitFieldPropertyInfo[]> BitFieldPropertiesCache = new();
+
+    /// <summary>
+    /// 获取指定类型的位字段属性信息列表，使用缓存提高效率
+    /// </summary>
+    /// <typeparam name="T">对象类型</typeparam>
+    /// <returns>位字段属性信息列表</returns>
+    private static BitFieldPropertyInfo[] GetBitFieldProperties<T>()
+    {
+        var typeName = typeof(T).Name;
+        if (BitFieldPropertiesCache.TryGetValue(typeName, out var cached))
+        {
+            return cached;
+        }
+
+        var properties = typeof(T).GetProperties();
+        var bitFieldProperties = new List<BitFieldPropertyInfo>();
+
+        foreach (var property in properties)
+        {
+            if (!Attribute.IsDefined(property, typeof(NetFieldOffsetAttribute)))
+            {
+                continue;
+            }
+
+            var offsetAttribute = (NetFieldOffsetAttribute)property.GetCustomAttribute(typeof(NetFieldOffsetAttribute))!;
+            bitFieldProperties.Add(new BitFieldPropertyInfo
+            {
+                Property = property,
+                OffsetAttribute = offsetAttribute
+            });
+        }
+
+        BitFieldPropertiesCache[typeName] = bitFieldProperties.ToArray();
+        return bitFieldProperties.ToArray();
+    }
+
+    /// <summary>
     /// 将对象的位字段序列化为字节数组
     /// </summary>
     /// <typeparam name="T">对象类型</typeparam>
@@ -17,29 +75,26 @@ public partial class SerializeHelper
     /// <returns>包含位字段数据的字节数组</returns>
     public static byte[] FieldObjectBuffer<T>(this T obj) where T : class
     {
-        var properties = typeof(T).GetProperties();
+        var bitFieldProperties = GetBitFieldProperties<T>();
         var totalSize = 0;
 
-        foreach (var property in properties)
+        foreach (var bp in bitFieldProperties)
         {
-            if (!Attribute.IsDefined(property, typeof(NetFieldOffsetAttribute))) continue;
+            totalSize = Math.Max(totalSize, bp.OffsetAttribute.Offset + bp.OffsetAttribute.Size);
+        }
 
-            var offsetAttribute =
-                (NetFieldOffsetAttribute)property.GetCustomAttribute(typeof(NetFieldOffsetAttribute));
-            totalSize = Math.Max(totalSize, offsetAttribute.Offset + offsetAttribute.Size);
+        if (totalSize == 0)
+        {
+            return [];
         }
 
         var bufferLength = (int)Math.Ceiling((double)totalSize / 8);
         var buffer = new byte[bufferLength];
 
-        foreach (var property in properties)
+        foreach (var bp in bitFieldProperties)
         {
-            if (!Attribute.IsDefined(property, typeof(NetFieldOffsetAttribute))) continue;
-
-            var offsetAttribute =
-                (NetFieldOffsetAttribute)property.GetCustomAttribute(typeof(NetFieldOffsetAttribute));
-            var value = property.GetValue(obj);
-            SetBitValue(ref buffer, Convert.ToInt32(value), offsetAttribute.Offset, offsetAttribute.Size);
+            var value = bp.Property.GetValue(obj);
+            SetBitValue(ref buffer, Convert.ToInt32(value), bp.OffsetAttribute.Offset, bp.OffsetAttribute.Size);
         }
 
         return buffer;
@@ -54,17 +109,13 @@ public partial class SerializeHelper
     public static T ToFieldObject<T>(this byte[] buffer) where T : class, new()
     {
         var obj = new T();
-        var properties = typeof(T).GetProperties();
+        var bitFieldProperties = GetBitFieldProperties<T>();
 
-        foreach (var property in properties)
+        foreach (var bp in bitFieldProperties)
         {
-            if (!Attribute.IsDefined(property, typeof(NetFieldOffsetAttribute))) continue;
-
-            var offsetAttribute =
-                (NetFieldOffsetAttribute)property.GetCustomAttribute(typeof(NetFieldOffsetAttribute));
-            var value = GetValueFromBit(buffer, offsetAttribute.Offset, offsetAttribute.Size,
-                property.PropertyType);
-            property.SetValue(obj, value);
+            var value = GetValueFromBit(buffer, bp.OffsetAttribute.Offset, bp.OffsetAttribute.Size,
+                bp.Property.PropertyType);
+            bp.Property.SetValue(obj, value);
         }
 
         return obj;
@@ -98,6 +149,6 @@ public partial class SerializeHelper
         var bitValue = (buffer[offset / 8] >> (offset % 8)) & mask;
         if (offset % 8 + size > 8) bitValue |= (buffer[offset / 8 + 1] << (8 - offset % 8)) & mask;
 
-        return Convert.ChangeType(bitValue, propertyType); // 根据属性类型进行转换
+        return Convert.ChangeType(bitValue, propertyType);
     }
 }

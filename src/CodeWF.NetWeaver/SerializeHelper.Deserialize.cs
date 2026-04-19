@@ -33,15 +33,11 @@ public partial class SerializeHelper
     /// <returns>反序列化后的对象</returns>
     public static T DeserializeObject<T>(this byte[] buffer, int readIndex = 0) where T : new()
     {
-        using (var stream = new MemoryStream(buffer, readIndex, buffer.Length - readIndex))
-        {
-            using (var reader = new BinaryReader(stream))
-            {
-                var data = new T();
-                DeserializeProperties(reader, data);
-                return data;
-            }
-        }
+        using var stream = new MemoryStream(buffer, readIndex, buffer.Length - readIndex);
+        using var reader = new BinaryReader(stream);
+        var data = new T();
+        DeserializeProperties(reader, data);
+        return data;
     }
 
     /// <summary>
@@ -51,16 +47,12 @@ public partial class SerializeHelper
     /// <param name="type">要反序列化的对象类型</param>
     /// <param name="readIndex">读取起始索引</param>
     /// <returns>反序列化后的对象</returns>
-    public static object DeserializeObject(this byte[] buffer, Type type, int readIndex = 0)
+    public static object? DeserializeObject(this byte[] buffer, Type type, int readIndex = 0)
     {
-        using (var stream = new MemoryStream(buffer, readIndex, buffer.Length - readIndex))
-        {
-            using (var reader = new BinaryReader(stream))
-            {
-                var data = DeserializeValue(reader, type);
-                return data;
-            }
-        }
+        using var stream = new MemoryStream(buffer, readIndex, buffer.Length - readIndex);
+        using var reader = new BinaryReader(stream);
+        var data = DeserializeValue(reader, type);
+        return data;
     }
 
     /// <summary>
@@ -117,9 +109,9 @@ public partial class SerializeHelper
     /// <param name="reader">BinaryReader 实例</param>
     /// <param name="propertyType">属性类型</param>
     /// <returns>反序列化后的值</returns>
-    private static object DeserializeValue(BinaryReader reader, Type propertyType)
+    private static object? DeserializeValue(BinaryReader reader, Type propertyType)
     {
-        object value;
+        object? value;
 
         if (propertyType.IsPrimitive || propertyType == typeof(string) || propertyType.IsEnum)
             value = DeserializeBaseValue(reader, propertyType);
@@ -187,14 +179,17 @@ public partial class SerializeHelper
         for (var i = 0; i < count; i++)
         {
             var key = DeserializeValue(reader, genericArguments[0]);
-            if (genericArguments.Length == 1)
+            switch (genericArguments.Length)
             {
-                (complexObj as IList).Add(key);
-            }
-            else if (genericArguments.Length == 2)
-            {
-                var value = DeserializeValue(reader, genericArguments[1]);
-                (complexObj as IDictionary)[key] = value;
+                case 1:
+                    (complexObj as IList)?.Add(key);
+                    break;
+                case 2:
+                {
+                    var value = DeserializeValue(reader, genericArguments[1]);
+                    (complexObj as IDictionary)?[key] = value;
+                    break;
+                }
             }
         }
 
@@ -207,10 +202,11 @@ public partial class SerializeHelper
     /// <param name="reader">BinaryReader 实例</param>
     /// <param name="propertyType">数组类型</param>
     /// <returns>反序列化后的数组</returns>
-    private static object DeserializeArrayValue(BinaryReader reader, Type propertyType)
+    private static object? DeserializeArrayValue(BinaryReader reader, Type propertyType)
     {
         var length = reader.ReadInt32();
         var elementType = propertyType.GetElementType();
+        if (elementType == null) return null;
         var array = Array.CreateInstance(elementType, length);
         for (var i = 0; i < length; i++)
         {
@@ -228,7 +224,7 @@ public partial class SerializeHelper
     /// <param name="reader">BinaryReader 实例</param>
     /// <param name="type">对象类型</param>
     /// <returns>反序列化后的对象</returns>
-    private static object DeserializeObject(BinaryReader reader, Type type)
+    private static object? DeserializeObject(BinaryReader reader, Type type)
     {
         var data = Activator.CreateInstance(type);
         DeserializeProperties(reader, data);

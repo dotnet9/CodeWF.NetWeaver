@@ -21,11 +21,11 @@ public partial class SerializeHelper
     /// <summary>
     /// 复杂类型名称列表，用于识别需要特殊处理的集合类型
     /// </summary>
-    private static readonly List<string> ComplexTypeNames = new List<string>()
-    {
+    private static readonly List<string> ComplexTypeNames =
+    [
         typeof(List<>).Name,
         typeof(Dictionary<,>).Name
-    };
+    ];
 
     /// <summary>
     /// 默认编码，用于字符串的序列化和反序列化
@@ -63,7 +63,6 @@ public partial class SerializeHelper
     /// <summary>
     /// 获取网络对象的头部信息
     /// </summary>
-    /// <param name="netObjectType">网络对象类型</param>
     /// <returns>网络对象头部属性</returns>
     /// <exception cref="Exception">当类型未标记 NetHeadAttribute 时抛出异常</exception>
     public static NetHeadAttribute GetNetObjectHead<T>()

@@ -26,30 +26,21 @@ public partial class SerializeHelper
     {
         if (data == null) throw new ArgumentNullException(nameof(data));
 
-        var netObjectInfo = GetNetObjectHead(data.GetType());
-        var bodyBuffer = SerializeObject(data);
-        using (var stream = new MemoryStream())
-        {
-            using (var writer = new BinaryWriter(stream, DefaultEncoding))
-            {
-                writer.Write(PacketHeadLen + bodyBuffer.Length);
-                writer.Write(systemId);
-                writer.Write(netObjectInfo.Id);
-                writer.Write(netObjectInfo.Version);
-                if (sendTime == default)
-                {
-                    writer.Write(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
-                }
-                else
-                {
-                    writer.Write(sendTime.ToUnixTimeMilliseconds());
-                }
+        var netObjectInfo = data.GetType().GetNetObjectHead();
+        var bodyBuffer = data.SerializeObject();
+        using var stream = new MemoryStream();
+        using var writer = new BinaryWriter(stream, DefaultEncoding);
+        writer.Write(PacketHeadLen + bodyBuffer.Length);
+        writer.Write(systemId);
+        writer.Write(netObjectInfo.Id);
+        writer.Write(netObjectInfo.Version);
+        writer.Write(sendTime == default
+            ? DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
+            : sendTime.ToUnixTimeMilliseconds());
 
-                writer.Write(bodyBuffer);
+        writer.Write(bodyBuffer);
 
-                return stream.ToArray();
-            }
-        }
+        return stream.ToArray();
     }
 
     /// <summary>
@@ -60,14 +51,10 @@ public partial class SerializeHelper
     /// <returns>序列化后的字节数组</returns>
     public static byte[] SerializeObject<T>(this T data)
     {
-        using (var stream = new MemoryStream())
-        {
-            using (var writer = new BinaryWriter(stream, DefaultEncoding))
-            {
-                SerializeValue(writer, data, typeof(T));
-                return stream.ToArray();
-            }
-        }
+        using var stream = new MemoryStream();
+        using var writer = new BinaryWriter(stream, DefaultEncoding);
+        SerializeValue(writer, data, typeof(T));
+        return stream.ToArray();
     }
 
     /// <summary>
@@ -78,14 +65,10 @@ public partial class SerializeHelper
     /// <returns>序列化后的字节数组</returns>
     public static byte[] SerializeObject(this object data, Type type)
     {
-        using (var stream = new MemoryStream())
-        {
-            using (var writer = new BinaryWriter(stream, DefaultEncoding))
-            {
-                SerializeValue(writer, data, type);
-                return stream.ToArray();
-            }
-        }
+        using var stream = new MemoryStream();
+        using var writer = new BinaryWriter(stream, DefaultEncoding);
+        SerializeValue(writer, data, type);
+        return stream.ToArray();
     }
 
     /// <summary>
@@ -137,62 +120,69 @@ public partial class SerializeHelper
     }
 
     /// <summary>
-    /// 序列化基本类型、字符串和枚举
+    /// 序列化基本类型、字符串和枚举（性能优化版本，直接转换避免 Parse 开销）
     /// </summary>
     /// <param name="writer">BinaryWriter 实例</param>
     /// <param name="value">要序列化的值</param>
     /// <param name="valueType">值的类型</param>
     /// <exception cref="Exception">当遇到不支持的类型时抛出</exception>
-    private static void SerializeBaseValue(BinaryWriter writer, object value, Type valueType)
+    private static void SerializeBaseValue(BinaryWriter writer, object? value, Type valueType)
     {
         if (valueType.IsEnum)
         {
-            // 对于枚举类型，将其转换为整数进行序列化
-            writer.Write(value == null ? 0 : Convert.ToInt32(value));
+            writer.Write(Convert.ToInt32(value));
         }
         else if (valueType == typeof(byte))
         {
-            writer.Write(value == null ? default : byte.Parse(value.ToString()));
+            writer.Write(value == null ? (byte)0 : (byte)value);
+        }
+        else if (valueType == typeof(sbyte))
+        {
+            writer.Write(value == null ? (sbyte)0 : (sbyte)value);
         }
         else if (valueType == typeof(short))
         {
-            writer.Write(value == null ? default : short.Parse(value.ToString()));
+            writer.Write(value == null ? (short)0 : (short)value);
         }
         else if (valueType == typeof(ushort))
         {
-            writer.Write(value == null ? default : ushort.Parse(value.ToString()));
+            writer.Write(value == null ? (ushort)0 : (ushort)value);
         }
         else if (valueType == typeof(int))
         {
-            writer.Write(value == null ? default : int.Parse(value.ToString()));
+            writer.Write(value == null ? 0 : (int)value);
         }
         else if (valueType == typeof(uint))
         {
-            writer.Write(value == null ? default : uint.Parse(value.ToString()));
+            writer.Write(value == null ? 0u : (uint)value);
         }
         else if (valueType == typeof(long))
         {
-            writer.Write(value == null ? default : long.Parse(value.ToString()));
+            writer.Write(value == null ? 0L : (long)value);
+        }
+        else if (valueType == typeof(ulong))
+        {
+            writer.Write(value == null ? 0UL : (ulong)value);
         }
         else if (valueType == typeof(float))
         {
-            writer.Write(value == null ? default : float.Parse(value.ToString()));
+            writer.Write(value == null ? 0f : (float)value);
         }
         else if (valueType == typeof(double))
         {
-            writer.Write(value == null ? default : double.Parse(value.ToString()));
+            writer.Write(value == null ? 0.0 : (double)value);
         }
         else if (valueType == typeof(decimal))
         {
-            writer.Write(value == null ? default : decimal.Parse(value.ToString()));
+            writer.Write(value == null ? 0m : (decimal)value);
         }
         else if (valueType == typeof(string))
         {
-            writer.Write(value == null ? string.Empty : value.ToString());
+            writer.Write(value?.ToString() ?? string.Empty);
         }
         else if (valueType == typeof(bool))
         {
-            writer.Write(value == null ? default : bool.Parse(value.ToString()));
+            writer.Write(value != null && (bool)value);
         }
         else
         {
@@ -206,22 +196,22 @@ public partial class SerializeHelper
     /// <param name="writer">BinaryWriter 实例</param>
     /// <param name="value">要序列化的数组</param>
     /// <param name="valueType">数组类型</param>
-    private static void SerializeArrayValue(BinaryWriter writer, object value, Type valueType)
+    private static void SerializeArrayValue(BinaryWriter writer, object? value, Type valueType)
     {
-        var length = 0;
         if (value == null)
         {
-            writer.Write(length);
+            writer.Write(0);
             return;
         }
 
-        length = ((Array)value).Length;
+        var array = (Array)value;
+        var length = array.Length;
         writer.Write(length);
 
-        var elementType = valueType.GetElementType();
+        var elementType = valueType.GetElementType()!;
         for (var i = 0; i < length; i++)
         {
-            var elementValue = ((Array)value).GetValue(i);
+            var elementValue = array.GetValue(i);
             SerializeValue(writer, elementValue, elementType);
         }
     }
@@ -232,32 +222,37 @@ public partial class SerializeHelper
     /// <param name="writer">BinaryWriter 实例</param>
     /// <param name="value">要序列化的对象</param>
     /// <param name="valueType">对象类型</param>
-    private static void SerializeComplexValue(BinaryWriter writer, object value, Type valueType)
+    private static void SerializeComplexValue(BinaryWriter writer, object? value, Type valueType)
     {
-        var count = 0;
         if (value == null)
         {
-            writer.Write(count);
+            writer.Write(0);
             return;
         }
 
-
         var genericArguments = valueType.GetGenericArguments();
-        if (value is IList list)
+        switch (value)
         {
-            writer.Write(list.Count);
-            foreach (var item in list)
+            case IList list:
             {
-                SerializeValue(writer, item, genericArguments[0]);
+                writer.Write(list.Count);
+                foreach (var item in list)
+                {
+                    SerializeValue(writer, item, genericArguments[0]);
+                }
+
+                break;
             }
-        }
-        else if (value is IDictionary dictionary)
-        {
-            writer.Write(dictionary.Count);
-            foreach (DictionaryEntry item in dictionary)
+            case IDictionary dictionary:
             {
-                SerializeValue(writer, item.Key, genericArguments[0]);
-                SerializeValue(writer, item.Value, genericArguments[1]);
+                writer.Write(dictionary.Count);
+                foreach (DictionaryEntry item in dictionary)
+                {
+                    SerializeValue(writer, item.Key, genericArguments[0]);
+                    SerializeValue(writer, item.Value, genericArguments[1]);
+                }
+
+                break;
             }
         }
     }
