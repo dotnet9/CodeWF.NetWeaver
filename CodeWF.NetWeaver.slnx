@@ -1,0 +1,28 @@
+<Solution>
+  <Configurations>
+    <Platform Name="Any CPU" />
+    <Platform Name="x64" />
+  </Configurations>
+  <Folder Name="/Solution Items/">
+    <File Path="Directory.Build.props" />
+    <File Path="README.md" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/CodeWF.NetWeaver/CodeWF.NetWeaver.csproj">
+      <Platform Solution="*|x64" Project="x64" />
+    </Project>
+    <Project Path="src/CodeWF.NetWrapper/CodeWF.NetWrapper.csproj" />
+  </Folder>
+  <Folder Name="/test/">
+    <Project Path="src/CodeWF.NetWeaver.AOTTest/CodeWF.NetWeaver.AOTTest.csproj">
+      <Platform Solution="*|x64" Project="x64" />
+    </Project>
+    <Project Path="src/CodeWF.NetWeaver.Tests/CodeWF.NetWeaver.Tests.csproj">
+      <Platform Solution="*|x64" Project="x64" />
+    </Project>
+    <Project Path="src/SocketDto.Test/SocketDto.Test.csproj" />
+    <Project Path="src/SocketDto/SocketDto.csproj" />
+    <Project Path="src/SocketTest.Client/SocketTest.Client.csproj" />
+    <Project Path="src/SocketTest.Server/SocketTest.Server.csproj" />
+  </Folder>
+</Solution>
