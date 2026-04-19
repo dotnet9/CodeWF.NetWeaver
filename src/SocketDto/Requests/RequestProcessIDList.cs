@@ -1,9 +1,9 @@
-﻿namespace SocketDto.Requests;
+namespace SocketDto.Requests;
 
 /// <summary>
 ///     请求进程ID列表信息
 /// </summary>
-[NetHead(7, 1)]
+[NetHead(NetConsts.RequestProcessIDListObjectId, 1)]
 public class RequestProcessIDList : INetObject
 {
     /// <summary>

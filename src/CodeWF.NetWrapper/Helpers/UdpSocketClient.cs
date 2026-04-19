@@ -54,6 +54,9 @@ public class UdpSocketClient
     /// </summary>
     public EventHandler<SocketCommand>? Received;
 
+    /// <summary>
+    /// 系统ID，用于标识客户端身份
+    /// </summary>
     public long SystemId { get; private set; }
 
     #endregion

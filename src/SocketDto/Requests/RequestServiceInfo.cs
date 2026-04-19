@@ -1,9 +1,9 @@
-﻿namespace SocketDto.Requests;
+namespace SocketDto.Requests;
 
 /// <summary>
 ///     请求基本信息
 /// </summary>
-[NetHead(5, 1)]
+[NetHead(NetConsts.RequestServiceInfoObjectId, 1)]
 public class RequestServiceInfo : INetObject
 {
     /// <summary>

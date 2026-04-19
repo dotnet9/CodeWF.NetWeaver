@@ -1,9 +1,9 @@
-﻿namespace SocketDto.Requests;
+namespace SocketDto.Requests;
 
 /// <summary>
 ///     请求Udp组播地址
 /// </summary>
-[NetHead(3, 1)]
+[NetHead(NetConsts.RequestUdpAddressObjectId, 1)]
 public class RequestUdpAddress : INetObject
 {
     /// <summary>

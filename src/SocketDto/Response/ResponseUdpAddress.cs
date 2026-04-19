@@ -1,9 +1,9 @@
-﻿namespace SocketDto.Response;
+namespace SocketDto.Response;
 
 /// <summary>
 ///     响应Udp组播地址
 /// </summary>
-[NetHead(4, 1)]
+[NetHead(NetConsts.ResponseUdpAddressObjectId, 1)]
 public class ResponseUdpAddress : INetObject
 {
     /// <summary>

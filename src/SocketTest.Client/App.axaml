@@ -4,6 +4,6 @@
              x:Class="SocketTest.Client.App">
     <Application.Styles>
         <semi:SemiTheme Locale="zh-CN" />
-        <StyleInclude Source="avares://Semi.Avalonia.DataGrid/Index.axaml" />
+        <semi:DataGridSemiTheme />
     </Application.Styles>
 </Application>

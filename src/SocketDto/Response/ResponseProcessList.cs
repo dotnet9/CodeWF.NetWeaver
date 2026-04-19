@@ -1,9 +1,9 @@
-﻿namespace SocketDto.Response;
+namespace SocketDto.Response;
 
 /// <summary>
 ///     响应请求进程信息
 /// </summary>
-[NetHead(10, 1)]
+[NetHead(NetConsts.ResponseProcessListObjectId, 1)]
 public class ResponseProcessList : INetObject
 {
     /// <summary>

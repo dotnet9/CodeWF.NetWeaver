@@ -5,8 +5,8 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:codewf="https://codewf.com"
         xmlns:converters="clr-namespace:SocketTest.Client.Converters"
-        mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
-        Width="1000" Height="800"
+        mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="850"
+        Width="1000" Height="850"
         x:Class="SocketTest.Client.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Icon="/Assets/logo.ico"
@@ -43,181 +43,234 @@
         <vm:MainWindowViewModel />
     </Design.DataContext>
 
-    <Grid Margin="5">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-            <RowDefinition Height="3" />
-            <RowDefinition Height="200" />
-            <RowDefinition Height="30" />
-            <RowDefinition Height="Auto" />
-        </Grid.RowDefinitions>
-        <StackPanel Orientation="Horizontal">
-            <TextBlock Margin="0,0,5,0" Text="服务端IP：" />
-            <TextBox Width="150"
-                     Text="{Binding TcpIp, Mode=TwoWay}" />
+    <TabControl>
+        <TabItem Header="进程监控">
+            <Grid Margin="5">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="3" />
+                    <RowDefinition Height="200" />
+                    <RowDefinition Height="30" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Margin="0,0,5,0" Text="服务端IP：" />
+                    <TextBox Width="150"
+                             Text="{Binding TcpIp, Mode=TwoWay}" />
 
-            <TextBlock Margin="10,0,5,0" Text="端口：" />
-            <TextBox Width="60"
-                     Text="{Binding TcpPort, Mode=TwoWay}" />
-            <Button
-                Command="{Binding HandleConnectTcpCommandAsync}"
-                Content="{codewf:If Condition={Binding IsRunning}, True=断开服务, False=连接服务}" />
-            <Button Command="{Binding RefreshCommand}" Content="刷新" />
-            <Button Command="{Binding RefreshAllCommand}" Content="刷新所有客户端" />
-            <TextBlock Text="测试：" />
-            <Button Content="正常包" Command="{Binding SendCorrectCommand}" />
-            <Button Content="包版本不同" Command="{Binding SendDiffVersionCommand}" />
-            <Button Content="包定义不同" Command="{Binding SendDiffPropsCommand}" />
-        </StackPanel>
-        <HeaderedContentControl Header="实时进程信息" Grid.Row="1">
-            <DataGrid CanUserReorderColumns="True" CanUserResizeColumns="True" CanUserSortColumns="True"
-                      GridLinesVisibility="All" ScrollViewer.AllowAutoHide="False" FontSize="12"
-                      HeadersVisibility="Column" IsReadOnly="True" BorderThickness="1" BorderBrush="#33000000"
-                      ItemsSource="{Binding DisplayProcesses, Mode=OneWay}">
-                <DataGrid.Columns>
-                    <DataGridTextColumn
-                        Width="70"
-                        Binding="{Binding PID, Mode=OneWay}"
-                        Header="PId" />
-                    <DataGridTextColumn
-                        Width="120"
-                        Binding="{Binding Name, Mode=OneWay}"
-                        Header="进程名称" />
-                    <DataGridTextColumn
-                        Width="90"
-                        Binding="{Binding Type, Converter={StaticResource EnumToDescriptionConverter}, Mode=OneWay}"
-                        Header="进程类型" />
-                    <DataGridTemplateColumn Width="90" Header="进程状态">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate>
-                                <TextBlock
-                                    Foreground="{Binding Status, Converter={StaticResource ProcessStatusToForegroundConverter}}"
-                                    Text="{Binding Status, Converter={StaticResource EnumToDescriptionConverter}, Mode=OneWay}" />
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                    </DataGridTemplateColumn>
-                    <DataGridTemplateColumn Width="90" Header="告警状态">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate>
-                                <TextBlock
-                                    Foreground="{Binding AlarmStatus, Converter={StaticResource AlarmStatusToForegroundConverter}}"
-                                    Text="{Binding AlarmStatus, Converter={StaticResource EnumToDescriptionConverter}, Mode=OneWay}" />
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                    </DataGridTemplateColumn>
-                    <DataGridTextColumn
-                        Width="120"
-                        Binding="{Binding Publisher, Mode=OneWay}"
-                        Header="发布者" />
-                    <DataGridTextColumn
-                        Width="120"
-                        Binding="{Binding CommandLine, Mode=OneWay}"
-                        Header="命令行" />
-                    <DataGridTemplateColumn Width="100" Header="CPU使用率">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate>
-                                <TextBlock
-                                    Foreground="{Binding Cpu, Converter={StaticResource UsageToForegroundConverter}}"
-                                    Text="{Binding Cpu, Converter={StaticResource UsageToFormatConverter}}" />
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                    </DataGridTemplateColumn>
-                    <DataGridTemplateColumn Width="90" Header="内存使用率">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate>
-                                <TextBlock
-                                    Foreground="{Binding Memory, Converter={StaticResource UsageToForegroundConverter}}"
-                                    Text="{Binding Memory, Converter={StaticResource UsageToFormatConverter}}" />
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                    </DataGridTemplateColumn>
-                    <DataGridTemplateColumn Width="100" Header="磁盘">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate>
-                                <TextBlock
-                                    Foreground="{Binding Disk, Converter={StaticResource UsageToForegroundConverter}}"
-                                    Text="{Binding Disk, Converter={StaticResource UsageToFormatConverter}}" />
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                    </DataGridTemplateColumn>
-                    <DataGridTemplateColumn Width="100" Header="网络">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate>
-                                <TextBlock
-                                    Foreground="{Binding Network, Converter={StaticResource UsageToForegroundConverter}}"
-                                    Text="{Binding Network, Converter={StaticResource UsageToFormatConverter}}" />
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                    </DataGridTemplateColumn>
-                    <DataGridTemplateColumn Width="60" Header="GPU">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate>
-                                <TextBlock
-                                    Foreground="{Binding Gpu, Converter={StaticResource UsageToForegroundConverter}}"
-                                    Text="{Binding Gpu, Converter={StaticResource UsageToFormatConverter}}" />
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                    </DataGridTemplateColumn>
-                    <DataGridTextColumn
-                        Width="120"
-                        Binding="{Binding GpuEngine, Mode=OneWay}"
-                        Header="GPU引擎" />
-                    <DataGridTemplateColumn Header="电源使用情况">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate>
-                                <TextBlock
-                                    Foreground="{Binding PowerUsage, Converter={StaticResource ProcessPowerUsageToForegroundConverter}}"
-                                    Text="{Binding PowerUsage, Converter={StaticResource EnumToDescriptionConverter}}" />
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                    </DataGridTemplateColumn>
-                    <DataGridTemplateColumn Width="120" Header="电源使用情况趋势">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate>
-                                <TextBlock
-                                    Foreground="{Binding PowerUsageTrend, Converter={StaticResource ProcessPowerUsageToForegroundConverter}}"
-                                    Text="{Binding PowerUsageTrend, Converter={StaticResource EnumToDescriptionConverter}}" />
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                    </DataGridTemplateColumn>
-                    <DataGridTextColumn
-                        Width="200"
-                        Binding="{Binding LastUpdateTime, StringFormat=yyyy-MM-dd HH:mm:ss fff, Mode=OneWay}"
-                        Header="上次更新时间" />
-                    <DataGridTextColumn
-                        Width="200"
-                        Binding="{Binding UpdateTime, StringFormat=yyyy-MM-dd HH:mm:ss fff, Mode=OneWay}"
-                        Header="更新时间" />
-                </DataGrid.Columns>
-            </DataGrid>
-        </HeaderedContentControl>
+                    <TextBlock Margin="10,0,5,0" Text="端口：" />
+                    <TextBox Width="60"
+                             Text="{Binding TcpPort, Mode=TwoWay}" />
+                    <Button
+                        Command="{Binding HandleConnectTcpCommandAsync}"
+                        Content="{codewf:If Condition={Binding IsRunning}, True=断开服务, False=连接服务}" />
+                    <Button Command="{Binding RefreshCommand}" Content="刷新" />
+                    <Button Command="{Binding RefreshAllCommand}" Content="刷新所有客户端" />
+                    <TextBlock Text="测试：" />
+                    <Button Content="正常包" Command="{Binding SendCorrectCommand}" />
+                    <Button Content="包版本不同" Command="{Binding SendDiffVersionCommand}" />
+                    <Button Content="包定义不同" Command="{Binding SendDiffPropsCommand}" />
+                </StackPanel>
+                <HeaderedContentControl Header="实时进程信息" Grid.Row="1">
+                    <DataGrid CanUserReorderColumns="True" CanUserResizeColumns="True" CanUserSortColumns="True"
+                              GridLinesVisibility="All" ScrollViewer.AllowAutoHide="False" FontSize="12"
+                              HeadersVisibility="Column" IsReadOnly="True" BorderThickness="1" BorderBrush="#33000000"
+                              ItemsSource="{Binding DisplayProcesses, Mode=OneWay}">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn
+                                Width="70"
+                                Binding="{Binding PID, Mode=OneWay}"
+                                Header="PId" />
+                            <DataGridTextColumn
+                                Width="120"
+                                Binding="{Binding Name, Mode=OneWay}"
+                                Header="进程名称" />
+                            <DataGridTextColumn
+                                Width="90"
+                                Binding="{Binding Type, Converter={StaticResource EnumToDescriptionConverter}, Mode=OneWay}"
+                                Header="进程类型" />
+                            <DataGridTemplateColumn Width="90" Header="进程状态">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock
+                                            Foreground="{Binding Status, Converter={StaticResource ProcessStatusToForegroundConverter}}"
+                                            Text="{Binding Status, Converter={StaticResource EnumToDescriptionConverter}, Mode=OneWay}" />
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            <DataGridTemplateColumn Width="90" Header="告警状态">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock
+                                            Foreground="{Binding AlarmStatus, Converter={StaticResource AlarmStatusToForegroundConverter}}"
+                                            Text="{Binding AlarmStatus, Converter={StaticResource EnumToDescriptionConverter}, Mode=OneWay}" />
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            <DataGridTextColumn
+                                Width="120"
+                                Binding="{Binding Publisher, Mode=OneWay}"
+                                Header="发布者" />
+                            <DataGridTextColumn
+                                Width="120"
+                                Binding="{Binding CommandLine, Mode=OneWay}"
+                                Header="命令行" />
+                            <DataGridTemplateColumn Width="100" Header="CPU使用率">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock
+                                            Foreground="{Binding Cpu, Converter={StaticResource UsageToForegroundConverter}}"
+                                            Text="{Binding Cpu, Converter={StaticResource UsageToFormatConverter}}" />
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            <DataGridTemplateColumn Width="90" Header="内存使用率">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock
+                                            Foreground="{Binding Memory, Converter={StaticResource UsageToForegroundConverter}}"
+                                            Text="{Binding Memory, Converter={StaticResource UsageToFormatConverter}}" />
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            <DataGridTemplateColumn Width="100" Header="磁盘">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock
+                                            Foreground="{Binding Disk, Converter={StaticResource UsageToForegroundConverter}}"
+                                            Text="{Binding Disk, Converter={StaticResource UsageToFormatConverter}}" />
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            <DataGridTemplateColumn Width="100" Header="网络">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock
+                                            Foreground="{Binding Network, Converter={StaticResource UsageToForegroundConverter}}"
+                                            Text="{Binding Network, Converter={StaticResource UsageToFormatConverter}}" />
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            <DataGridTemplateColumn Width="60" Header="GPU">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock
+                                            Foreground="{Binding Gpu, Converter={StaticResource UsageToForegroundConverter}}"
+                                            Text="{Binding Gpu, Converter={StaticResource UsageToFormatConverter}}" />
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            <DataGridTextColumn
+                                Width="120"
+                                Binding="{Binding GpuEngine, Mode=OneWay}"
+                                Header="GPU引擎" />
+                            <DataGridTemplateColumn Header="电源使用情况">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock
+                                            Foreground="{Binding PowerUsage, Converter={StaticResource ProcessPowerUsageToForegroundConverter}}"
+                                            Text="{Binding PowerUsage, Converter={StaticResource EnumToDescriptionConverter}}" />
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            <DataGridTemplateColumn Width="120" Header="电源使用情况趋势">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock
+                                            Foreground="{Binding PowerUsageTrend, Converter={StaticResource ProcessPowerUsageToForegroundConverter}}"
+                                            Text="{Binding PowerUsageTrend, Converter={StaticResource EnumToDescriptionConverter}}" />
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            <DataGridTextColumn
+                                Width="200"
+                                Binding="{Binding LastUpdateTime, StringFormat=yyyy-MM-dd HH:mm:ss fff, Mode=OneWay}"
+                                Header="上次更新时间" />
+                            <DataGridTextColumn
+                                Width="200"
+                                Binding="{Binding UpdateTime, StringFormat=yyyy-MM-dd HH:mm:ss fff, Mode=OneWay}"
+                                Header="更新时间" />
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </HeaderedContentControl>
 
-        <GridSplitter
-            Grid.Row="2"
-            Height="3"
-            HorizontalAlignment="Stretch"
-            ResizeDirection="Rows" />
-        <HeaderedContentControl Header="日志" Grid.Row="3" Margin="3">
-            <codewf:LogView />
-        </HeaderedContentControl>
+                <GridSplitter
+                    Grid.Row="2"
+                    Height="3"
+                    HorizontalAlignment="Stretch"
+                    ResizeDirection="Rows" />
+                <HeaderedContentControl Header="日志" Grid.Row="3" Margin="3">
+                    <codewf:LogView />
+                </HeaderedContentControl>
 
-        <StackPanel
-            Grid.Row="4"
-            VerticalAlignment="Center"
-            Orientation="Horizontal">
-            <TextBlock Text="{Binding BaseInfo}" />
-        </StackPanel>
-        <StackPanel
-            Grid.Row="5"
-            Margin="0,8"
-            VerticalAlignment="Center">
-            <TextBlock>
-                <Run Text="UDP组播：" />
-                <Run Text="{Binding UdpIp,Mode=OneWay}" />
-                <Run Text=":" />
-                <Run Text="{Binding UdpPort,Mode=OneWay}" />
-            </TextBlock>
-        </StackPanel>
-    </Grid>
+                <StackPanel
+                    Grid.Row="4"
+                    VerticalAlignment="Center"
+                    Orientation="Horizontal">
+                    <TextBlock Text="{Binding BaseInfo}" />
+                </StackPanel>
+                <StackPanel
+                    Grid.Row="5"
+                    Margin="0,8"
+                    VerticalAlignment="Center">
+                    <TextBlock>
+                        <Run Text="UDP组播：" />
+                        <Run Text="{Binding UdpIp,Mode=OneWay}" />
+                        <Run Text=":" />
+                        <Run Text="{Binding UdpPort,Mode=OneWay}" />
+                    </TextBlock>
+                </StackPanel>
+            </Grid>
+        </TabItem>
+        <TabItem Header="文件传输">
+            <Grid Margin="5">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <HeaderedContentControl Grid.Row="0" Header="文件操作">
+                    <StackPanel Orientation="Horizontal">
+                        <Button Command="{Binding SelectFilesCommand}" Content="选择文件(批量)" Margin="5,0" />
+                        <Button Command="{Binding UploadFilesCommand}" Content="上传文件" Margin="5,0" />
+                        <Button Command="{Binding DownloadFilesCommand}" Content="下载文件" Margin="5,0" />
+                        <Button Command="{Binding CancelTransferCommand}" Content="取消传输" Margin="5,0" />
+                    </StackPanel>
+                </HeaderedContentControl>
+                <HeaderedContentControl Grid.Row="1" Header="保存路径配置">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Margin="0,0,5,0" Text="保存路径：" />
+                        <TextBox Width="400" Text="{Binding DownloadPath, Mode=TwoWay}" />
+                        <Button Command="{Binding BrowseDownloadPathCommand}" Content="浏览" Margin="5,0" />
+                    </StackPanel>
+                </HeaderedContentControl>
+                <HeaderedContentControl Grid.Row="2" Header="传输列表">
+                    <DataGrid CanUserReorderColumns="True" CanUserResizeColumns="True" CanUserSortColumns="True"
+                              GridLinesVisibility="All" ScrollViewer.AllowAutoHide="False" FontSize="12"
+                              HeadersVisibility="Column" IsReadOnly="True" BorderThickness="1" BorderBrush="#33000000"
+                              ItemsSource="{Binding FileTransferList, Mode=OneWay}">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Width="150" Binding="{Binding FileName, Mode=OneWay}" Header="文件名" />
+                            <DataGridTextColumn Width="100" Binding="{Binding FileSize, Mode=OneWay, StringFormat={}{0} bytes}" Header="文件大小" />
+                            <DataGridTextColumn Width="150" Binding="{Binding Progress, Mode=OneWay, StringFormat={}{0:F2}%}" Header="进度" />
+                            <DataGridTextColumn Width="100" Binding="{Binding Status, Mode=OneWay}" Header="状态" />
+                            <DataGridTextColumn Width="*" Binding="{Binding Message, Mode=OneWay}" Header="信息" />
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </HeaderedContentControl>
+                <StackPanel Grid.Row="3" Margin="0,5" Orientation="Horizontal">
+                    <TextBlock Margin="0,0,20,0">
+                        <Run Text="总进度：" />
+                        <Run Foreground="Green" Text="{Binding TotalProgress, StringFormat={}{0:F2}%}" />
+                    </TextBlock>
+                    <TextBlock>
+                        <Run Text="传输速度：" />
+                        <Run Foreground="Green" Text="{Binding TransferSpeed, Mode=OneWay}" />
+                    </TextBlock>
+                </StackPanel>
+            </Grid>
+        </TabItem>
+    </TabControl>
 </Window>

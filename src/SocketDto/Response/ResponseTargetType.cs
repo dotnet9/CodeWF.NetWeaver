@@ -1,9 +1,9 @@
-﻿namespace SocketDto.Response;
+namespace SocketDto.Response;
 
 /// <summary>
 ///     响应目标终端类型
 /// </summary>
-[NetHead(2, 1)]
+[NetHead(NetConsts.ResponseTargetTypeObjectId, 1)]
 public class ResponseTargetType : INetObject
 {
     /// <summary>
