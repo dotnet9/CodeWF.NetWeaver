@@ -162,6 +162,7 @@ public class MainWindowViewModel : ReactiveObject
                     item.Message = "传输完成";
                 }
             }
+
             UpdateTotalProgress();
         });
     }
@@ -173,6 +174,7 @@ public class MainWindowViewModel : ReactiveObject
             TotalProgress = 0;
             return;
         }
+
         var total = FileTransferList.Sum(f => f.FileSize);
         var transferred = FileTransferList.Sum(f => f.TransferredBytes);
         TotalProgress = total > 0 ? (double)transferred / total * 100 : 0;
@@ -272,7 +274,8 @@ public class MainWindowViewModel : ReactiveObject
 
             try
             {
-                await TcpHelper.StartFileUploadAsync(SelectedClient.Value.Key, filePath, fileName, _uploadCancellation.Token);
+                await TcpHelper.StartFileUploadAsync(SelectedClient.Value.Key, filePath, fileName,
+                    _uploadCancellation.Token);
             }
             catch (Exception ex)
             {
@@ -335,6 +338,7 @@ public class MainWindowViewModel : ReactiveObject
         {
             return desktop.MainWindow;
         }
+
         return null;
     }
 
@@ -382,17 +386,20 @@ public class MainWindowViewModel : ReactiveObject
         else if (request.IsCommand<FileTransferStart>())
         {
             var startInfo = request.GetCommand<FileTransferStart>();
-            await TcpHelper.HandleFileTransferStartAsync(request.Client!, startInfo.FileName, startInfo.FileSize, startInfo.FileHash, startInfo.AlreadyTransferredBytes);
+            await TcpHelper.HandleFileTransferStartAsync(request.Client!, startInfo.FileName, startInfo.FileSize,
+                startInfo.FileHash, startInfo.AlreadyTransferredBytes);
         }
         else if (request.IsCommand<FileBlockData>())
         {
             var blockData = request.GetCommand<FileBlockData>();
-            await TcpHelper.HandleFileBlockDataAsync(request.Client!, blockData.BlockIndex, blockData.Offset, blockData.BlockSize, blockData.Data);
+            await TcpHelper.HandleFileBlockDataAsync(request.Client!, blockData.BlockIndex, blockData.Offset,
+                blockData.BlockSize, blockData.Data);
         }
         else if (request.IsCommand<FileBlockAck>())
         {
             var blockAck = request.GetCommand<FileBlockAck>();
-            await TcpHelper.HandleFileBlockAckAsync(request.Client!, blockAck.BlockIndex, blockAck.Success, blockAck.Message);
+            await TcpHelper.HandleFileBlockAckAsync(request.Client!, blockAck.BlockIndex, blockAck.Success,
+                blockAck.Message);
         }
         else
         {
@@ -457,6 +464,12 @@ public class MainWindowViewModel : ReactiveObject
 
     private async Task ReceiveSocketCommandAsync(Socket client, RequestProcessList request)
     {
+        if (!MockUtil.IsInitOver)
+        {
+            _ = Log("模拟数据尚未初始化完成");
+            return;
+        }
+
         _ = Log("收到请求进程详细信息列表命令");
         await Task.Run(async () =>
         {
@@ -515,7 +528,8 @@ public class MainWindowViewModel : ReactiveObject
         try
         {
             var currentNetHead = SerializeHelper.GetNetObjectHead<RequestStudentListDiffVersion>();
-            var errorMessage = $"命令版本异常：命令ID: {request.HeadInfo.ObjectId}，服务端版本{currentNetHead.Version}，客户端版本{request.HeadInfo.ObjectVersion}，服务端不能正常解析";
+            var errorMessage =
+                $"命令版本异常：命令ID: {request.HeadInfo.ObjectId}，服务端版本{currentNetHead.Version}，客户端版本{request.HeadInfo.ObjectVersion}，服务端不能正常解析";
             await TcpHelper.SendCommandAsync(client, CommonSocketResponse.Fail(default, errorMessage));
         }
         catch (Exception ex)
@@ -533,7 +547,8 @@ public class MainWindowViewModel : ReactiveObject
             if (currentNetHead.Id == request.HeadInfo.ObjectId &&
                 currentNetHead.Version == request.HeadInfo.ObjectVersion)
             {
-                Logger.Info($"{nameof(RequestStudentListDiffProps)}对象ID({currentNetHead.Id})与版本({currentNetHead.Version})相同，尝试解析：");
+                Logger.Info(
+                    $"{nameof(RequestStudentListDiffProps)}对象ID({currentNetHead.Id})与版本({currentNetHead.Version})相同，尝试解析：");
                 var data = request.GetCommand<RequestStudentListDiffProps>();
                 Logger.Info($"按理说这里就不会打印，上面获取代码会抛出异常");
             }
@@ -573,6 +588,11 @@ public class MainWindowViewModel : ReactiveObject
 
     private async void MockSendData(object? sender, ElapsedEventArgs? e)
     {
+        if (!MockUtil.IsInitOver)
+        {
+            return;
+        }
+
         if (_isUpdateAll)
         {
             await TcpHelper.SendCommandAsync(new ChangeProcessList());
@@ -582,7 +602,7 @@ public class MainWindowViewModel : ReactiveObject
 
         await TcpHelper.SendCommandAsync(new UpdateProcessList
         {
-            Processes = await MockUtil.MockProcessesAsync(MockCount, MockPageSize)
+            Processes = await MockUtil.MockProcessesAsync(MockCount, 0)
         });
         Logger.Info("====TCP推送更新通知====");
 
@@ -683,11 +703,8 @@ public class MainWindowViewModel : ReactiveObject
 
     private async Task SendMockDataAsync()
     {
-        Task.Run(async () =>
-        {
-            await MockUtil.MockAsync(MockCount);
-            _ = Log("数据模拟完成，客户端可以正常请求数据了");
-        });
+        await MockUtil.MockAsync(MockCount);
+        _ = Log("数据模拟完成，客户端可以正常请求数据了");
     }
 
     private void Invoke(Action action)

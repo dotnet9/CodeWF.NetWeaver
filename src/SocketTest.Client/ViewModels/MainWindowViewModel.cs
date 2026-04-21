@@ -174,9 +174,9 @@ public class MainWindowViewModel : ReactiveObject
             var (isSuccess, errorMessage) = await TcpHelper.ConnectAsync("TCP客户端", TcpIp, TcpPort);
             if (isSuccess)
             {
-                IsRunning = true;
-                ReceiveTcpData();
                 SendHeartbeat();
+                await RequestTargetTypeAsync();
+                IsRunning = true;
                 _ = Log("连接Tcp服务成功");
             }
             else
@@ -189,6 +189,7 @@ public class MainWindowViewModel : ReactiveObject
             StopSendHeartbeat();
             TcpHelper.Stop();
             IsRunning = false;
+            UdpHelper.Received -= ReceiveUdpCommand;
             UdpHelper.Stop();
             _ = Log("断开Tcp服务");
         }
@@ -202,7 +203,8 @@ public class MainWindowViewModel : ReactiveObject
             return;
         }
 
-        await RequestTargetTypeAsync();
+        ClearData();
+        await TcpHelper.SendCommandAsync(new RequestServiceInfo() { TaskId = NetHelper.GetTaskId() });
     }
 
     private async Task HandleRefreshAllCommandAsync()
@@ -213,8 +215,8 @@ public class MainWindowViewModel : ReactiveObject
             return;
         }
 
-        ClearData();
-        await RequestTargetTypeAsync();
+        await TcpHelper.SendCommandAsync(new ChangeProcessList());
+        Logger.Info("发送刷新所有进程命令");
     }
 
     private async Task HandleSendCorrectCommandAsync()
@@ -454,17 +456,7 @@ public class MainWindowViewModel : ReactiveObject
     }
 
     #region 接收事件
-
-    private void ReceiveTcpData()
-    {
-        Task.Run(async () =>
-        {
-            while (!TcpHelper.IsRunning) await Task.Delay(TimeSpan.FromMilliseconds(10));
-
-            await HandleRefreshCommandAsync();
-        });
-    }
-
+    
     [EventHandler]
     private async Task ReceivedSocketMessage(SocketCommand message)
     {
