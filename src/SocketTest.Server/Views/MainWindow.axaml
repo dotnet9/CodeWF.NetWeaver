@@ -96,55 +96,5 @@
                 </StackPanel>
             </Grid>
         </TabItem>
-        <TabItem Header="文件传输">
-            <Grid Margin="5">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" />
-                    <RowDefinition Height="Auto" />
-                </Grid.RowDefinitions>
-                <HeaderedContentControl Grid.Row="0" Header="选择客户端">
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Margin="0,0,5,0" Text="客户端：" />
-                        <ComboBox Width="200" ItemsSource="{Binding ConnectedClients, Mode=OneWay}"
-                                  SelectedItem="{Binding SelectedClient, Mode=TwoWay}"
-                                  DisplayMemberBinding="{Binding Key, Mode=OneWay}" />
-                    </StackPanel>
-                </HeaderedContentControl>
-                <HeaderedContentControl Grid.Row="1" Header="文件操作">
-                    <StackPanel Orientation="Horizontal">
-                        <Button Command="{Binding SelectFilesCommand}" Content="选择文件(批量)" Margin="5,0" />
-                        <Button Command="{Binding UploadFilesCommand}" Content="上传文件" Margin="5,0" />
-                        <Button Command="{Binding DownloadFilesCommand}" Content="下载文件" Margin="5,0" />
-                        <Button Command="{Binding CancelTransferCommand}" Content="取消传输" Margin="5,0" />
-                    </StackPanel>
-                </HeaderedContentControl>
-                <HeaderedContentControl Grid.Row="2" Header="传输列表">
-                    <DataGrid CanUserReorderColumns="True" CanUserResizeColumns="True" CanUserSortColumns="True"
-                              GridLinesVisibility="All" ScrollViewer.AllowAutoHide="False" FontSize="12"
-                              HeadersVisibility="Column" IsReadOnly="True" BorderThickness="1" BorderBrush="#33000000"
-                              ItemsSource="{Binding FileTransferList, Mode=OneWay}">
-                        <DataGrid.Columns>
-                            <DataGridTextColumn Width="150" Binding="{Binding FileName, Mode=OneWay}" Header="文件名" />
-                            <DataGridTextColumn Width="100" Binding="{Binding FileSize, Mode=OneWay, StringFormat={}{0} bytes}" Header="文件大小" />
-                            <DataGridTextColumn Width="150" Binding="{Binding Progress, Mode=OneWay, StringFormat={}{0:F2}%}" Header="进度" />
-                            <DataGridTextColumn Width="100" Binding="{Binding Status, Mode=OneWay}" Header="状态" />
-                            <DataGridTextColumn Width="*" Binding="{Binding Message, Mode=OneWay}" Header="信息" />
-                        </DataGrid.Columns>
-                    </DataGrid>
-                </HeaderedContentControl>
-                <StackPanel Grid.Row="3" Margin="0,5" Orientation="Horizontal">
-                    <TextBlock Margin="0,0,20,0">
-                        <Run Text="总进度：" />
-                        <Run Foreground="Green" Text="{Binding TotalProgress, StringFormat={}{0:F2}%}" />
-                    </TextBlock>
-                    <TextBlock>
-                        <Run Text="传输速度：" />
-                        <Run Foreground="Green" Text="{Binding TransferSpeed, Mode=OneWay}" />
-                    </TextBlock>
-                </StackPanel>
-            </Grid>
-        </TabItem>
     </TabControl>
 </Window>

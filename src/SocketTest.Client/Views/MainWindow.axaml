@@ -227,40 +227,81 @@
             <Grid Margin="5">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
-                <HeaderedContentControl Grid.Row="0" Header="文件操作">
-                    <StackPanel Orientation="Horizontal">
-                        <Button Command="{Binding SelectFilesCommand}" Content="选择文件(批量)" Margin="5,0" />
-                        <Button Command="{Binding UploadFilesCommand}" Content="上传文件" Margin="5,0" />
-                        <Button Command="{Binding DownloadFilesCommand}" Content="下载文件" Margin="5,0" />
-                        <Button Command="{Binding CancelTransferCommand}" Content="取消传输" Margin="5,0" />
-                    </StackPanel>
-                </HeaderedContentControl>
-                <HeaderedContentControl Grid.Row="1" Header="保存路径配置">
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Margin="0,0,5,0" Text="保存路径：" />
-                        <TextBox Width="400" Text="{Binding DownloadPath, Mode=TwoWay}" />
-                        <Button Command="{Binding BrowseDownloadPathCommand}" Content="浏览" Margin="5,0" />
-                    </StackPanel>
-                </HeaderedContentControl>
-                <HeaderedContentControl Grid.Row="2" Header="传输列表">
+                <Grid Grid.Row="0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <HeaderedContentControl Grid.Row="0" Header="上传参数（客户端 -> 服务端）">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" Orientation="Horizontal">
+                                <TextBlock Text="本地上传：" VerticalAlignment="Center" Margin="0,0,5,0" />
+                                <TextBox Width="250" Text="{Binding UploadLocalPaths, Mode=TwoWay}" Watermark="本地文件路径，多个用逗号分隔" Margin="0,0,5,0" />
+                                <Button Command="{Binding SelectUploadFilesCommand}" Content="选择文件" Margin="0,0,10,0" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="2" Orientation="Horizontal">
+                                <TextBlock Text="目标目录：" VerticalAlignment="Center" Margin="0,0,5,0" />
+                                <TextBox Width="200" Text="{Binding UploadRemoteDirectory, Mode=TwoWay}" Watermark="目标端保存目录" Margin="0,0,5,0" />
+                                <Button Command="{Binding SelectUploadRemoteDirectoryCommand}" Content="选择目录" Margin="0,0,10,0" />
+                            </StackPanel>
+                            <Button Grid.Column="3" Command="{Binding UploadFilesCommand}" Content="上传" />
+                        </Grid>
+                    </HeaderedContentControl>
+                    <HeaderedContentControl Grid.Row="1" Header="下载参数（服务端 -> 客户端）">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" Orientation="Horizontal">
+                                <TextBlock Text="服务端文件：" VerticalAlignment="Center" Margin="0,0,5,0" />
+                                <TextBox Width="250" Text="{Binding DownloadServerFilePaths, Mode=TwoWay}" Watermark="服务端文件路径，多个用逗号分隔" Margin="0,0,5,0" />
+                                <Button Command="{Binding SelectDownloadServerFilesCommand}" Content="选择文件" Margin="0,0,10,0" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="2" Orientation="Horizontal">
+                                <TextBlock Text="保存目录：" VerticalAlignment="Center" Margin="0,0,5,0" />
+                                <TextBox Width="200" Text="{Binding DownloadSaveDirectory, Mode=TwoWay}" Watermark="本地保存目录" Margin="0,0,5,0" />
+                                <Button Command="{Binding SelectDownloadSaveDirectoryCommand}" Content="选择目录" Margin="0,0,10,0" />
+                            </StackPanel>
+                            <Button Grid.Column="3" Command="{Binding DownloadFilesCommand}" Content="下载" />
+                        </Grid>
+                    </HeaderedContentControl>
+                </Grid>
+                <HeaderedContentControl Grid.Row="1" Header="传输列表">
                     <DataGrid CanUserReorderColumns="True" CanUserResizeColumns="True" CanUserSortColumns="True"
                               GridLinesVisibility="All" ScrollViewer.AllowAutoHide="False" FontSize="12"
                               HeadersVisibility="Column" IsReadOnly="True" BorderThickness="1" BorderBrush="#33000000"
                               ItemsSource="{Binding FileTransferList, Mode=OneWay}">
                         <DataGrid.Columns>
-                            <DataGridTextColumn Width="150" Binding="{Binding FileName, Mode=OneWay}" Header="文件名" />
-                            <DataGridTextColumn Width="100" Binding="{Binding FileSize, Mode=OneWay, StringFormat={}{0} bytes}" Header="文件大小" />
-                            <DataGridTextColumn Width="150" Binding="{Binding Progress, Mode=OneWay, StringFormat={}{0:F2}%}" Header="进度" />
-                            <DataGridTextColumn Width="100" Binding="{Binding Status, Mode=OneWay}" Header="状态" />
-                            <DataGridTextColumn Width="*" Binding="{Binding Message, Mode=OneWay}" Header="信息" />
+                            <DataGridTextColumn Width="200" Binding="{Binding LocalPath, Mode=OneWay}" Header="文件路径1" />
+                            <DataGridTextColumn Width="200" Binding="{Binding RemotePath, Mode=OneWay}" Header="文件路径2" />
+                            <DataGridTextColumn Width="80" Binding="{Binding TransferType, Mode=OneWay}" Header="类型" />
+                            <DataGridTextColumn Width="120" Binding="{Binding Progress, Mode=OneWay, StringFormat={}{0:F2}%}" Header="传输进度" />
+                            <DataGridTemplateColumn Header="控制" Width="80">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <Button Content="{Binding CommandText}"
+                                                Command="{Binding $parent[DataGrid].((vm:MainWindowViewModel)DataContext).FileControlCommand}"
+                                                CommandParameter="{Binding}"
+                                                Padding="5,2" />
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
                         </DataGrid.Columns>
                     </DataGrid>
                 </HeaderedContentControl>
-                <StackPanel Grid.Row="3" Margin="0,5" Orientation="Horizontal">
+                <StackPanel Grid.Row="2" Margin="0,5" Orientation="Horizontal">
                     <TextBlock Margin="0,0,20,0">
                         <Run Text="总进度：" />
                         <Run Foreground="Green" Text="{Binding TotalProgress, StringFormat={}{0:F2}%}" />

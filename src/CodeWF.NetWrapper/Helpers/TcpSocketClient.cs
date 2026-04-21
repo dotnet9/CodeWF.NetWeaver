@@ -196,10 +196,10 @@ public class TcpSocketClient
     /// <summary>
     /// 开始向服务器上传文件
     /// </summary>
-    /// <param name="localFilePath">本地文件路径</param>
-    /// <param name="remoteFileName">远程文件名</param>
+    /// <param name="localFilePath">本地上传文件路径</param>
+    /// <param name="remoteFilePath">服务端保存文件路径（含文件名）</param>
     /// <param name="cancellationToken">取消令牌</param>
-    public async Task StartFileUploadAsync(string localFilePath, string remoteFileName,
+    public async Task StartFileUploadAsync(string localFilePath, string remoteFilePath,
         CancellationToken cancellationToken = default)
     {
         if (!CanSend)
@@ -215,6 +215,7 @@ public class TcpSocketClient
             return;
         }
 
+        var remoteFileName = Path.GetFileName(remoteFilePath);
         _currentUploadSession = new FileTransferSession
         {
             FileName = remoteFileName,
@@ -223,7 +224,7 @@ public class TcpSocketClient
             IsUpload = true
         };
 
-        _currentUploadSession.AlreadyTransferredBytes = GetExistingTransferBytes(remoteFileName);
+        _currentUploadSession.AlreadyTransferredBytes = GetExistingTransferBytes(remoteFilePath);
         _currentUploadSession.FileHash = await ComputeFileHashAsync(localFilePath);
 
         var startCommand = new FileTransferStart
@@ -232,11 +233,12 @@ public class TcpSocketClient
             FileSize = fileInfo.Length,
             FileHash = _currentUploadSession.FileHash,
             AlreadyTransferredBytes = _currentUploadSession.AlreadyTransferredBytes,
-            IsUpload = true
+            IsUpload = true,
+            RemoteFilePath = remoteFilePath
         };
 
         await SendCommandAsync(startCommand);
-        Logger.Info($"{ServerMark} 请求上传文件：{remoteFileName}，大小：{fileInfo.Length}字节，已传输：{_currentUploadSession.AlreadyTransferredBytes}字节");
+        Logger.Info($"{ServerMark} 请求上传文件：{localFilePath} -> {remoteFilePath}，大小：{fileInfo.Length}字节，已传输：{_currentUploadSession.AlreadyTransferredBytes}字节");
 
         await SendUploadBlockAsync();
     }
@@ -244,10 +246,10 @@ public class TcpSocketClient
     /// <summary>
     /// 请求从服务器下载文件
     /// </summary>
-    /// <param name="serverFileName">服务器上的文件名</param>
-    /// <param name="savePath">本地保存路径</param>
+    /// <param name="serverFilePath">服务端待下载文件完整路径</param>
+    /// <param name="localSaveDirectory">本地保存目录</param>
     /// <param name="cancellationToken">取消令牌</param>
-    public async Task StartFileDownloadAsync(string serverFileName, string savePath,
+    public async Task StartFileDownloadAsync(string serverFilePath, string localSaveDirectory,
         CancellationToken cancellationToken = default)
     {
         if (!CanSend)
@@ -256,10 +258,10 @@ public class TcpSocketClient
             return;
         }
 
-        var directory = Path.GetDirectoryName(savePath) ?? ".";
-        if (!Directory.Exists(directory))
+        var serverFileName = Path.GetFileName(serverFilePath);
+        if (!Directory.Exists(localSaveDirectory))
         {
-            Directory.CreateDirectory(directory);
+            Directory.CreateDirectory(localSaveDirectory);
         }
 
         _currentDownloadSession = new FileTransferSession
@@ -267,8 +269,9 @@ public class TcpSocketClient
             FileName = serverFileName,
             FileSize = 0,
             FileHash = string.Empty,
-            AlreadyTransferredBytes = GetExistingTransferBytes(serverFileName),
-            IsUpload = false
+            AlreadyTransferredBytes = GetExistingTransferBytes(serverFilePath),
+            IsUpload = false,
+            LocalFilePath = Path.Combine(localSaveDirectory, serverFileName)
         };
 
         var startCommand = new FileTransferStart
@@ -277,11 +280,12 @@ public class TcpSocketClient
             FileSize = 0,
             FileHash = string.Empty,
             AlreadyTransferredBytes = _currentDownloadSession.AlreadyTransferredBytes,
-            IsUpload = false
+            IsUpload = false,
+            RemoteFilePath = serverFilePath
         };
 
         await SendCommandAsync(startCommand);
-        Logger.Info($"{ServerMark} 请求下载文件：{serverFileName}，已传输：{_currentDownloadSession.AlreadyTransferredBytes}字节");
+        Logger.Info($"{ServerMark} 请求下载文件：{serverFilePath} -> {localSaveDirectory}，已传输：{_currentDownloadSession.AlreadyTransferredBytes}字节");
     }
 
     /// <summary>
@@ -359,14 +363,15 @@ public class TcpSocketClient
     /// <param name="fileSize">文件大小</param>
     /// <param name="fileHash">文件哈希</param>
     /// <param name="alreadyTransferredBytes">已传输字节数（断点续传用）</param>
-    public async Task HandleFileTransferStartAsync(string fileName, long fileSize, string fileHash, long alreadyTransferredBytes)
+    /// <param name="remoteFilePath">远程文件路径（服务端保存路径）</param>
+    public async Task HandleFileTransferStartAsync(string fileName, long fileSize, string fileHash, long alreadyTransferredBytes, string remoteFilePath)
     {
         _currentDownloadSession = new FileTransferSession
         {
             FileName = fileName,
             FileSize = fileSize,
             FileHash = fileHash,
-            LocalFilePath = string.Empty,
+            LocalFilePath = remoteFilePath,
             IsUpload = true,
             AlreadyTransferredBytes = alreadyTransferredBytes
         };
@@ -377,7 +382,7 @@ public class TcpSocketClient
             AlreadyTransferredBytes = alreadyTransferredBytes
         };
         await SendCommandAsync(ack);
-        Logger.Info($"{ServerMark} 收到服务器文件传输请求：{fileName}，已传输：{alreadyTransferredBytes}字节");
+        Logger.Info($"{ServerMark} 收到服务器文件传输请求：{fileName} -> {remoteFilePath}，已传输：{alreadyTransferredBytes}字节");
 
         await RequestNextBlockAsync();
     }

@@ -8,7 +8,7 @@ namespace CodeWF.NetWrapper.Models;
 [NetHead(SocketConstants.FileTransferStartObjectId, 1)]
 public class FileTransferStart : INetObject
 {
-    /// <summary>文件名</summary>
+    /// <summary>文件名（不含路径）</summary>
     public string FileName { get; set; } = string.Empty;
 
     /// <summary>文件大小（字节）</summary>
@@ -22,4 +22,7 @@ public class FileTransferStart : INetObject
 
     /// <summary>是否为上传操作（true=上传，false=下载）</summary>
     public bool IsUpload { get; set; }
+
+    /// <summary>远程文件路径（上传时：服务端保存路径；下载时：服务端待下载文件路径）</summary>
+    public string RemoteFilePath { get; set; } = string.Empty;
 }

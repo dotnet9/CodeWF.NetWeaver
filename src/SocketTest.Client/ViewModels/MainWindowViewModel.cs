@@ -37,8 +37,6 @@ namespace SocketTest.Client.ViewModels;
 public class MainWindowViewModel : ReactiveObject
 {
     public WindowNotificationManager? NotificationManager { get; set; }
-    private readonly List<string> _selectedFilePaths = new();
-    private CancellationTokenSource? _uploadCancellation;
     private readonly List<ProcessItemModel> _receivedProcesses = new();
 
     private int[]? _processIdArray;
@@ -59,11 +57,14 @@ public class MainWindowViewModel : ReactiveObject
             SendCorrectCommand = ReactiveCommand.CreateFromTask(HandleSendCorrectCommandAsync);
             SendDiffVersionCommand = ReactiveCommand.CreateFromTask(HandleSendDiffVersionCommandAsync);
             SendDiffPropsCommand = ReactiveCommand.CreateFromTask(HandleSendDiffPropsCommandAsync);
-            SelectFilesCommand = ReactiveCommand.CreateFromTask(HandleSelectFilesAsync);
+            SelectUploadFilesCommand = ReactiveCommand.CreateFromTask(HandleSelectUploadFilesAsync);
+            SelectUploadRemoteDirectoryCommand = ReactiveCommand.CreateFromTask(HandleSelectUploadRemoteDirectoryAsync);
+            SelectDownloadServerFilesCommand = ReactiveCommand.CreateFromTask(HandleSelectDownloadServerFilesAsync);
+            SelectDownloadSaveDirectoryCommand = ReactiveCommand.CreateFromTask(HandleSelectDownloadSaveDirectoryAsync);
             UploadFilesCommand = ReactiveCommand.CreateFromTask(HandleUploadFilesAsync);
             DownloadFilesCommand = ReactiveCommand.CreateFromTask(HandleDownloadFilesAsync);
             CancelTransferCommand = ReactiveCommand.Create(HandleCancelTransfer);
-            BrowseDownloadPathCommand = ReactiveCommand.CreateFromTask(HandleBrowseDownloadPathAsync);
+            FileControlCommand = ReactiveCommand.CreateFromTask<FileTransferItem>(HandleFileControlAsync);
         }
 
         TcpHelper.FileTransferProgress += OnFileTransferProgress;
@@ -105,12 +106,6 @@ public class MainWindowViewModel : ReactiveObject
 
     public string? SearchKey { get; set; }
 
-    public string DownloadPath
-    {
-        get;
-        set => this.RaiseAndSetIfChanged(ref field, value);
-    } = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
-
     public double TotalProgress
     {
         get;
@@ -124,11 +119,44 @@ public class MainWindowViewModel : ReactiveObject
     public ReactiveCommand<Unit, Unit>? SendCorrectCommand { get; private set; }
     public ReactiveCommand<Unit, Unit>? SendDiffVersionCommand { get; private set; }
     public ReactiveCommand<Unit, Unit>? SendDiffPropsCommand { get; private set; }
-    public ReactiveCommand<Unit, Unit>? SelectFilesCommand { get; private set; }
+    public ReactiveCommand<Unit, Unit>? SelectUploadFilesCommand { get; private set; }
+    public ReactiveCommand<Unit, Unit>? SelectUploadRemoteDirectoryCommand { get; private set; }
+    public ReactiveCommand<Unit, Unit>? SelectDownloadServerFilesCommand { get; private set; }
+    public ReactiveCommand<Unit, Unit>? SelectDownloadSaveDirectoryCommand { get; private set; }
     public ReactiveCommand<Unit, Unit>? UploadFilesCommand { get; private set; }
     public ReactiveCommand<Unit, Unit>? DownloadFilesCommand { get; private set; }
     public ReactiveCommand<Unit, Unit>? CancelTransferCommand { get; private set; }
-    public ReactiveCommand<Unit, Unit>? BrowseDownloadPathCommand { get; private set; }
+    public ReactiveCommand<FileTransferItem, Unit>? FileControlCommand { get; private set; }
+
+    private readonly List<string> _selectedUploadFilePaths = new();
+    private string _uploadRemoteDirectory = @"/client/uploads/";
+    public string UploadRemoteDirectory
+    {
+        get => _uploadRemoteDirectory;
+        set => this.RaiseAndSetIfChanged(ref _uploadRemoteDirectory, value);
+    }
+
+    private string _uploadLocalPaths = string.Empty;
+    public string UploadLocalPaths
+    {
+        get => _uploadLocalPaths;
+        set => this.RaiseAndSetIfChanged(ref _uploadLocalPaths, value);
+    }
+
+    private string _downloadServerFilePaths = string.Empty;
+    public string DownloadServerFilePaths
+    {
+        get => _downloadServerFilePaths;
+        set => this.RaiseAndSetIfChanged(ref _downloadServerFilePaths, value);
+    }
+
+    private readonly List<string> _selectedDownloadServerFilePaths = new();
+    private string _downloadSaveDirectory = string.Empty;
+    public string DownloadSaveDirectory
+    {
+        get => _downloadSaveDirectory;
+        set => this.RaiseAndSetIfChanged(ref _downloadSaveDirectory, value);
+    }
 
     #endregion
 
@@ -146,7 +174,7 @@ public class MainWindowViewModel : ReactiveObject
                 if (e.TransferredBytes >= e.TotalBytes)
                 {
                     item.Status = "完成";
-                    item.Message = "传输完成";
+                    item.CommandText = "完成";
                 }
             }
             UpdateTotalProgress();
@@ -255,40 +283,83 @@ public class MainWindowViewModel : ReactiveObject
         Logger.Info("发送模拟相同数据包、相同版本、不同定义数据包（错误数据包）命令");
     }
 
-    private async Task HandleSelectFilesAsync()
+    private async Task HandleSelectUploadFilesAsync()
     {
         var topLevel = GetTopLevel();
         if (topLevel == null) return;
 
         var files = await topLevel.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
         {
-            Title = "选择文件",
+            Title = "选择上传文件(批量)",
             AllowMultiple = true
         });
 
-        _selectedFilePaths.Clear();
+        _selectedUploadFilePaths.Clear();
         foreach (var file in files)
         {
-            _selectedFilePaths.Add(file.Path.LocalPath);
+            _selectedUploadFilePaths.Add(file.Path.LocalPath);
+            Logger.Info($"已选择上传文件：{file.Path.LocalPath}");
         }
 
-        Logger.Info($"已选择 {_selectedFilePaths.Count} 个文件");
+        UploadLocalPaths = string.Join(",", _selectedUploadFilePaths);
+        Logger.Info($"共选择 {_selectedUploadFilePaths.Count} 个上传文件");
     }
 
-    private async Task HandleBrowseDownloadPathAsync()
+    private async Task HandleSelectUploadRemoteDirectoryAsync()
     {
         var topLevel = GetTopLevel();
         if (topLevel == null) return;
 
         var folder = await topLevel.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
         {
-            Title = "选择保存路径",
+            Title = "选择服务端上传目标目录",
             AllowMultiple = false
         });
 
         if (folder.Count > 0)
         {
-            DownloadPath = folder[0].Path.LocalPath;
+            UploadRemoteDirectory = folder[0].Path.LocalPath;
+            Logger.Info($"已选择上传目标目录：{UploadRemoteDirectory}");
+        }
+    }
+
+    private async Task HandleSelectDownloadServerFilesAsync()
+    {
+        var topLevel = GetTopLevel();
+        if (topLevel == null) return;
+
+        var files = await topLevel.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = "选择服务端待下载文件(批量)",
+            AllowMultiple = true
+        });
+
+        _selectedDownloadServerFilePaths.Clear();
+        foreach (var file in files)
+        {
+            _selectedDownloadServerFilePaths.Add(file.Path.LocalPath);
+            Logger.Info($"已选择下载文件：{file.Path.LocalPath}");
+        }
+
+        DownloadServerFilePaths = string.Join(",", _selectedDownloadServerFilePaths);
+        Logger.Info($"共选择 {_selectedDownloadServerFilePaths.Count} 个下载文件");
+    }
+
+    private async Task HandleSelectDownloadSaveDirectoryAsync()
+    {
+        var topLevel = GetTopLevel();
+        if (topLevel == null) return;
+
+        var folder = await topLevel.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
+        {
+            Title = "选择下载保存目录",
+            AllowMultiple = false
+        });
+
+        if (folder.Count > 0)
+        {
+            DownloadSaveDirectory = folder[0].Path.LocalPath;
+            Logger.Info($"已选择下载保存目录：{DownloadSaveDirectory}");
         }
     }
 
@@ -300,35 +371,59 @@ public class MainWindowViewModel : ReactiveObject
             return;
         }
 
-        if (_selectedFilePaths.Count == 0)
+        if (string.IsNullOrWhiteSpace(UploadLocalPaths))
         {
-            Logger.Error("请先选择要上传的文件");
+            Logger.Error("请输入要上传的文件路径");
             return;
         }
 
-        _uploadCancellation = new CancellationTokenSource();
+        var separators = new[] { ',', '，' };
+        var filePaths = UploadLocalPaths.Split(separators, StringSplitOptions.RemoveEmptyEntries)
+            .Select(s => s.Trim())
+            .Where(s => !string.IsNullOrWhiteSpace(s))
+            .ToList();
 
-        foreach (var filePath in _selectedFilePaths)
+        if (filePaths.Count == 0)
         {
+            Logger.Error("请输入要上传的文件路径");
+            return;
+        }
+
+        foreach (var filePath in filePaths)
+        {
+            if (!File.Exists(filePath))
+            {
+                Logger.Error($"文件不存在：{filePath}");
+                continue;
+            }
+
             var fileName = Path.GetFileName(filePath);
+            var remoteFilePath = Path.Combine(UploadRemoteDirectory, fileName).Replace("\\", "/");
             var item = new FileTransferItem
             {
                 FileName = fileName,
+                LocalPath = filePath,
+                RemotePath = remoteFilePath,
+                TransferType = "上传",
                 FileSize = new FileInfo(filePath).Length,
                 Progress = 0,
                 Status = "上传中",
-                Message = "等待传输..."
+                LocalFilePath = filePath,
+                RemoteFilePath = remoteFilePath,
+                IsUpload = true
             };
             FileTransferList.Add(item);
+            Logger.Info($"客户端请求上传文件：{filePath} -> {remoteFilePath}");
 
+            var cts = item.GetCancellationTokenSource();
             try
             {
-                await TcpHelper.StartFileUploadAsync(filePath, fileName, _uploadCancellation.Token);
+                await TcpHelper.StartFileUploadAsync(filePath, remoteFilePath, cts.Token);
             }
             catch (Exception ex)
             {
                 item.Status = "失败";
-                item.Message = ex.Message;
+                item.CommandText = "重试";
                 Logger.Error($"上传文件失败：{fileName}", ex);
             }
         }
@@ -342,33 +437,52 @@ public class MainWindowViewModel : ReactiveObject
             return;
         }
 
-        if (_selectedFilePaths.Count == 0)
+        if (string.IsNullOrWhiteSpace(DownloadServerFilePaths))
         {
-            Logger.Error("请先选择要下载的文件（服务端文件名）");
+            Logger.Error("请输入服务端待下载文件路径");
             return;
         }
 
-        foreach (var fileName in _selectedFilePaths)
+        if (string.IsNullOrWhiteSpace(DownloadSaveDirectory))
         {
-            var savePath = Path.Combine(DownloadPath, Path.GetFileName(fileName));
+            Logger.Error("请选择本地保存目录");
+            return;
+        }
+
+        var separators = new[] { ',', '，' };
+        var serverFilePaths = DownloadServerFilePaths.Split(separators, StringSplitOptions.RemoveEmptyEntries)
+            .Select(s => s.Trim())
+            .Where(s => !string.IsNullOrWhiteSpace(s))
+            .ToList();
+
+        foreach (var serverFilePath in serverFilePaths)
+        {
+            var fileName = Path.GetFileName(serverFilePath);
+            var localSavePath = Path.Combine(DownloadSaveDirectory, fileName).Replace("\\", "/");
             var item = new FileTransferItem
             {
-                FileName = Path.GetFileName(fileName),
-                FileSize = 0,
+                FileName = fileName,
+                LocalPath = localSavePath,
+                RemotePath = serverFilePath,
+                TransferType = "下载",
                 Progress = 0,
                 Status = "下载中",
-                Message = "等待传输..."
+                LocalFilePath = localSavePath,
+                RemoteFilePath = serverFilePath,
+                IsUpload = false
             };
             FileTransferList.Add(item);
+            Logger.Info($"客户端请求下载文件：{serverFilePath} -> {DownloadSaveDirectory}");
 
+            var cts = item.GetCancellationTokenSource();
             try
             {
-                await TcpHelper.StartFileDownloadAsync(Path.GetFileName(fileName), savePath);
+                await TcpHelper.StartFileDownloadAsync(serverFilePath, DownloadSaveDirectory);
             }
             catch (Exception ex)
             {
                 item.Status = "失败";
-                item.Message = ex.Message;
+                item.CommandText = "重试";
                 Logger.Error($"下载文件失败：{fileName}", ex);
             }
         }
@@ -376,8 +490,62 @@ public class MainWindowViewModel : ReactiveObject
 
     private void HandleCancelTransfer()
     {
-        _uploadCancellation?.Cancel();
-        Logger.Info("已取消文件传输");
+        Logger.Info("请使用文件列表中的控制按钮取消单个文件传输");
+    }
+
+    private async Task HandleFileControlAsync(FileTransferItem item)
+    {
+        if (item.Status == "上传中" || item.Status == "下载中")
+        {
+            item.Cancel();
+            Logger.Info($"已停止文件传输：{item.FileName}");
+        }
+        else if (item.Status == "已停止" || item.Status == "失败" || item.Status == "完成")
+        {
+            await RestartTransferAsync(item);
+        }
+    }
+
+    private async Task RestartTransferAsync(FileTransferItem item)
+    {
+        if (!TcpHelper.IsRunning)
+        {
+            Logger.Error("未连接服务端，无法续传文件");
+            return;
+        }
+
+        if (item.IsUpload)
+        {
+            item.Reset();
+            var cts = item.GetCancellationTokenSource();
+            try
+            {
+                await TcpHelper.StartFileUploadAsync(item.LocalFilePath!, item.RemoteFilePath!, cts.Token);
+                Logger.Info($"续传文件：{item.FileName}");
+            }
+            catch (Exception ex)
+            {
+                item.Status = "失败";
+                item.CommandText = "重试";
+                Logger.Error($"续传失败：{item.FileName}", ex);
+            }
+        }
+        else
+        {
+            item.Reset();
+            var cts = item.GetCancellationTokenSource();
+            try
+            {
+                await TcpHelper.StartFileDownloadAsync(item.RemoteFilePath!, Path.GetDirectoryName(item.LocalFilePath!)!);
+                Logger.Info($"续传文件：{item.FileName}");
+            }
+            catch (Exception ex)
+            {
+                item.Status = "失败";
+                item.CommandText = "重试";
+                Logger.Error($"续传失败：{item.FileName}", ex);
+            }
+        }
     }
 
     private static TopLevel? GetTopLevel()
@@ -456,7 +624,7 @@ public class MainWindowViewModel : ReactiveObject
     }
 
     #region 接收事件
-    
+
     [EventHandler]
     private async Task ReceivedSocketMessage(SocketCommand message)
     {
@@ -499,7 +667,7 @@ public class MainWindowViewModel : ReactiveObject
         else if (message.IsCommand<FileTransferStart>())
         {
             var startInfo = message.GetCommand<FileTransferStart>();
-            await TcpHelper.HandleFileTransferStartAsync(startInfo.FileName, startInfo.FileSize, startInfo.FileHash, startInfo.AlreadyTransferredBytes);
+            await TcpHelper.HandleFileTransferStartAsync(startInfo.FileName, startInfo.FileSize, startInfo.FileHash, startInfo.AlreadyTransferredBytes, startInfo.RemoteFilePath);
         }
         else if (message.IsCommand<FileBlockData>())
         {
@@ -767,9 +935,52 @@ public class MainWindowViewModel : ReactiveObject
 public class FileTransferItem : ReactiveObject
 {
     public string FileName { get; set; } = string.Empty;
+    public string LocalPath { get; set; } = string.Empty;
+    public string RemotePath { get; set; } = string.Empty;
+    public string TransferType { get; set; } = string.Empty;
     public long FileSize { get; set; }
     public double Progress { get; set; }
     public string Status { get; set; } = "等待";
-    public string Message { get; set; } = string.Empty;
     public long TransferredBytes { get; set; }
+
+    public string? LocalFilePath { get; set; }
+    public string? RemoteFilePath { get; set; }
+    public bool IsUpload { get; set; }
+
+    private CancellationTokenSource? _cts;
+    private string _commandText = "停止";
+    public string CommandText
+    {
+        get => _commandText;
+        set => this.RaiseAndSetIfChanged(ref _commandText, value);
+    }
+
+    public CancellationTokenSource? GetCancellationTokenSource()
+    {
+        _cts ??= new CancellationTokenSource();
+        return _cts;
+    }
+
+    public void Cancel()
+    {
+        _cts?.Cancel();
+        Status = "已停止";
+        CommandText = "继续";
+        this.RaisePropertyChanged(nameof(Status));
+    }
+
+    public void Reset()
+    {
+        _cts = new CancellationTokenSource();
+        Status = "等待";
+        CommandText = "停止";
+        Progress = 0;
+        TransferredBytes = 0;
+        this.RaisePropertyChanged(nameof(Status));
+        this.RaisePropertyChanged(nameof(Progress));
+        this.RaisePropertyChanged(nameof(TransferredBytes));
+    }
+
+    public bool IsTransferring => Status == "上传中" || Status == "下载中";
+    public bool CanResume => Status == "已停止" || Status == "失败";
 }
