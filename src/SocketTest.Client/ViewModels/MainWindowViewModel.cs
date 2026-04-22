@@ -664,21 +664,6 @@ public class MainWindowViewModel : ReactiveObject
         {
             await ReceivedSocketMessageAsync(message.GetCommand<CommonSocketResponse>());
         }
-        else if (message.IsCommand<FileTransferStart>())
-        {
-            var startInfo = message.GetCommand<FileTransferStart>();
-            await TcpHelper.HandleFileTransferStartAsync(startInfo.FileName, startInfo.FileSize, startInfo.FileHash, startInfo.AlreadyTransferredBytes, startInfo.RemoteFilePath);
-        }
-        else if (message.IsCommand<FileBlockData>())
-        {
-            var blockData = message.GetCommand<FileBlockData>();
-            await TcpHelper.HandleFileBlockDataAsync(blockData.BlockIndex, blockData.Offset, blockData.BlockSize, blockData.Data);
-        }
-        else if (message.IsCommand<FileBlockAck>())
-        {
-            var blockAck = message.GetCommand<FileBlockAck>();
-            await TcpHelper.HandleFileBlockAckAsync(blockAck.BlockIndex, blockAck.Success, blockAck.Message);
-        }
     }
 
     private void ReceiveUdpCommand(object? sender, SocketCommand command)

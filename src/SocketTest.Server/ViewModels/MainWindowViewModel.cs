@@ -222,24 +222,6 @@ public class MainWindowViewModel : ReactiveObject
         {
             await ReceiveRequestStudentListDiffVersionAsync(request.Client!, request);
         }
-        else if (request.IsCommand<FileTransferStart>())
-        {
-            var startInfo = request.GetCommand<FileTransferStart>();
-            await TcpHelper.HandleFileTransferStartAsync(request.Client!, startInfo.FileName, startInfo.FileSize,
-                startInfo.FileHash, startInfo.AlreadyTransferredBytes, startInfo.RemoteFilePath);
-        }
-        else if (request.IsCommand<FileBlockData>())
-        {
-            var blockData = request.GetCommand<FileBlockData>();
-            await TcpHelper.HandleFileBlockDataAsync(request.Client!, blockData.BlockIndex, blockData.Offset,
-                blockData.BlockSize, blockData.Data);
-        }
-        else if (request.IsCommand<FileBlockAck>())
-        {
-            var blockAck = request.GetCommand<FileBlockAck>();
-            await TcpHelper.HandleFileBlockAckAsync(request.Client!, blockAck.BlockIndex, blockAck.Success,
-                blockAck.Message);
-        }
         else
         {
             await ReceiveSocketCommandAsync(request.Client!, request);
