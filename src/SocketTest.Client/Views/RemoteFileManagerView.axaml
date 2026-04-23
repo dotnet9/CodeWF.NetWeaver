@@ -1,0 +1,68 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:SocketTest.Client.ViewModels"
+             xmlns:converters="using:SocketTest.Client.Converters"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="600"
+             x:Class="SocketTest.Client.Views.RemoteFileManagerView"
+             x:DataType="vm:RemoteFileManagerViewModel">
+    <UserControl.Styles>
+        <Style Selector="TextBlock">
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+    </UserControl.Styles>
+    <UserControl.Resources>
+        <converters:BoolToDirectoryConverter x:Key="BoolToDirectoryConverter" />
+    </UserControl.Resources>
+    <Grid Margin="5">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <Grid Grid.Row="0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel Grid.Column="0" Orientation="Horizontal">
+                <TextBlock Text="当前目录：" VerticalAlignment="Center" Margin="0,0,5,0" />
+                <TextBox Width="400" Text="{Binding CurrentServerDirectory, Mode=TwoWay}" Watermark="服务端目录路径" Margin="0,0,10,0" />
+                <Button Command="{Binding RefreshServerDirectoryCommand}" Content="刷新" Margin="0,0,5,0" />
+                <Button Command="{Binding EnterParentDirectoryCommand}" Content="上级目录" Margin="0,0,5,0" />
+            </StackPanel>
+            <StackPanel Grid.Column="2" Orientation="Horizontal">
+                <Button Command="{Binding CreateServerDirectoryCommand}" Content="创建目录" Margin="0,0,5,0" />
+                <Button Command="{Binding DeleteServerItemCommand}" Content="删除" Margin="0,0,5,0" />
+            </StackPanel>
+        </Grid>
+        <HeaderedContentControl Grid.Row="1" Header="目录内容">
+            <DataGrid CanUserReorderColumns="True" CanUserResizeColumns="True" CanUserSortColumns="True"
+                      GridLinesVisibility="All" ScrollViewer.AllowAutoHide="False" FontSize="12"
+                      HeadersVisibility="Column" IsReadOnly="True" BorderThickness="1" BorderBrush="#33000000"
+                      ItemsSource="{Binding ServerDirectoryItems, Mode=OneWay}"
+                      SelectedItem="{Binding SelectedServerItem, Mode=TwoWay}">
+                <DataGrid.Columns>
+                    <DataGridTemplateColumn Header="类型" Width="80">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding IsDirectory, Converter={StaticResource BoolToDirectoryConverter}}" />
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                    <DataGridTextColumn Width="200" Binding="{Binding Name, Mode=OneWay}" Header="名称" />
+                    <DataGridTextColumn Width="120" Binding="{Binding Size, Mode=OneWay, StringFormat={}{0:N0}}" Header="大小(字节)" />
+                    <DataGridTextColumn Width="180" Binding="{Binding LastModifiedTime, StringFormat=yyyy-MM-dd HH:mm:ss, Mode=OneWay}" Header="修改时间" />
+                </DataGrid.Columns>
+            </DataGrid>
+        </HeaderedContentControl>
+        <StackPanel Grid.Row="2" Margin="0,5" Orientation="Horizontal">
+            <TextBlock>
+                <Run Text="当前路径：" />
+                <Run Text="{Binding CurrentServerDirectory, Mode=OneWay}" />
+            </TextBlock>
+        </StackPanel>
+    </Grid>
+</UserControl>
