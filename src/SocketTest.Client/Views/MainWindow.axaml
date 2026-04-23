@@ -18,6 +18,7 @@
         <converters:ProcessStatusToForegroundConverter x:Key="ProcessStatusToForegroundConverter" />
         <converters:AlarmStatusToForegroundConverter x:Key="AlarmStatusToForegroundConverter" />
         <converters:UsageToFormatConverter x:Key="UsageToFormatConverter" />
+        <converters:BoolToDirectoryConverter x:Key="BoolToDirectoryConverter" />
         <x:Double x:Key="DataGridColumnHeaderMinHeight">21</x:Double>
         <x:Double x:Key="DataGridCellMinHeight">21</x:Double>
     </Window.Resources>
@@ -235,7 +236,7 @@
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
-                    <HeaderedContentControl Grid.Row="0" Header="上传参数（客户端 -> 服务端）">
+                    <HeaderedContentControl Grid.Row="0" Header="上传参数（客户端 -&gt; 服务端）">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
@@ -256,7 +257,7 @@
                             <Button Grid.Column="3" Command="{Binding UploadFilesCommand}" Content="上传" />
                         </Grid>
                     </HeaderedContentControl>
-                    <HeaderedContentControl Grid.Row="1" Header="下载参数（服务端 -> 客户端）">
+                    <HeaderedContentControl Grid.Row="1" Header="下载参数（服务端 -&gt; 客户端）">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
@@ -309,6 +310,61 @@
                     <TextBlock>
                         <Run Text="传输速度：" />
                         <Run Foreground="Green" Text="{Binding TransferSpeed, Mode=OneWay}" />
+                    </TextBlock>
+                </StackPanel>
+            </Grid>
+        </TabItem>
+        <TabItem Header="远程文件管理">
+            <Grid Margin="5">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Grid Grid.Row="0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0" Orientation="Horizontal">
+                        <TextBlock Text="当前目录：" VerticalAlignment="Center" Margin="0,0,5,0" />
+                        <TextBox Width="400" Text="{Binding CurrentServerDirectory, Mode=TwoWay}" Watermark="服务端目录路径" Margin="0,0,10,0" />
+                        <Button Command="{Binding RefreshServerDirectoryCommand}" Content="刷新" Margin="0,0,5,0" />
+                        <Button Command="{Binding EnterParentDirectoryCommand}" Content="上级目录" Margin="0,0,5,0" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2" Orientation="Horizontal">
+                        <Button Command="{Binding CreateServerDirectoryCommand}" Content="创建目录" Margin="0,0,5,0" />
+                        <Button Command="{Binding DeleteServerItemCommand}" Content="删除" Margin="0,0,5,0" />
+                        <Button Command="{Binding UploadFilesCommand}" Content="上传到当前目录" Margin="0,0,5,0" />
+                        <Button Command="{Binding DownloadFilesCommand}" Content="下载到本地" />
+                    </StackPanel>
+                </Grid>
+                <HeaderedContentControl Grid.Row="1" Header="目录内容">
+                    <DataGrid CanUserReorderColumns="True" CanUserResizeColumns="True" CanUserSortColumns="True"
+                              GridLinesVisibility="All" ScrollViewer.AllowAutoHide="False" FontSize="12"
+                              HeadersVisibility="Column" IsReadOnly="True" BorderThickness="1" BorderBrush="#33000000"
+                              ItemsSource="{Binding ServerDirectoryItems, Mode=OneWay}"
+                              SelectedItem="{Binding SelectedServerItem, Mode=TwoWay}"
+                              DoubleTapped="OnServerDirectoryItemDoubleTapped">
+                        <DataGrid.Columns>
+                            <DataGridTemplateColumn Header="类型" Width="60">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding IsDirectory, Converter={StaticResource BoolToDirectoryConverter}}" />
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            <DataGridTextColumn Width="200" Binding="{Binding Name, Mode=OneWay}" Header="名称" />
+                            <DataGridTextColumn Width="120" Binding="{Binding Size, Mode=OneWay, StringFormat={}{0:N0}}" Header="大小(字节)" />
+                            <DataGridTextColumn Width="180" Binding="{Binding LastModifiedTime, StringFormat=yyyy-MM-dd HH:mm:ss, Mode=OneWay}" Header="修改时间" />
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </HeaderedContentControl>
+                <StackPanel Grid.Row="2" Margin="0,5" Orientation="Horizontal">
+                    <TextBlock>
+                        <Run Text="当前路径：" />
+                        <Run Text="{Binding CurrentServerDirectory, Mode=OneWay}" />
                     </TextBlock>
                 </StackPanel>
             </Grid>

@@ -1,6 +1,7 @@
 using CodeWF.NetWeaver.Base;
+using CodeWF.NetWrapper.Models;
 
-namespace CodeWF.NetWrapper.Models;
+namespace CodeWF.NetWrapper.Response;
 
 /// <summary>
 /// 通用 Socket 响应类，用于封装通用的 Socket 响应信息

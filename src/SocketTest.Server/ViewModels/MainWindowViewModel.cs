@@ -32,6 +32,7 @@ using System.Timers;
 using SocketTest.Server.Dtos;
 using Timer = System.Timers.Timer;
 using Notification = Avalonia.Controls.Notifications.Notification;
+using CodeWF.NetWrapper.Response;
 
 namespace SocketTest.Server.ViewModels;
 

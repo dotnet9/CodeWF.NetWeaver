@@ -1,6 +1,6 @@
 using CodeWF.NetWeaver.Base;
 
-namespace CodeWF.NetWrapper.Models;
+namespace CodeWF.NetWrapper.Response;
 
 /// <summary>
 /// 文件传输完成 DTO

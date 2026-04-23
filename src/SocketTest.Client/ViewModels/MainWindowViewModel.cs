@@ -28,9 +28,12 @@ using System.Reactive;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Timers;
+using CodeWF.NetWrapper.Requests;
 using Timer = System.Timers.Timer;
 using SocketTest.Client.Dtos;
+using SocketTest.Client.Models;
 using Notification = Avalonia.Controls.Notifications.Notification;
+using CodeWF.NetWrapper.Response;
 
 namespace SocketTest.Client.ViewModels;
 
@@ -65,6 +68,11 @@ public class MainWindowViewModel : ReactiveObject
             DownloadFilesCommand = ReactiveCommand.CreateFromTask(HandleDownloadFilesAsync);
             CancelTransferCommand = ReactiveCommand.Create(HandleCancelTransfer);
             FileControlCommand = ReactiveCommand.CreateFromTask<FileTransferItem>(HandleFileControlAsync);
+            RefreshServerDirectoryCommand = ReactiveCommand.CreateFromTask(HandleRefreshServerDirectoryAsync);
+            EnterParentDirectoryCommand = ReactiveCommand.CreateFromTask(HandleEnterParentDirectoryAsync);
+            CreateServerDirectoryCommand = ReactiveCommand.CreateFromTask(HandleCreateServerDirectoryAsync);
+            DeleteServerItemCommand = ReactiveCommand.CreateFromTask(HandleDeleteServerItemAsync);
+            EnterDirectoryCommand = ReactiveCommand.CreateFromTask<string>(HandleEnterDirectoryAsync);
         }
 
         TcpHelper.FileTransferProgress += OnFileTransferProgress;
@@ -157,6 +165,32 @@ public class MainWindowViewModel : ReactiveObject
         get => _downloadSaveDirectory;
         set => this.RaiseAndSetIfChanged(ref _downloadSaveDirectory, value);
     }
+
+    #endregion
+
+    #region 远程文件管理属性
+
+    public ObservableCollection<ServerDirectoryItem> ServerDirectoryItems { get; } = new();
+
+    private ServerDirectoryItem? _selectedServerItem;
+    public ServerDirectoryItem? SelectedServerItem
+    {
+        get => _selectedServerItem;
+        set => this.RaiseAndSetIfChanged(ref _selectedServerItem, value);
+    }
+
+    private string _currentServerDirectory = @"/";
+    public string CurrentServerDirectory
+    {
+        get => _currentServerDirectory;
+        set => this.RaiseAndSetIfChanged(ref _currentServerDirectory, value);
+    }
+
+    public ReactiveCommand<Unit, Unit>? RefreshServerDirectoryCommand { get; private set; }
+    public ReactiveCommand<Unit, Unit>? EnterParentDirectoryCommand { get; private set; }
+    public ReactiveCommand<Unit, Unit>? CreateServerDirectoryCommand { get; private set; }
+    public ReactiveCommand<Unit, Unit>? DeleteServerItemCommand { get; private set; }
+    public ReactiveCommand<string, Unit>? EnterDirectoryCommand { get; private set; }
 
     #endregion
 
@@ -548,6 +582,125 @@ public class MainWindowViewModel : ReactiveObject
         }
     }
 
+    private async Task HandleRefreshServerDirectoryAsync()
+    {
+        if (!TcpHelper.IsRunning)
+        {
+            await Log("未连接服务端，无法刷新目录");
+            return;
+        }
+
+        ServerDirectoryItems.Clear();
+        await TcpHelper.SendCommandAsync(new QueryFileStart
+        {
+            DirectoryPath = CurrentServerDirectory
+        });
+        await Log($"请求刷新目录：{CurrentServerDirectory}");
+    }
+
+    private async Task HandleEnterParentDirectoryAsync()
+    {
+        if (string.IsNullOrEmpty(CurrentServerDirectory) || CurrentServerDirectory == "/")
+        {
+            return;
+        }
+
+        var parentPath = CurrentServerDirectory.TrimEnd('/');
+        var lastSlashIndex = parentPath.LastIndexOf('/');
+        CurrentServerDirectory = lastSlashIndex > 0 ? parentPath.Substring(0, lastSlashIndex) + "/" : "/";
+        await HandleRefreshServerDirectoryAsync();
+    }
+
+    private async Task HandleCreateServerDirectoryAsync()
+    {
+        if (!TcpHelper.IsRunning)
+        {
+            await Log("未连接服务端，无法创建目录");
+            return;
+        }
+
+        var newDirName = "新建目录";
+        var newDirPath = CurrentServerDirectory.TrimEnd('/') + "/" + newDirName;
+        await TcpHelper.SendCommandAsync(new CreateDirectoryStart
+        {
+            DirectoryPath = newDirPath
+        });
+        await Log($"请求创建目录：{newDirPath}");
+        await HandleRefreshServerDirectoryAsync();
+    }
+
+    private async Task HandleDeleteServerItemAsync()
+    {
+        if (!TcpHelper.IsRunning)
+        {
+            await Log("未连接服务端，无法删除");
+            return;
+        }
+
+        if (SelectedServerItem == null)
+        {
+            await Log("请先选择要删除的项");
+            return;
+        }
+
+        await TcpHelper.SendCommandAsync(new DeleteFileStart
+        {
+            FilePath = SelectedServerItem.FullPath,
+            IsDirectory = SelectedServerItem.IsDirectory
+        });
+        await Log($"请求删除：{SelectedServerItem.FullPath}");
+        await HandleRefreshServerDirectoryAsync();
+    }
+
+    private async Task HandleEnterDirectoryAsync(string directoryName)
+    {
+        if (!TcpHelper.IsRunning)
+        {
+            await Log("未连接服务端，无法进入目录");
+            return;
+        }
+
+        CurrentServerDirectory = CurrentServerDirectory.TrimEnd('/') + "/" + directoryName;
+        await HandleRefreshServerDirectoryAsync();
+    }
+
+    private async Task ReceivedSocketMessageAsync(DirectoryEntry entry)
+    {
+        var item = new ServerDirectoryItem
+        {
+            Name = entry.Name,
+            FullPath = CurrentServerDirectory.TrimEnd('/') + "/" + entry.Name,
+            IsDirectory = entry.IsDirectory,
+            Size = entry.Size,
+            LastModifiedTime = ((uint)entry.LastModifiedTime).FromSpecialUnixTimeSecondsToDateTime(2000)
+        };
+        ServerDirectoryItems.Add(item);
+    }
+
+    private async Task ReceivedSocketMessageAsync(CreateDirectoryStartAck response)
+    {
+        if (response.Success)
+        {
+            await Log($"创建目录成功：{response.DirectoryPath}");
+        }
+        else
+        {
+            await Log($"创建目录失败：{response.Message}", LogType.Error);
+        }
+    }
+
+    private async Task ReceivedSocketMessageAsync(DeleteFileStartAck response)
+    {
+        if (response.Success)
+        {
+            await Log($"删除成功：{response.FilePath}");
+        }
+        else
+        {
+            await Log($"删除失败：{response.Message}", LogType.Error);
+        }
+    }
+
     private static TopLevel? GetTopLevel()
     {
         if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
@@ -663,6 +816,18 @@ public class MainWindowViewModel : ReactiveObject
         else if (message.IsCommand<CommonSocketResponse>())
         {
             await ReceivedSocketMessageAsync(message.GetCommand<CommonSocketResponse>());
+        }
+        else if (message.IsCommand<DirectoryEntry>())
+        {
+            await ReceivedSocketMessageAsync(message.GetCommand<DirectoryEntry>());
+        }
+        else if (message.IsCommand<CreateDirectoryStartAck>())
+        {
+            await ReceivedSocketMessageAsync(message.GetCommand<CreateDirectoryStartAck>());
+        }
+        else if (message.IsCommand<DeleteFileStartAck>())
+        {
+            await ReceivedSocketMessageAsync(message.GetCommand<DeleteFileStartAck>());
         }
     }
 
