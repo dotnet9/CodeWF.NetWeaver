@@ -2,7 +2,7 @@ using CodeWF.Log.Core;
 using CodeWF.NetWeaver;
 using CodeWF.NetWeaver.Base;
 using CodeWF.NetWrapper.Commands;
-using CodeWF.NetWrapper.Models;
+using CodeWF.NetWrapper.Requests;
 using CodeWF.NetWrapper.Response;
 using System;
 using System.Collections.Concurrent;

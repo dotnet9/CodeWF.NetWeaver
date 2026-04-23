@@ -367,13 +367,13 @@ public partial class TcpSocketClient
     {
         var errorMessage = reject.ErrorCode switch
         {
-            -31 => $"服务端文件大于客户端已有文件",
-            -32 => $"文件已存在，无需重复上传",
-            -33 => $"文件大小相同但Hash不同，拒绝上传",
-            -41 => $"服务端文件不存在",
-            -42 => $"服务端文件小于客户端已有文件",
-            -43 => $"文件相同，不需要下载",
-            -44 => $"文件大小相同但Hash不同",
+            FileTransferErrorCode.UploadServerFileLarger => $"服务端文件大于客户端已有文件",
+            FileTransferErrorCode.UploadFileAlreadyExists => $"文件已存在，无需重复上传",
+            FileTransferErrorCode.UploadFileHashMismatch => $"文件大小相同但Hash不同，拒绝上传",
+            FileTransferErrorCode.DownloadServerFileNotFound => $"服务端文件不存在",
+            FileTransferErrorCode.DownloadServerFileSmaller => $"服务端文件小于客户端已有文件",
+            FileTransferErrorCode.DownloadFileIdentical => $"文件相同，不需要下载",
+            FileTransferErrorCode.DownloadFileHashMismatch => $"文件大小相同但Hash不同",
             _ => $"未知错误：{reject.ErrorCode}，{reject.Message}"
         };
 

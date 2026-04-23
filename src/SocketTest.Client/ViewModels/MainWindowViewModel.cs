@@ -664,19 +664,6 @@ public class MainWindowViewModel : ReactiveObject
         await HandleRefreshServerDirectoryAsync();
     }
 
-    private async Task ReceivedSocketMessageAsync(DirectoryEntry entry)
-    {
-        var item = new ServerDirectoryItem
-        {
-            Name = entry.Name,
-            FullPath = CurrentServerDirectory.TrimEnd('/') + "/" + entry.Name,
-            IsDirectory = entry.IsDirectory,
-            Size = entry.Size,
-            LastModifiedTime = ((uint)entry.LastModifiedTime).FromSpecialUnixTimeSecondsToDateTime(2000)
-        };
-        ServerDirectoryItems.Add(item);
-    }
-
     private async Task ReceivedSocketMessageAsync(CreateDirectoryStartAck response)
     {
         if (response.Success)
@@ -816,10 +803,6 @@ public class MainWindowViewModel : ReactiveObject
         else if (message.IsCommand<CommonSocketResponse>())
         {
             await ReceivedSocketMessageAsync(message.GetCommand<CommonSocketResponse>());
-        }
-        else if (message.IsCommand<DirectoryEntry>())
-        {
-            await ReceivedSocketMessageAsync(message.GetCommand<DirectoryEntry>());
         }
         else if (message.IsCommand<CreateDirectoryStartAck>())
         {
