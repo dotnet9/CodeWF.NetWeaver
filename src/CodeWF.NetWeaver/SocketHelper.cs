@@ -25,7 +25,36 @@ public static partial class SerializeHelper
     public const int ArrayOrDictionaryCountSize = 4;
 
     /// <summary>
-    /// 异步从Socket读取数据包
+    /// 从Socket异步读取指定数量的字节，确保读取到完整的字节数
+    /// </summary>
+    /// <param name="socket">Socket对象</param>
+    /// <param name="buffer">目标缓冲区</param>
+    /// <param name="offset">缓冲区起始偏移</param>
+    /// <param name="count">需要读取的字节数</param>
+    /// <param name="cancellationToken">取消令牌</param>
+    /// <returns>是否成功读取到指定数量的字节</returns>
+    public static async Task<bool> ReceiveExactAsync(this Socket socket, byte[] buffer, int offset, int count,
+        CancellationToken cancellationToken = default)
+    {
+        var totalBytesRead = 0;
+        while (totalBytesRead < count)
+        {
+            var bytesRead = await socket.ReceiveAsync(
+                new ArraySegment<byte>(buffer, offset + totalBytesRead, count - totalBytesRead), SocketFlags.None,
+                cancellationToken);
+            if (bytesRead == 0)
+            {
+                return false;
+            }
+
+            totalBytesRead += bytesRead;
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// 异步从Socket读取数据包</param>
     /// </summary>
     /// <param name="socket">Socket对象</param>
     /// <param name="cancellationToken">取消令牌</param>
@@ -37,34 +66,21 @@ public static partial class SerializeHelper
         var lenBuffer = ArrayPool<byte>.Shared.Rent(4);
         try
         {
-            var bytesRead = await socket.ReceiveAsync(new ArraySegment<byte>(lenBuffer, 0, 4), SocketFlags.None,
-                cancellationToken);
-            if (bytesRead != 4)
+            if (!await socket.ReceiveExactAsync(lenBuffer, 0, 4, cancellationToken))
             {
                 return (false, Array.Empty<byte>(), default);
             }
 
-            // 使用Span<T>来避免不必要的内存拷贝
             var bufferLen = BitConverter.ToInt32(lenBuffer.AsSpan(0, 4));
             var buffer = ArrayPool<byte>.Shared.Rent(bufferLen);
             try
             {
-                // 将长度信息复制到结果缓冲的开头
                 lenBuffer.AsSpan(0, 4).CopyTo(buffer.AsSpan(0, 4));
-                var totalBytesRead = 4;
 
-                while (totalBytesRead < bufferLen)
+                if (!await socket.ReceiveExactAsync(buffer, 4, bufferLen - 4, cancellationToken))
                 {
-                    bytesRead = await socket.ReceiveAsync(
-                        new ArraySegment<byte>(buffer, totalBytesRead, bufferLen - totalBytesRead), SocketFlags.None,
-                        cancellationToken);
-                    if (bytesRead == 0)
-                    {
-                        ArrayPool<byte>.Shared.Return(buffer);
-                        return (false, Array.Empty<byte>(), default);
-                    }
-
-                    totalBytesRead += bytesRead;
+                    ArrayPool<byte>.Shared.Return(buffer);
+                    return (false, Array.Empty<byte>(), default);
                 }
 
                 var readIndex = 0;
