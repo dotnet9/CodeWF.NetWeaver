@@ -52,15 +52,13 @@ public class ProcessItemModel : ReactiveObject
         set => this.RaiseAndSetIfChanged(ref field, value);
     }
 
-    private AlarmStatus _alarmStatus;
-
     /// <summary>
     /// 进程一般状态
     /// </summary>
     public AlarmStatus AlarmStatus
     {
-        get => _alarmStatus;
-        set => this.RaiseAndSetIfChanged(ref _alarmStatus, value);
+        get;
+        set => this.RaiseAndSetIfChanged(ref field, value);
     }
 
     /// <summary>

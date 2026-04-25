@@ -3,19 +3,19 @@ using CodeWF.EventBus;
 using CodeWF.Log.Core;
 using CodeWF.NetWrapper.Commands;
 using CodeWF.NetWrapper.Helpers;
-using CodeWF.Tools.Extensions;
 using ReactiveUI;
 using SocketDto;
 using SocketDto.AutoCommand;
 using SocketDto.Enums;
+using SocketDto.Requests;
 using SocketDto.Response;
-using SocketTest.Client.Dtos;
+using SocketDto.Udp;
 using SocketTest.Client.Extensions;
 using SocketTest.Client.Models;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reactive;
 using System.Threading.Tasks;
 
 namespace SocketTest.Client.ViewModels;
@@ -23,104 +23,108 @@ namespace SocketTest.Client.ViewModels;
 public class ProcessMonitorViewModel : ReactiveObject
 {
     private readonly List<ProcessItemModel> _receivedProcesses = [];
-    private int[]? _processIdArray;
-    private Dictionary<int, ProcessItemModel>? _processIdAndItems;
-    private string _tcpIp = "127.0.0.1";
-    private int _tcpPort = 5000;
-    private string _udpIp = "239.255.255.250";
-    private int _udpPort = 11012;
-    private long _systemId = 1000;
+    private readonly Dictionary<int, ProcessItemModel> _processLookup = [];
+    private readonly ConcurrentDictionary<int, TaskCompletionSource<ResponseTerminateProcess>> _pendingTerminateRequests = new();
+    private int[]? _processIds;
+    private int _timestampStartYear = 2020;
+    private int _activeProcessTaskId = -1;
+    private int _expectedProcessPages;
+    private int _receivedProcessPages;
+    private ProcessItemModel? _pendingTerminateProcess;
 
     public ProcessMonitorViewModel()
     {
         DisplayProcesses = new RangObservableCollection<ProcessItemModel>();
-        HandleConnectTcpCommand = ReactiveCommand.CreateFromTask(HandleConnectTcpAsync);
-        RefreshCommand = ReactiveCommand.Create(HandleRefreshCommand);
-        RefreshAllCommand = ReactiveCommand.Create(HandleRefreshAllCommand);
-        SendCorrectCommand = ReactiveCommand.Create(HandleSendCorrectCommand);
-        SendDiffVersionCommand = ReactiveCommand.Create(HandleSendDiffVersionCommand);
-        SendDiffPropsCommand = ReactiveCommand.Create(HandleSendDiffPropsCommand);
 
+        UdpHelper.Received += HandleUdpMessageReceived;
         EventBus.Default.Subscribe(this);
-        Logger.Info("进程监控模块已初始化。");
     }
+
+    public event Action<bool>? ConnectionStateChanged;
 
     public RangObservableCollection<ProcessItemModel> DisplayProcesses { get; }
 
     public string TcpIp
     {
-        get => _tcpIp;
-        set => this.RaiseAndSetIfChanged(ref _tcpIp, value);
-    }
+        get;
+        set => this.RaiseAndSetIfChanged(ref field, value);
+    } = "127.0.0.1";
 
     public int TcpPort
     {
-        get => _tcpPort;
-        set => this.RaiseAndSetIfChanged(ref _tcpPort, value);
-    }
+        get;
+        set => this.RaiseAndSetIfChanged(ref field, value);
+    } = 5000;
 
     public string UdpIp
     {
-        get => _udpIp;
+        get;
         set
         {
-            this.RaiseAndSetIfChanged(ref _udpIp, value);
+            this.RaiseAndSetIfChanged(ref field, value);
             this.RaisePropertyChanged(nameof(UdpSummary));
         }
-    }
+    } = "239.255.255.250";
 
     public int UdpPort
     {
-        get => _udpPort;
+        get;
         set
         {
-            this.RaiseAndSetIfChanged(ref _udpPort, value);
+            this.RaiseAndSetIfChanged(ref field, value);
             this.RaisePropertyChanged(nameof(UdpSummary));
         }
-    }
+    } = 11012;
 
     public long SystemId
     {
-        get => _systemId;
-        set => this.RaiseAndSetIfChanged(ref _systemId, value);
-    }
+        get;
+        set => this.RaiseAndSetIfChanged(ref field, value);
+    } = 1000;
 
     public bool IsRunning => TcpHelper.IsRunning;
 
     public string ConnectionSummary => TcpHelper.IsRunning
         ? $"已连接到 {TcpIp}:{TcpPort}"
-        : "未连接到 TCP 服务端";
+        : "尚未连接到 TCP 服务端";
 
     public string ConnectButtonText => TcpHelper.IsRunning ? "断开连接" : "连接服务端";
 
-    public string ProcessSummary => $"当前展示 {DisplayProcesses.Count} 个进程";
+    public string ProcessSummary => $"当前展示 {DisplayProcesses.Count:N0} 个进程";
 
     public string UdpSummary => $"{UdpIp}:{UdpPort}";
+
+    public ProcessItemModel? SelectedProcess
+    {
+        get;
+        set => this.RaiseAndSetIfChanged(ref field, value);
+    }
+
+    public bool IsTerminateDialogOpen
+    {
+        get;
+        private set => this.RaiseAndSetIfChanged(ref field, value);
+    }
+
+    public string TerminateDialogMessage
+    {
+        get;
+        private set => this.RaiseAndSetIfChanged(ref field, value);
+    } = string.Empty;
 
     public TcpSocketClient TcpHelper { get; } = new();
 
     public UdpSocketClient UdpHelper { get; } = new();
 
-    public ReactiveCommand<Unit, Unit> HandleConnectTcpCommand { get; }
-
-    public ReactiveCommand<Unit, Unit> RefreshCommand { get; }
-
-    public ReactiveCommand<Unit, Unit> RefreshAllCommand { get; }
-
-    public ReactiveCommand<Unit, Unit> SendCorrectCommand { get; }
-
-    public ReactiveCommand<Unit, Unit> SendDiffVersionCommand { get; }
-
-    public ReactiveCommand<Unit, Unit> SendDiffPropsCommand { get; }
-
-    private async Task HandleConnectTcpAsync()
+    public async Task HandleConnectTcpAsync()
     {
         if (TcpHelper.IsRunning)
         {
+            UdpHelper.Stop();
             TcpHelper.Stop();
-            this.RaisePropertyChanged(nameof(IsRunning));
-            this.RaisePropertyChanged(nameof(ConnectionSummary));
-            this.RaisePropertyChanged(nameof(ConnectButtonText));
+            ClearProcesses();
+            RaiseConnectionProperties();
+            ConnectionStateChanged?.Invoke(false);
             return;
         }
 
@@ -128,36 +132,107 @@ public class ProcessMonitorViewModel : ReactiveObject
         if (!result.IsSuccess)
         {
             Logger.Warn(result.ErrorMessage ?? "TCP 连接失败。");
+            RaiseConnectionProperties();
+            return;
         }
 
-        this.RaisePropertyChanged(nameof(IsRunning));
-        this.RaisePropertyChanged(nameof(ConnectionSummary));
-        this.RaisePropertyChanged(nameof(ConnectButtonText));
+        RaiseConnectionProperties();
+        ConnectionStateChanged?.Invoke(true);
+        await RequestInitialDataAsync();
     }
 
-    private void HandleRefreshCommand()
+    public async Task RequestInitialDataAsync()
     {
-        _ = TcpHelper.SendCommandAsync(new RequestProcessList());
+        if (!TcpHelper.IsRunning)
+        {
+            return;
+        }
+
+        await TcpHelper.SendCommandAsync(new RequestTargetType { TaskId = NetHelper.GetTaskId() });
+        await TcpHelper.SendCommandAsync(new RequestServiceInfo { TaskId = NetHelper.GetTaskId() });
+        await TcpHelper.SendCommandAsync(new RequestUdpAddress { TaskId = NetHelper.GetTaskId() });
+        await TcpHelper.SendCommandAsync(new RequestProcessIDList { TaskId = NetHelper.GetTaskId() });
+        await RefreshProcessesAsync();
     }
 
-    private void HandleRefreshAllCommand()
+    public async Task RefreshProcessesAsync()
     {
-        _ = TcpHelper.SendCommandAsync(new RequestProcessList());
+        if (!TcpHelper.IsRunning)
+        {
+            return;
+        }
+
+        await TcpHelper.SendCommandAsync(new RequestProcessList { TaskId = NetHelper.GetTaskId() });
     }
 
-    private void HandleSendCorrectCommand()
+    public void ShowTerminateProcessDialog(ProcessItemModel? process)
     {
-        _ = TcpHelper.SendCommandAsync(new RequestStudentListCorrect());
+        var targetProcess = process ?? SelectedProcess;
+        if (targetProcess == null)
+        {
+            return;
+        }
+
+        _pendingTerminateProcess = targetProcess;
+        TerminateDialogMessage =
+            $"确认结束进程“{targetProcess.Name}”(PID: {targetProcess.PID})吗？\n服务端会同步结束该进程的所有子进程。";
+        IsTerminateDialogOpen = true;
     }
 
-    private void HandleSendDiffVersionCommand()
+    public async Task ConfirmTerminateProcessAsync()
     {
-        _ = TcpHelper.SendCommandAsync(new RequestStudentListDiffVersion());
+        var targetProcess = _pendingTerminateProcess;
+        if (targetProcess == null)
+        {
+            IsTerminateDialogOpen = false;
+            return;
+        }
+
+        IsTerminateDialogOpen = false;
+
+        if (!TcpHelper.IsRunning)
+        {
+            Logger.Warn("尚未连接服务端，无法结束进程。");
+            return;
+        }
+
+        var taskId = NetHelper.GetTaskId();
+        var tcs = new TaskCompletionSource<ResponseTerminateProcess>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _pendingTerminateRequests[taskId] = tcs;
+
+        await TcpHelper.SendCommandAsync(new RequestTerminateProcess
+        {
+            TaskId = taskId,
+            ProcessId = targetProcess.PID,
+            KillEntireProcessTree = true
+        });
+
+        try
+        {
+            var response = await tcs.Task;
+            if (!response.Success)
+            {
+                Logger.Warn(response.Message ?? $"结束进程失败，PID={targetProcess.PID}");
+                return;
+            }
+
+            Logger.Info(response.Message ?? $"已结束进程：PID={targetProcess.PID}");
+            await RequestInitialDataAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.Error("结束进程请求失败。", ex);
+        }
+        finally
+        {
+            _pendingTerminateProcess = null;
+        }
     }
 
-    private void HandleSendDiffPropsCommand()
+    public void CancelTerminateProcessDialog()
     {
-        _ = TcpHelper.SendCommandAsync(new RequestStudentListDiffProps());
+        _pendingTerminateProcess = null;
+        IsTerminateDialogOpen = false;
     }
 
     public void ReceivedSocketCommand(SocketCommand message)
@@ -182,6 +257,10 @@ public class ProcessMonitorViewModel : ReactiveObject
         {
             ReceivedSocketMessage(message.GetCommand<ResponseProcessList>());
         }
+        else if (message.IsCommand<ResponseTerminateProcess>())
+        {
+            ReceivedSocketMessage(message.GetCommand<ResponseTerminateProcess>());
+        }
         else if (message.IsCommand<UpdateProcessList>())
         {
             ReceivedSocketMessage(message.GetCommand<UpdateProcessList>());
@@ -194,10 +273,9 @@ public class ProcessMonitorViewModel : ReactiveObject
 
     private void ReceivedSocketMessage(ResponseTargetType response)
     {
-        var type = (TerminalType)Enum.Parse(typeof(TerminalType), response.Type.ToString());
         if (response.Type == (byte)TerminalType.Server)
         {
-            Logger.Info($"连接目标已确认：{type.GetDescription()}。");
+            Logger.Info("已确认连接目标为服务端。");
         }
     }
 
@@ -206,76 +284,215 @@ public class ProcessMonitorViewModel : ReactiveObject
         UdpIp = response.Ip ?? UdpIp;
         UdpPort = response.Port;
         Logger.Info($"已收到 UDP 组播地址：{UdpIp}:{UdpPort}");
-        _ = UdpHelper.ConnectAsync("Server", UdpIp, UdpPort, string.Empty, SystemId);
+
+        if (!UdpHelper.IsRunning)
+        {
+            _ = UdpHelper.ConnectAsync("Server", UdpIp, UdpPort, string.Empty, SystemId);
+        }
     }
 
     private void ReceivedSocketMessage(ResponseServiceInfo response)
     {
+        _timestampStartYear = response.TimestampStartYear;
         Logger.Info($"服务端信息：{response.OS}，时间基准年份：{response.TimestampStartYear}");
     }
 
     private void ReceivedSocketMessage(ResponseProcessIDList response)
     {
-        _processIdArray = response.IDList;
-        _processIdAndItems = _receivedProcesses.ToDictionary(process => process.PID, process => process);
+        _processIds = response.IDList;
+        RebuildProcessLookup();
     }
 
     private void ReceivedSocketMessage(ResponseProcessList response)
     {
-        _receivedProcesses.Clear();
+        if (_activeProcessTaskId != response.TaskId || response.PageIndex == 0)
+        {
+            _activeProcessTaskId = response.TaskId;
+            _expectedProcessPages = Math.Max(response.PageCount, 1);
+            _receivedProcessPages = 0;
+            _receivedProcesses.Clear();
+        }
+
         foreach (var process in response.Processes ?? [])
         {
-            _receivedProcesses.Add(new ProcessItemModel(process, 2020));
+            _receivedProcesses.Add(new ProcessItemModel(process, _timestampStartYear));
         }
 
-        if (_processIdArray != null)
-        {
-            _processIdAndItems = _receivedProcesses
-                .Where(process => _processIdArray.Contains(process.PID))
-                .ToDictionary(process => process.PID, process => process);
-        }
-
-        Dispatcher.UIThread.Post(() =>
-        {
-            DisplayProcesses.Clear();
-            DisplayProcesses.AddRange(_receivedProcesses);
-            this.RaisePropertyChanged(nameof(ProcessSummary));
-        });
-    }
-
-    private void ReceivedSocketMessage(UpdateProcessList response)
-    {
-        if (_processIdAndItems == null)
+        _receivedProcessPages++;
+        if (_receivedProcessPages < _expectedProcessPages)
         {
             return;
         }
 
-        foreach (var updateInfo in response.Processes ?? [])
+        RebuildProcessLookup();
+        RefreshProcessGrid();
+        Logger.Info($"已接收完整进程列表，共 {_receivedProcesses.Count:N0} 项。");
+    }
+
+    private void ReceivedSocketMessage(ResponseTerminateProcess response)
+    {
+        if (_pendingTerminateRequests.TryRemove(response.TaskId, out var tcs))
         {
-            if (_processIdAndItems.TryGetValue(updateInfo.Pid, out var process))
-            {
-                process.Status = (ProcessStatus)updateInfo.ProcessStatus;
-                process.AlarmStatus = (AlarmStatus)updateInfo.AlarmStatus;
-                process.Cpu = updateInfo.Cpu;
-                process.Memory = updateInfo.Memory;
-                process.Disk = updateInfo.Disk;
-                process.Network = updateInfo.Network;
-                process.Gpu = updateInfo.Gpu;
-                process.PowerUsage = (PowerUsage)updateInfo.PowerUsage;
-                process.UpdateTime = DateTime.Now;
-            }
+            tcs.TrySetResult(response);
+        }
+    }
+
+    private void ReceivedSocketMessage(UpdateProcessList response)
+    {
+        if (_receivedProcesses.Count == 0 || response.Processes == null)
+        {
+            return;
         }
 
-        Dispatcher.UIThread.Post(() =>
+        for (var i = 0; i < response.Processes.Count && i < _receivedProcesses.Count; i++)
         {
-            DisplayProcesses.Clear();
-            DisplayProcesses.AddRange(_receivedProcesses);
-            this.RaisePropertyChanged(nameof(ProcessSummary));
-        });
+            var updateInfo = response.Processes[i];
+            var process = _receivedProcesses[i];
+            process.Status = (ProcessStatus)updateInfo.ProcessStatus;
+            process.AlarmStatus = (AlarmStatus)updateInfo.AlarmStatus;
+            process.Cpu = updateInfo.Cpu;
+            process.Memory = updateInfo.Memory;
+            process.Disk = updateInfo.Disk;
+            process.Network = updateInfo.Network;
+            process.Gpu = updateInfo.Gpu;
+            process.PowerUsage = (PowerUsage)updateInfo.PowerUsage;
+            process.UpdateTime = DateTime.Now;
+        }
+
+        RefreshProcessGrid();
     }
 
     private void ReceivedSocketMessage(ChangeProcessList response)
     {
-        Logger.Info("服务端通知进程集合发生变更。");
+        Logger.Info("服务端通知进程结构已变化，准备重新拉取进程列表。");
+        _ = RequestInitialDataAsync();
+    }
+
+    private void HandleUdpMessageReceived(object? sender, SocketCommand message)
+    {
+        try
+        {
+            if (message.IsCommand<UpdateRealtimeProcessList>())
+            {
+                ApplyRealtimeUdpUpdate(message.GetCommand<UpdateRealtimeProcessList>());
+            }
+            else if (message.IsCommand<UpdateGeneralProcessList>())
+            {
+                ApplyGeneralUdpUpdate(message.GetCommand<UpdateGeneralProcessList>());
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.Error("处理 UDP 增量进程数据失败。", ex);
+        }
+    }
+
+    private void ApplyRealtimeUdpUpdate(UpdateRealtimeProcessList response)
+    {
+        if (_receivedProcesses.Count == 0)
+        {
+            return;
+        }
+
+        var startIndex = response.PageIndex * response.PageSize;
+        var count = Math.Min(response.Cpus.Length / sizeof(short), _receivedProcesses.Count - startIndex);
+        for (var i = 0; i < count; i++)
+        {
+            var process = _receivedProcesses[startIndex + i];
+            process.Update(
+                BitConverter.ToInt16(response.Cpus, i * sizeof(short)),
+                BitConverter.ToInt16(response.Memories, i * sizeof(short)),
+                BitConverter.ToInt16(response.Disks, i * sizeof(short)),
+                BitConverter.ToInt16(response.Networks, i * sizeof(short)));
+        }
+
+        RefreshProcessGrid();
+    }
+
+    private void ApplyGeneralUdpUpdate(UpdateGeneralProcessList response)
+    {
+        if (_receivedProcesses.Count == 0)
+        {
+            return;
+        }
+
+        var startIndex = response.PageIndex * response.PageSize;
+        var count = Math.Min(response.ProcessStatuses.Length, _receivedProcesses.Count - startIndex);
+        for (var i = 0; i < count; i++)
+        {
+            var process = _receivedProcesses[startIndex + i];
+            process.Update(
+                _timestampStartYear,
+                response.ProcessStatuses[i],
+                response.AlarmStatuses[i],
+                BitConverter.ToInt16(response.Gpus, i * sizeof(short)),
+                response.GpuEngine[i],
+                response.PowerUsage[i],
+                response.PowerUsageTrend[i],
+                BitConverter.ToUInt32(response.UpdateTimes, i * sizeof(uint)));
+        }
+
+        RefreshProcessGrid();
+    }
+
+    private void RebuildProcessLookup()
+    {
+        _processLookup.Clear();
+        foreach (var process in _receivedProcesses)
+        {
+            _processLookup[process.PID] = process;
+        }
+
+        if (_processIds == null || _processIds.Length == 0)
+        {
+            return;
+        }
+
+        var orderedProcesses = new List<ProcessItemModel>(_processIds.Length);
+        foreach (var processId in _processIds)
+        {
+            if (_processLookup.TryGetValue(processId, out var process))
+            {
+                orderedProcesses.Add(process);
+            }
+        }
+
+        if (orderedProcesses.Count > 0)
+        {
+            _receivedProcesses.Clear();
+            _receivedProcesses.AddRange(orderedProcesses);
+        }
+    }
+
+    private void RefreshProcessGrid()
+    {
+        Dispatcher.UIThread.Post(() =>
+        {
+            DisplayProcesses.Clear();
+            DisplayProcesses.AddRange(_receivedProcesses);
+            if (SelectedProcess != null)
+            {
+                SelectedProcess = DisplayProcesses.FirstOrDefault(item => item.PID == SelectedProcess.PID);
+            }
+
+            this.RaisePropertyChanged(nameof(ProcessSummary));
+        });
+    }
+
+    private void ClearProcesses()
+    {
+        _receivedProcesses.Clear();
+        _processLookup.Clear();
+        _processIds = null;
+        DisplayProcesses.Clear();
+        SelectedProcess = null;
+        this.RaisePropertyChanged(nameof(ProcessSummary));
+    }
+
+    private void RaiseConnectionProperties()
+    {
+        this.RaisePropertyChanged(nameof(IsRunning));
+        this.RaisePropertyChanged(nameof(ConnectionSummary));
+        this.RaisePropertyChanged(nameof(ConnectButtonText));
     }
 }

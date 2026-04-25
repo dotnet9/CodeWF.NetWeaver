@@ -42,10 +42,10 @@
 
         <Border Grid.Row="1" Classes="surface" Padding="16" Margin="0,0,0,12">
             <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,*">
-                <Button Command="{Binding PauseSelectedCommand}" Content="批量停止" />
-                <Button Grid.Column="1" Margin="8,0,0,0" Command="{Binding ResumeSelectedCommand}" Content="批量继续" />
-                <Button Grid.Column="2" Margin="8,0,0,0" Command="{Binding RemoveSelectedCommand}" Content="删除选中" />
-                <Button Grid.Column="3" Margin="8,0,0,0" Command="{Binding ClearCompletedCommand}" Content="清理已完成/失败" />
+                <Button Command="{Binding PauseSelectedTransfers}" Content="批量停止" />
+                <Button Grid.Column="1" Margin="8,0,0,0" Command="{Binding ResumeSelectedTransfers}" Content="批量继续" />
+                <Button Grid.Column="2" Margin="8,0,0,0" Command="{Binding RemoveSelectedTransfers}" Content="删除选中" />
+                <Button Grid.Column="3" Margin="8,0,0,0" Command="{Binding ClearCompletedTransfers}" Content="清理已完成/失败" />
                 <TextBlock Grid.Column="4"
                            HorizontalAlignment="Right"
                            Foreground="#667085"
@@ -103,10 +103,10 @@
                                         <StackPanel Orientation="Horizontal" Spacing="8">
                                             <Button IsVisible="{Binding HasPrimaryAction}"
                                                     Content="{Binding ActionText}"
-                                                    Command="{Binding $parent[DataGrid].((vm:FileTransferViewModel)DataContext).ToggleTransferCommand}"
+                                                    Command="{Binding $parent[DataGrid].((vm:FileTransferViewModel)DataContext).ToggleTransferState}"
                                                     CommandParameter="{Binding}" />
                                             <Button Content="删除"
-                                                    Command="{Binding $parent[DataGrid].((vm:FileTransferViewModel)DataContext).RemoveTransferCommand}"
+                                                    Command="{Binding $parent[DataGrid].((vm:FileTransferViewModel)DataContext).RemoveTransfer}"
                                                     CommandParameter="{Binding}" />
                                         </StackPanel>
                                     </Border>

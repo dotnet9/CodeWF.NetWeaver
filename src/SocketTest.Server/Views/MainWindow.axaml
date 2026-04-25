@@ -4,97 +4,79 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:codewf="https://codewf.com"
-        mc:Ignorable="d" d:DesignWidth="650" d:DesignHeight="650" Width="650" Height="650"
+        mc:Ignorable="d"
+        d:DesignWidth="880"
+        d:DesignHeight="640"
+        Width="880"
+        Height="640"
+        MinWidth="760"
+        MinHeight="520"
         x:Class="SocketTest.Server.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Icon="/Assets/logo.ico"
-        Title="Socket服务端(承载TCP服务和UDP组播)">
+        Title="SocketTest.Server">
     <Window.Styles>
-        <Style Selector="TextBlock">
-            <Setter Property="VerticalAlignment" Value="Center" />
-        </Style>
-        <Style Selector="TextBox.form">
-            <Setter Property="VerticalContentAlignment" Value="Center" />
-            <Setter Property="Height" Value="23" />
-        </Style>
-        <Style Selector="HeaderedContentControl.form">
-            <Setter Property="VerticalAlignment" Value="Center" />
-        </Style>
-        <Style Selector="Button">
-            <Setter Property="Height" Value="30" />
-            <Setter Property="Padding" Value="15,2" />
-            <Setter Property="Margin" Value="10,0" />
-            <Setter Property="VerticalAlignment" Value="Center" />
+        <Style Selector="Border.panel">
+            <Setter Property="Background" Value="#FFFFFF" />
+            <Setter Property="CornerRadius" Value="14" />
+            <Setter Property="BorderBrush" Value="#D9E2EC" />
+            <Setter Property="BorderThickness" Value="1" />
         </Style>
     </Window.Styles>
+
     <Design.DataContext>
         <vm:MainWindowViewModel />
     </Design.DataContext>
-    <TabControl>
-        <TabItem Header="服务配置">
-            <Grid Margin="5">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" />
-                    <RowDefinition Height="Auto" />
-                </Grid.RowDefinitions>
-                <HeaderedContentControl Grid.Row="0" Header="Tcp服务配置">
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Margin="0,0,5,0" Text="IP：" />
-                        <TextBox Width="150" Text="{Binding TcpIp, Mode=TwoWay}" />
 
-                        <TextBlock Margin="10,0,5,0" Text="端口：" />
-                        <TextBox Width="60" Text="{Binding TcpPort, Mode=TwoWay}" />
-                        <TextBlock Margin="10,0,5,0" Text="模拟总数：" />
-                        <TextBox Width="80"
-                                 Text="{Binding MockCount, Mode=TwoWay}" />
-                        <TextBlock Margin="10,0,5,0" Text="单包数据：" />
-                        <TextBox Width="60"
-                                 Text="{Binding MockPageSize, Mode=TwoWay}" />
-                    </StackPanel>
-                </HeaderedContentControl>
-                <HeaderedContentControl Grid.Row="1" Header="Udp组播配置">
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Margin="0,0,5,0" Text="IP：" />
-                        <TextBox Width="150" Text="{Binding UdpIp, Mode=TwoWay}" />
-
-                        <TextBlock Margin="10,0,5,0" Text="端口：" />
-                        <TextBox Width="60" Text="{Binding UdpPort, Mode=TwoWay}" />
-                    </StackPanel>
-                </HeaderedContentControl>
-                <StackPanel
-                    Grid.Row="2"
-                    Margin="0,5"
-                    Orientation="Horizontal">
-                    <Button
-                        Command="{Binding HandleRunCommandCommandAsync}"
-                        Content="{codewf:If Condition={Binding IsRunning}, True=停止服务, False=开启服务}" />
-                    <Button Command="{Binding RefreshCommand}" Content="刷新" />
-                    <Button Command="{Binding UpdateCommand}" Content="更新" />
+    <Grid Background="#F5F7FA" RowDefinitions="Auto,*,Auto">
+        <Border Padding="20,16"
+                Background="#FFFFFF"
+                BorderBrush="#E5E7EB"
+                BorderThickness="0,0,0,1">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="20">
+                <StackPanel Spacing="4">
+                    <TextBlock FontSize="22" FontWeight="SemiBold" Text="SocketTest.Server" />
+                    <TextBlock Foreground="#667085" Text="配置自动生成、启动自动加载，运行信息统一写入日志，底部状态栏仅保留核心状态。" />
                 </StackPanel>
-                <HeaderedContentControl Header="日志" Grid.Row="3">
-                    <codewf:LogView />
-                </HeaderedContentControl>
-                <StackPanel
-                    Grid.Row="4"
-                    Margin="0,8"
-                    VerticalAlignment="Center">
-                    <TextBlock Margin="0,5,0,5">
-                        <Run Text="TCP服务：" />
-                        <Run Text="    心跳时间：" />
-                        <Run Foreground="Green" Text="{Binding HeartbeatTime, StringFormat=yyyy-MM-dd HH:mm:ss fff}" />
-                        <Run Text="    客户端：" />
-                        <Run Foreground="Green" Text="{Binding ClientCount, Mode=OneWay}" />
+                <Button Grid.Column="1"
+                        MinWidth="120"
+                        Height="38"
+                        HorizontalAlignment="Right"
+                        Command="{Binding ToggleServerAsync}"
+                        Content="{Binding StartButtonText}" />
+            </Grid>
+        </Border>
 
-                    </TextBlock>
-                    <TextBlock>
-                        <Run Text="UDP组播：" />
-                        <Run Foreground="Green" Text="2023-12-16 11:27" />
-                    </TextBlock>
+        <Border Grid.Row="1" Classes="panel" Margin="18" Padding="12">
+            <Grid RowDefinitions="Auto,*">
+                <TextBlock Margin="4,0,0,10" FontSize="16" FontWeight="SemiBold" Text="运行日志" />
+                <codewf:LogView Grid.Row="1" />
+            </Grid>
+        </Border>
+
+        <Border Grid.Row="2"
+                Margin="18,0,18,18"
+                Padding="14,10"
+                Background="#111827"
+                CornerRadius="12">
+            <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,*" ColumnSpacing="18">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <TextBlock Foreground="#9CA3AF" Text="状态" />
+                    <TextBlock Foreground="White" Text="{Binding ServiceStatusText}" />
+                </StackPanel>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
+                    <TextBlock Foreground="#9CA3AF" Text="进程数" />
+                    <TextBlock Foreground="White" Text="{Binding CurrentProcessCount}" />
+                </StackPanel>
+                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6">
+                    <TextBlock Foreground="#9CA3AF" Text="客户端" />
+                    <TextBlock Foreground="White" Text="{Binding ClientCount}" />
+                </StackPanel>
+                <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="6">
+                    <TextBlock Foreground="#9CA3AF" Text="心跳" />
+                    <TextBlock Foreground="White" Text="{Binding HeartbeatTime, StringFormat=yyyy-MM-dd HH:mm:ss}" />
                 </StackPanel>
             </Grid>
-        </TabItem>
-    </TabControl>
+        </Border>
+    </Grid>
 </Window>

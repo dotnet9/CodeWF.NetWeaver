@@ -7,13 +7,6 @@ namespace SocketTest.Client.Models;
 
 public class FileTransferItem : ReactiveObject
 {
-    private bool _isSelected;
-    private double _progress;
-    private long _transferredBytes;
-    private long _totalBytes;
-    private string _detail = "等待开始";
-    private FileTransferState _state = FileTransferState.Queued;
-
     public Guid Id { get; } = Guid.NewGuid();
 
     public int TaskId { get; set; }
@@ -36,57 +29,57 @@ public class FileTransferItem : ReactiveObject
 
     public bool IsSelected
     {
-        get => _isSelected;
-        set => this.RaiseAndSetIfChanged(ref _isSelected, value);
+        get;
+        set => this.RaiseAndSetIfChanged(ref field, value);
     }
 
     public double Progress
     {
-        get => _progress;
+        get;
         set
         {
-            this.RaiseAndSetIfChanged(ref _progress, value);
+            this.RaiseAndSetIfChanged(ref field, value);
             this.RaisePropertyChanged(nameof(ProgressText));
         }
     }
 
     public long TransferredBytes
     {
-        get => _transferredBytes;
+        get;
         set
         {
-            this.RaiseAndSetIfChanged(ref _transferredBytes, value);
+            this.RaiseAndSetIfChanged(ref field, value);
             this.RaisePropertyChanged(nameof(TransferredText));
         }
     }
 
     public long TotalBytes
     {
-        get => _totalBytes;
+        get;
         set
         {
-            this.RaiseAndSetIfChanged(ref _totalBytes, value);
+            this.RaiseAndSetIfChanged(ref field, value);
             this.RaisePropertyChanged(nameof(TransferredText));
         }
     }
 
     public FileTransferState State
     {
-        get => _state;
+        get;
         set
         {
-            this.RaiseAndSetIfChanged(ref _state, value);
+            this.RaiseAndSetIfChanged(ref field, value);
             this.RaisePropertyChanged(nameof(StateText));
             this.RaisePropertyChanged(nameof(ActionText));
             this.RaisePropertyChanged(nameof(HasPrimaryAction));
         }
-    }
+    } = FileTransferState.Queued;
 
     public string Detail
     {
-        get => _detail;
-        set => this.RaiseAndSetIfChanged(ref _detail, value);
-    }
+        get;
+        set => this.RaiseAndSetIfChanged(ref field, value);
+    } = "等待开始";
 
     public string DirectionText => Direction == FileTransferDirection.Upload ? "上传" : "下载";
 

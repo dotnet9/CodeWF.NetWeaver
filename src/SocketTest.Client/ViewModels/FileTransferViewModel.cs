@@ -10,7 +10,6 @@ using System.Collections.Specialized;
 using System.ComponentModel;
 using System.IO;
 using System.Linq;
-using System.Reactive;
 using System.Threading;
 using System.Threading.Tasks;
 using Timer = System.Timers.Timer;
@@ -26,9 +25,6 @@ public class FileTransferViewModel : ReactiveObject
     private bool _isProcessingQueue;
     private FileTransferItem? _activeTransfer;
     private TaskCompletionSource<FileTransferOutcomeEventArgs>? _activeCompletionSource;
-    private double _totalProgress;
-    private string _transferSpeed = "0 B/s";
-    private string _queueSummary = "暂无传输任务";
 
     public FileTransferViewModel(TcpSocketClient tcpHelper)
     {
@@ -39,13 +35,6 @@ public class FileTransferViewModel : ReactiveObject
         _tcpHelper.FileTransferProgress += HandleFileTransferProgress;
         _tcpHelper.FileTransferOutcome += HandleFileTransferOutcome;
 
-        PauseSelectedCommand = ReactiveCommand.Create(PauseSelectedTransfers);
-        ResumeSelectedCommand = ReactiveCommand.Create(ResumeSelectedTransfers);
-        RemoveSelectedCommand = ReactiveCommand.Create(RemoveSelectedTransfers);
-        ClearCompletedCommand = ReactiveCommand.Create(ClearCompletedTransfers);
-        ToggleTransferCommand = ReactiveCommand.Create<FileTransferItem>(ToggleTransferState);
-        RemoveTransferCommand = ReactiveCommand.Create<FileTransferItem>(RemoveTransfer);
-
         _updateTimer = new Timer(500);
         _updateTimer.Elapsed += (_, _) => Dispatcher.UIThread.Post(UpdateDashboard);
         _updateTimer.Start();
@@ -55,35 +44,23 @@ public class FileTransferViewModel : ReactiveObject
 
     public double TotalProgress
     {
-        get => _totalProgress;
-        private set => this.RaiseAndSetIfChanged(ref _totalProgress, value);
+        get;
+        private set => this.RaiseAndSetIfChanged(ref field, value);
     }
 
     public string TransferSpeed
     {
-        get => _transferSpeed;
-        private set => this.RaiseAndSetIfChanged(ref _transferSpeed, value);
-    }
+        get;
+        private set => this.RaiseAndSetIfChanged(ref field, value);
+    } = "0 B/s";
 
     public string QueueSummary
     {
-        get => _queueSummary;
-        private set => this.RaiseAndSetIfChanged(ref _queueSummary, value);
-    }
+        get;
+        private set => this.RaiseAndSetIfChanged(ref field, value);
+    } = "暂无传输任务";
 
     public int SelectedCount => FileTransferList.Count(item => item.IsSelected);
-
-    public ReactiveCommand<Unit, Unit> PauseSelectedCommand { get; }
-
-    public ReactiveCommand<Unit, Unit> ResumeSelectedCommand { get; }
-
-    public ReactiveCommand<Unit, Unit> RemoveSelectedCommand { get; }
-
-    public ReactiveCommand<Unit, Unit> ClearCompletedCommand { get; }
-
-    public ReactiveCommand<FileTransferItem, Unit> ToggleTransferCommand { get; }
-
-    public ReactiveCommand<FileTransferItem, Unit> RemoveTransferCommand { get; }
 
     public void EnqueueUploads(params (string LocalPath, string RemotePath)[] uploads) =>
         EnqueueUploads((System.Collections.Generic.IEnumerable<(string LocalPath, string RemotePath)>)uploads);
@@ -131,11 +108,7 @@ public class FileTransferViewModel : ReactiveObject
         TriggerQueueProcessing();
     }
 
-    public void ToggleTransfer(FileTransferItem item) => ToggleTransferState(item);
-
-    public void RemoveTransferItem(FileTransferItem item) => RemoveTransfer(item);
-
-    private void PauseSelectedTransfers()
+    public void PauseSelectedTransfers()
     {
         foreach (var item in FileTransferList.Where(x => x.IsSelected).ToList())
         {
@@ -143,7 +116,7 @@ public class FileTransferViewModel : ReactiveObject
         }
     }
 
-    private void ResumeSelectedTransfers()
+    public void ResumeSelectedTransfers()
     {
         foreach (var item in FileTransferList.Where(x => x.IsSelected).ToList())
         {
@@ -151,7 +124,7 @@ public class FileTransferViewModel : ReactiveObject
         }
     }
 
-    private void RemoveSelectedTransfers()
+    public void RemoveSelectedTransfers()
     {
         foreach (var item in FileTransferList.Where(x => x.IsSelected).ToList())
         {
@@ -159,7 +132,7 @@ public class FileTransferViewModel : ReactiveObject
         }
     }
 
-    private void ClearCompletedTransfers()
+    public void ClearCompletedTransfers()
     {
         foreach (var item in FileTransferList.Where(x => x.State is FileTransferState.Completed or FileTransferState.Failed).ToList())
         {
@@ -175,7 +148,7 @@ public class FileTransferViewModel : ReactiveObject
         UpdateDashboard();
     }
 
-    private void ToggleTransferState(FileTransferItem item)
+    public void ToggleTransferState(FileTransferItem item)
     {
         if (item.State is FileTransferState.Queued or FileTransferState.Running)
         {
@@ -188,6 +161,23 @@ public class FileTransferViewModel : ReactiveObject
             ResumeTransfer(item);
         }
     }
+
+    public void ToggleTransfer(FileTransferItem item) => ToggleTransferState(item);
+
+    public void RemoveTransfer(FileTransferItem item)
+    {
+        if (item.State == FileTransferState.Running)
+        {
+            PauseTransfer(item);
+            return;
+        }
+
+        DetachTransfer(item);
+        FileTransferList.Remove(item);
+        UpdateDashboard();
+    }
+
+    public void RemoveTransferItem(FileTransferItem item) => RemoveTransfer(item);
 
     private void PauseTransfer(FileTransferItem item)
     {
@@ -219,19 +209,6 @@ public class FileTransferViewModel : ReactiveObject
         item.MarkQueued("准备继续传输");
         UpdateDashboard();
         TriggerQueueProcessing();
-    }
-
-    private void RemoveTransfer(FileTransferItem item)
-    {
-        if (item.State == FileTransferState.Running)
-        {
-            PauseTransfer(item);
-            return;
-        }
-
-        DetachTransfer(item);
-        FileTransferList.Remove(item);
-        UpdateDashboard();
     }
 
     private void TriggerQueueProcessing()

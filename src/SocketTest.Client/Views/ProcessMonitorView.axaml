@@ -2,8 +2,8 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-             xmlns:codewf="https://codewf.com"
              xmlns:vm="using:SocketTest.Client.ViewModels"
+             xmlns:models="using:SocketTest.Client.Models"
              xmlns:converters="using:SocketTest.Client.Converters"
              mc:Ignorable="d"
              d:DesignWidth="1280"
@@ -31,47 +31,21 @@
         <converters:ProcessPowerUsageToForegroundConverter x:Key="ProcessPowerUsageToForegroundConverter" />
     </UserControl.Resources>
 
-    <Grid Margin="10" RowDefinitions="Auto,Auto,*,Auto,190,Auto">
+    <Grid Margin="10" RowDefinitions="Auto,*">
         <Border Classes="surface" Padding="16" Margin="0,0,0,12">
-            <Grid ColumnDefinitions="Auto,160,Auto,90,Auto,Auto,*,Auto,Auto,Auto">
-                <TextBlock Text="服务端 IP" Margin="0,0,8,0" />
-                <TextBox Grid.Column="1" Text="{Binding TcpIp, Mode=TwoWay}" Watermark="127.0.0.1" />
-                <TextBlock Grid.Column="2" Margin="16,0,8,0" Text="端口" />
-                <TextBox Grid.Column="3" Text="{Binding TcpPort, Mode=TwoWay}" />
-                <Button Grid.Column="4" Margin="16,0,0,0" Command="{Binding HandleConnectTcpCommand}" Content="{Binding ConnectButtonText}" />
-                <Button Grid.Column="5" Margin="8,0,0,0" Command="{Binding RefreshCommand}" Content="刷新进程" />
-                <StackPanel Grid.Column="7" Orientation="Horizontal" Spacing="8">
-                    <Button Command="{Binding SendCorrectCommand}" Content="正常包" />
-                    <Button Command="{Binding SendDiffVersionCommand}" Content="版本不匹配" />
-                    <Button Command="{Binding SendDiffPropsCommand}" Content="属性不匹配" />
+            <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10">
+                <StackPanel Spacing="4">
+                    <TextBlock FontSize="18" FontWeight="SemiBold" Text="服务端进程监控" />
+                    <TextBlock Foreground="#667085" Text="聚焦实时进程状态、资源占用与告警信息，右键可直接请求服务端结束目标进程树。" />
                 </StackPanel>
+                <Button Grid.Column="1" Command="{Binding RefreshProcessesAsync}" Content="刷新进程" />
+                <Button Grid.Column="2" Command="{Binding RequestInitialDataAsync}" Content="重新同步" />
             </Grid>
         </Border>
 
-        <Grid Grid.Row="1" ColumnDefinitions="*,*,*" Margin="0,0,0,12">
-            <Border Classes="surface" Padding="16" Margin="0,0,8,0">
-                <StackPanel Spacing="4">
-                    <TextBlock Foreground="#667085" Text="TCP 状态" />
-                    <TextBlock FontSize="18" FontWeight="SemiBold" Text="{Binding ConnectionSummary}" />
-                </StackPanel>
-            </Border>
-            <Border Grid.Column="1" Classes="surface" Padding="16" Margin="4,0">
-                <StackPanel Spacing="4">
-                    <TextBlock Foreground="#667085" Text="UDP 组播" />
-                    <TextBlock FontSize="18" FontWeight="SemiBold" Text="{Binding UdpSummary}" />
-                </StackPanel>
-            </Border>
-            <Border Grid.Column="2" Classes="surface" Padding="16" Margin="8,0,0,0">
-                <StackPanel Spacing="4">
-                    <TextBlock Foreground="#667085" Text="进程概览" />
-                    <TextBlock FontSize="18" FontWeight="SemiBold" Text="{Binding ProcessSummary}" />
-                </StackPanel>
-            </Border>
-        </Grid>
-
-        <Border Grid.Row="2" Classes="surface" Padding="10" Margin="0,0,0,12">
+        <Border Grid.Row="1" Classes="surface" Padding="10">
             <Grid RowDefinitions="Auto,*">
-                <TextBlock FontSize="16" FontWeight="SemiBold" Text="服务端进程列表" Margin="4,0,0,10" />
+                <TextBlock Margin="4,0,0,10" FontSize="16" FontWeight="SemiBold" Text="进程列表" />
                 <DataGrid Grid.Row="1"
                           CanUserReorderColumns="True"
                           CanUserResizeColumns="True"
@@ -80,16 +54,31 @@
                           HeadersVisibility="Column"
                           IsReadOnly="True"
                           BorderThickness="0"
-                          ItemsSource="{Binding DisplayProcesses, Mode=OneWay}">
+                          ItemsSource="{Binding DisplayProcesses, Mode=OneWay}"
+                          SelectedItem="{Binding SelectedProcess, Mode=TwoWay}">
                     <DataGrid.Columns>
                         <DataGridTextColumn Width="80" Binding="{Binding PID}" Header="PID" />
-                        <DataGridTextColumn Width="170" Binding="{Binding Name}" Header="进程名称" />
+                        <DataGridTemplateColumn Width="210" Header="进程名称">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate x:DataType="models:ProcessItemModel">
+                                    <Border Padding="4,0">
+                                        <Border.ContextMenu>
+                                            <ContextMenu>
+                                                <MenuItem Header="结束进程（含子进程）"
+                                                          Click="TerminateProcessMenuItem_OnClick" />
+                                            </ContextMenu>
+                                        </Border.ContextMenu>
+                                        <TextBlock Text="{Binding Name}" />
+                                    </Border>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
                         <DataGridTextColumn Width="110"
                                             Binding="{Binding Type, Converter={StaticResource EnumToDescriptionConverter}}"
                                             Header="类型" />
                         <DataGridTemplateColumn Width="110" Header="状态">
                             <DataGridTemplateColumn.CellTemplate>
-                                <DataTemplate>
+                                <DataTemplate x:DataType="models:ProcessItemModel">
                                     <TextBlock Foreground="{Binding Status, Converter={StaticResource ProcessStatusToForegroundConverter}}"
                                                Text="{Binding Status, Converter={StaticResource EnumToDescriptionConverter}}" />
                                 </DataTemplate>
@@ -97,17 +86,17 @@
                         </DataGridTemplateColumn>
                         <DataGridTemplateColumn Width="110" Header="告警">
                             <DataGridTemplateColumn.CellTemplate>
-                                <DataTemplate>
+                                <DataTemplate x:DataType="models:ProcessItemModel">
                                     <TextBlock Foreground="{Binding AlarmStatus, Converter={StaticResource AlarmStatusToForegroundConverter}}"
                                                Text="{Binding AlarmStatus, Converter={StaticResource EnumToDescriptionConverter}}" />
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellTemplate>
                         </DataGridTemplateColumn>
                         <DataGridTextColumn Width="150" Binding="{Binding Publisher}" Header="发布者" />
-                        <DataGridTextColumn Width="260" Binding="{Binding CommandLine}" Header="命令行" />
+                        <DataGridTextColumn Width="260" Binding="{Binding CommandLine}" Header="程序路径" />
                         <DataGridTemplateColumn Width="90" Header="CPU">
                             <DataGridTemplateColumn.CellTemplate>
-                                <DataTemplate>
+                                <DataTemplate x:DataType="models:ProcessItemModel">
                                     <TextBlock Foreground="{Binding Cpu, Converter={StaticResource UsageToForegroundConverter}}"
                                                Text="{Binding Cpu, Converter={StaticResource UsageToFormatConverter}}" />
                                 </DataTemplate>
@@ -115,7 +104,7 @@
                         </DataGridTemplateColumn>
                         <DataGridTemplateColumn Width="90" Header="内存">
                             <DataGridTemplateColumn.CellTemplate>
-                                <DataTemplate>
+                                <DataTemplate x:DataType="models:ProcessItemModel">
                                     <TextBlock Foreground="{Binding Memory, Converter={StaticResource UsageToForegroundConverter}}"
                                                Text="{Binding Memory, Converter={StaticResource UsageToFormatConverter}}" />
                                 </DataTemplate>
@@ -123,7 +112,7 @@
                         </DataGridTemplateColumn>
                         <DataGridTemplateColumn Width="90" Header="磁盘">
                             <DataGridTemplateColumn.CellTemplate>
-                                <DataTemplate>
+                                <DataTemplate x:DataType="models:ProcessItemModel">
                                     <TextBlock Foreground="{Binding Disk, Converter={StaticResource UsageToForegroundConverter}}"
                                                Text="{Binding Disk, Converter={StaticResource UsageToFormatConverter}}" />
                                 </DataTemplate>
@@ -131,7 +120,7 @@
                         </DataGridTemplateColumn>
                         <DataGridTemplateColumn Width="90" Header="网络">
                             <DataGridTemplateColumn.CellTemplate>
-                                <DataTemplate>
+                                <DataTemplate x:DataType="models:ProcessItemModel">
                                     <TextBlock Foreground="{Binding Network, Converter={StaticResource UsageToForegroundConverter}}"
                                                Text="{Binding Network, Converter={StaticResource UsageToFormatConverter}}" />
                                 </DataTemplate>
@@ -139,7 +128,7 @@
                         </DataGridTemplateColumn>
                         <DataGridTemplateColumn Width="80" Header="GPU">
                             <DataGridTemplateColumn.CellTemplate>
-                                <DataTemplate>
+                                <DataTemplate x:DataType="models:ProcessItemModel">
                                     <TextBlock Foreground="{Binding Gpu, Converter={StaticResource UsageToForegroundConverter}}"
                                                Text="{Binding Gpu, Converter={StaticResource UsageToFormatConverter}}" />
                                 </DataTemplate>
@@ -148,7 +137,7 @@
                         <DataGridTextColumn Width="140" Binding="{Binding GpuEngine, Converter={StaticResource EnumToDescriptionConverter}}" Header="GPU 引擎" />
                         <DataGridTemplateColumn Width="150" Header="电源使用">
                             <DataGridTemplateColumn.CellTemplate>
-                                <DataTemplate>
+                                <DataTemplate x:DataType="models:ProcessItemModel">
                                     <TextBlock Foreground="{Binding PowerUsage, Converter={StaticResource ProcessPowerUsageToForegroundConverter}}"
                                                Text="{Binding PowerUsage, Converter={StaticResource EnumToDescriptionConverter}}" />
                                 </DataTemplate>
@@ -156,28 +145,32 @@
                         </DataGridTemplateColumn>
                         <DataGridTemplateColumn Width="150" Header="电源趋势">
                             <DataGridTemplateColumn.CellTemplate>
-                                <DataTemplate>
+                                <DataTemplate x:DataType="models:ProcessItemModel">
                                     <TextBlock Foreground="{Binding PowerUsageTrend, Converter={StaticResource ProcessPowerUsageToForegroundConverter}}"
                                                Text="{Binding PowerUsageTrend, Converter={StaticResource EnumToDescriptionConverter}}" />
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellTemplate>
                         </DataGridTemplateColumn>
-                        <DataGridTextColumn Width="180" Binding="{Binding LastUpdateTime, StringFormat=yyyy-MM-dd HH:mm:ss}" Header="上次更新时间" />
+                        <DataGridTextColumn Width="180" Binding="{Binding LastUpdateTime, StringFormat=yyyy-MM-dd HH:mm:ss}" Header="上次刷新时间" />
                         <DataGridTextColumn Width="180" Binding="{Binding UpdateTime, StringFormat=yyyy-MM-dd HH:mm:ss}" Header="最新更新时间" />
                     </DataGrid.Columns>
                 </DataGrid>
             </Grid>
         </Border>
 
-        <Border Grid.Row="4" Classes="surface" Padding="10" Margin="0,0,0,12">
-            <Grid RowDefinitions="Auto,*">
-                <TextBlock FontSize="16" FontWeight="SemiBold" Text="运行日志" Margin="4,0,0,10" />
-                <codewf:LogView Grid.Row="1" />
+        <Border IsVisible="{Binding IsTerminateDialogOpen}" Background="#66000000" ZIndex="20">
+            <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
+                <Border Width="430" Classes="surface" Padding="20">
+                    <StackPanel Spacing="14">
+                        <TextBlock FontSize="18" FontWeight="SemiBold" Text="确认结束进程" />
+                        <TextBlock TextWrapping="Wrap" Text="{Binding TerminateDialogMessage}" />
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+                            <Button Command="{Binding ConfirmTerminateProcessAsync}" Content="确认结束" />
+                            <Button Grid.Column="1" Command="{Binding CancelTerminateProcessDialog}" Content="取消" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
             </Grid>
-        </Border>
-
-        <Border Grid.Row="5" Padding="12,8" Background="#101828" CornerRadius="12">
-            <TextBlock Foreground="White" Text="{Binding ConnectionSummary}" />
         </Border>
     </Grid>
 </UserControl>

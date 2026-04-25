@@ -1,4 +1,3 @@
-using Avalonia.Threading;
 using CodeWF.EventBus;
 using CodeWF.Log.Core;
 using CodeWF.NetWrapper.Commands;
@@ -14,7 +13,6 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
-using System.Reactive;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -35,7 +33,7 @@ public class RemoteFileManagerViewModel : ReactiveObject
     private bool _isListView = true;
     private bool _isBusy;
     private bool _isSearchMode;
-    private string _statusText = "等待连接到服务端";
+    private string _statusText = "请先连接到服务端。";
     private int _currentSearchPage = 1;
     private int _searchPageSize = 40;
     private bool _isCreateDialogOpen;
@@ -46,36 +44,30 @@ public class RemoteFileManagerViewModel : ReactiveObject
     private string _deleteDialogMessage = string.Empty;
     private ServerDirectoryItem? _selectedServerItem;
     private ServerDirectoryItem? _pendingDeleteItem;
+    private RemoteTreeNode? _selectedTreeNode;
     private CancellationTokenSource? _searchCancellationTokenSource;
+    private bool _rootDisplaysDriveList = true;
 
     public RemoteFileManagerViewModel(TcpSocketClient tcpHelper, FileTransferViewModel fileTransferViewModel)
     {
         _tcpHelper = tcpHelper;
         _fileTransferViewModel = fileTransferViewModel;
 
-        VisibleItems = new ObservableCollection<ServerDirectoryItem>();
-
-        RefreshServerDirectoryCommand = ReactiveCommand.CreateFromTask(RefreshCurrentDirectoryAsync);
-        GoToDirectoryCommand = ReactiveCommand.CreateFromTask(GoToCurrentDirectoryAsync);
-        EnterParentDirectoryCommand = ReactiveCommand.CreateFromTask(EnterParentDirectoryAsync);
-        OpenItemCommand = ReactiveCommand.CreateFromTask<ServerDirectoryItem>(OpenItemAsync);
-        StartSearchCommand = ReactiveCommand.CreateFromTask(StartSearchAsync);
-        ClearSearchCommand = ReactiveCommand.Create(ClearSearch);
-        PreviousSearchPageCommand = ReactiveCommand.Create(GoToPreviousSearchPage);
-        NextSearchPageCommand = ReactiveCommand.Create(GoToNextSearchPage);
-        SwitchToListViewCommand = ReactiveCommand.Create(() => { IsListView = true; });
-        SwitchToTileViewCommand = ReactiveCommand.Create(() => { IsListView = false; });
-        ShowCreateDirectoryDialogCommand = ReactiveCommand.Create<ServerDirectoryItem?>(ShowCreateDirectoryDialog);
-        ConfirmCreateDirectoryCommand = ReactiveCommand.CreateFromTask(ConfirmCreateDirectoryAsync);
-        CancelCreateDirectoryCommand = ReactiveCommand.Create(CancelCreateDirectoryDialog);
-        ShowDeleteDialogCommand = ReactiveCommand.Create<ServerDirectoryItem?>(ShowDeleteDialog);
-        ConfirmDeleteCommand = ReactiveCommand.CreateFromTask(ConfirmDeleteAsync);
-        CancelDeleteCommand = ReactiveCommand.Create(CancelDeleteDialog);
+        NavigationRoots = [];
+        VisibleItems = [];
 
         EventBus.Default.Subscribe(this);
     }
 
+    public ObservableCollection<RemoteTreeNode> NavigationRoots { get; }
+
     public ObservableCollection<ServerDirectoryItem> VisibleItems { get; }
+
+    public RemoteTreeNode? SelectedTreeNode
+    {
+        get => _selectedTreeNode;
+        private set => this.RaiseAndSetIfChanged(ref _selectedTreeNode, value);
+    }
 
     public ServerDirectoryItem? SelectedServerItem
     {
@@ -126,8 +118,11 @@ public class RemoteFileManagerViewModel : ReactiveObject
         {
             this.RaiseAndSetIfChanged(ref _isSearchMode, value);
             this.RaisePropertyChanged(nameof(SearchSummary));
+            this.RaisePropertyChanged(nameof(IsBrowseMode));
         }
     }
+
+    public bool IsBrowseMode => !IsSearchMode;
 
     public string StatusText
     {
@@ -165,8 +160,8 @@ public class RemoteFileManagerViewModel : ReactiveObject
     public bool CanGoNextSearchPage => CurrentSearchPage < SearchTotalPages;
 
     public string SearchSummary => IsSearchMode
-        ? $"搜索结果 {_searchResults.Count} 项，第 {CurrentSearchPage}/{SearchTotalPages} 页"
-        : $"{_currentDirectoryItems.Count} 个项目";
+        ? $"搜索结果 {_searchResults.Count} 项，页码 {CurrentSearchPage}/{SearchTotalPages}"
+        : $"当前目录 {_currentDirectoryItems.Count} 项";
 
     public bool IsCreateDialogOpen
     {
@@ -198,41 +193,132 @@ public class RemoteFileManagerViewModel : ReactiveObject
         private set => this.RaiseAndSetIfChanged(ref _deleteDialogMessage, value);
     }
 
-    public ReactiveCommand<Unit, Unit> RefreshServerDirectoryCommand { get; }
+    public Task RefreshServerDirectoryCommand() => RefreshCurrentDirectoryAsync();
 
-    public ReactiveCommand<Unit, Unit> GoToDirectoryCommand { get; }
+    public Task GoToDirectoryCommand() => GoToCurrentDirectoryAsync();
 
-    public ReactiveCommand<Unit, Unit> EnterParentDirectoryCommand { get; }
+    public Task EnterParentDirectoryCommand() => EnterParentDirectoryAsync();
 
-    public ReactiveCommand<ServerDirectoryItem, Unit> OpenItemCommand { get; }
+    public Task OpenItemCommand(ServerDirectoryItem item) => OpenItemAsync(item);
 
-    public ReactiveCommand<Unit, Unit> StartSearchCommand { get; }
+    public Task StartSearchCommand() => StartSearchAsync();
 
-    public ReactiveCommand<Unit, Unit> ClearSearchCommand { get; }
+    public void ClearSearchCommand() => ClearSearch();
 
-    public ReactiveCommand<Unit, Unit> PreviousSearchPageCommand { get; }
+    public void PreviousSearchPageCommand() => GoToPreviousSearchPage();
 
-    public ReactiveCommand<Unit, Unit> NextSearchPageCommand { get; }
+    public void NextSearchPageCommand() => GoToNextSearchPage();
 
-    public ReactiveCommand<Unit, Unit> SwitchToListViewCommand { get; }
+    public void SwitchToListViewCommand() => IsListView = true;
 
-    public ReactiveCommand<Unit, Unit> SwitchToTileViewCommand { get; }
+    public void SwitchToTileViewCommand() => IsListView = false;
 
-    public ReactiveCommand<ServerDirectoryItem?, Unit> ShowCreateDirectoryDialogCommand { get; }
+    public void ShowCreateDirectoryDialogCommand(ServerDirectoryItem? item) => ShowCreateDirectoryDialog(item);
 
-    public ReactiveCommand<Unit, Unit> ConfirmCreateDirectoryCommand { get; }
+    public Task ConfirmCreateDirectoryCommand() => ConfirmCreateDirectoryAsync();
 
-    public ReactiveCommand<Unit, Unit> CancelCreateDirectoryCommand { get; }
+    public void CancelCreateDirectoryCommand() => CancelCreateDirectoryDialog();
 
-    public ReactiveCommand<ServerDirectoryItem?, Unit> ShowDeleteDialogCommand { get; }
+    public void ShowDeleteDialogCommand(ServerDirectoryItem? item) => ShowDeleteDialog(item);
 
-    public ReactiveCommand<Unit, Unit> ConfirmDeleteCommand { get; }
+    public Task ConfirmDeleteCommand() => ConfirmDeleteAsync();
 
-    public ReactiveCommand<Unit, Unit> CancelDeleteCommand { get; }
+    public void CancelDeleteCommand() => CancelDeleteDialog();
+
+    public async Task HandleConnectionStateChangedAsync(bool isConnected)
+    {
+        if (isConnected)
+        {
+            await InitializeExplorerAsync();
+            return;
+        }
+
+        ResetExplorer("连接已断开，请重新连接服务端。");
+    }
+
+    public async Task InitializeExplorerAsync()
+    {
+        if (!EnsureConnected())
+        {
+            return;
+        }
+
+        IsBusy = true;
+        try
+        {
+            ClearSearchInternal();
+
+            var rootNode = GetOrCreateRootNode();
+            var rootItems = await BrowseDirectoryAsync("/");
+
+            ApplyDirectoryItems("/", rootItems);
+            PopulateNodeChildren(rootNode, rootItems);
+
+            rootNode.IsExpanded = true;
+            rootNode.IsSelected = true;
+            SelectedTreeNode = rootNode;
+            StatusText = "已连接服务端，正在浏览远程文件系统。";
+        }
+        catch (Exception ex)
+        {
+            Logger.Error("初始化远程文件管理器失败", ex);
+            ResetExplorer(ex.Message);
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    public async Task SelectTreeNodeAsync(RemoteTreeNode? node)
+    {
+        if (node == null || node.IsPlaceholder || !EnsureConnected())
+        {
+            return;
+        }
+
+        SelectedTreeNode = node;
+        node.IsSelected = true;
+        await NavigateToPathAsync(node.FullPath);
+    }
+
+    public async Task ExpandTreeNodeAsync(RemoteTreeNode? node)
+    {
+        if (node == null || node.IsPlaceholder || !node.IsDirectory || !EnsureConnected())
+        {
+            return;
+        }
+
+        if (node.ChildrenLoaded)
+        {
+            node.IsExpanded = true;
+            return;
+        }
+
+        node.IsLoading = true;
+        try
+        {
+            var items = PathsEqual(node.FullPath, CurrentServerDirectory) && !IsSearchMode
+                ? _currentDirectoryItems.ToList()
+                : await BrowseDirectoryAsync(node.FullPath);
+
+            PopulateNodeChildren(node, items);
+            node.IsExpanded = true;
+        }
+        catch (Exception ex)
+        {
+            Logger.Error($"加载目录树节点失败：{node.FullPath}", ex);
+            StatusText = ex.Message;
+        }
+        finally
+        {
+            node.IsLoading = false;
+        }
+    }
 
     public async Task UploadFilesAsync(IEnumerable<string> localFilePaths, ServerDirectoryItem? targetDirectory = null)
     {
-        if (!EnsureConnected())
+        if (!TryGetWritableTargetDirectory(targetDirectory, out var remoteDirectory))
         {
             return;
         }
@@ -244,21 +330,40 @@ public class RemoteFileManagerViewModel : ReactiveObject
             return;
         }
 
-        var remoteDirectory = GetTargetDirectoryPath(targetDirectory);
         var transfers = files.Select(file => (file, CombineRemotePath(remoteDirectory, Path.GetFileName(file)))).ToList();
         _fileTransferViewModel.EnqueueUploads(transfers);
-        StatusText = $"已添加 {transfers.Count} 个上传任务。";
+        StatusText = $"已加入 {transfers.Count} 个上传任务。";
     }
 
     public void ShowCreateDirectoryDialogFor(ServerDirectoryItem? item) => ShowCreateDirectoryDialog(item);
 
+    public void ShowCreateDirectoryDialogForTreeNode(RemoteTreeNode? node)
+    {
+        if (node == null || node.IsPlaceholder)
+        {
+            return;
+        }
+
+        ShowCreateDirectoryDialog(ToDirectoryItem(node));
+    }
+
     public void ShowDeleteDialogFor(ServerDirectoryItem? item) => ShowDeleteDialog(item);
+
+    public void ShowDeleteDialogForTreeNode(RemoteTreeNode? node)
+    {
+        if (node == null || node.IsPlaceholder)
+        {
+            return;
+        }
+
+        ShowDeleteDialog(ToDirectoryItem(node));
+    }
 
     public Task OpenItemFromMenuAsync(ServerDirectoryItem item) => OpenItemAsync(item);
 
     public async Task UploadFolderAsync(string localFolderPath, ServerDirectoryItem? targetDirectory = null)
     {
-        if (!EnsureConnected())
+        if (!TryGetWritableTargetDirectory(targetDirectory, out var remoteDirectory))
         {
             return;
         }
@@ -270,14 +375,22 @@ public class RemoteFileManagerViewModel : ReactiveObject
         }
 
         var folderName = Path.GetFileName(localFolderPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
-        var remoteDirectory = GetTargetDirectoryPath(targetDirectory);
         var remoteRootPath = CombineRemotePath(remoteDirectory, folderName);
 
-        await CreateDirectoryRequestAsync(remoteRootPath);
-        foreach (var subDirectory in Directory.GetDirectories(localFolderPath, "*", SearchOption.AllDirectories))
+        try
         {
-            var relativeDirectory = Path.GetRelativePath(localFolderPath, subDirectory).Replace('\\', '/');
-            await CreateDirectoryRequestAsync(CombineRemotePath(remoteRootPath, relativeDirectory));
+            await CreateDirectoryRequestAsync(remoteRootPath);
+            foreach (var subDirectory in Directory.GetDirectories(localFolderPath, "*", SearchOption.AllDirectories))
+            {
+                var relativeDirectory = Path.GetRelativePath(localFolderPath, subDirectory).Replace('\\', '/');
+                await CreateDirectoryRequestAsync(CombineRemotePath(remoteRootPath, relativeDirectory));
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.Error($"创建远程目录结构失败：{remoteRootPath}", ex);
+            StatusText = ex.Message;
+            return;
         }
 
         var uploads = Directory.GetFiles(localFolderPath, "*", SearchOption.AllDirectories)
@@ -289,7 +402,7 @@ public class RemoteFileManagerViewModel : ReactiveObject
             .ToList();
 
         _fileTransferViewModel.EnqueueUploads(uploads);
-        StatusText = $"已添加文件夹上传任务，共 {uploads.Count} 个文件。";
+        StatusText = $"已加入文件夹上传任务，共 {uploads.Count} 个文件。";
     }
 
     public async Task DownloadItemAsync(ServerDirectoryItem? item, string localRootDirectory)
@@ -305,12 +418,18 @@ public class RemoteFileManagerViewModel : ReactiveObject
             return;
         }
 
+        if (item.IsDrive)
+        {
+            StatusText = "请先进入磁盘后再选择具体目录或文件下载。";
+            return;
+        }
+
         Directory.CreateDirectory(localRootDirectory);
 
         if (!item.IsDirectory)
         {
             _fileTransferViewModel.EnqueueDownloads((item.FullPath, Path.Combine(localRootDirectory, item.Name)));
-            StatusText = $"已添加文件下载任务：{item.Name}";
+            StatusText = $"已加入下载任务：{item.Name}";
             return;
         }
 
@@ -342,10 +461,25 @@ public class RemoteFileManagerViewModel : ReactiveObject
         }
 
         _fileTransferViewModel.EnqueueDownloads(downloads);
-        StatusText = $"已添加文件夹下载任务，共 {downloads.Count} 个文件。";
+        StatusText = $"已加入文件夹下载任务，共 {downloads.Count} 个文件。";
     }
 
-    private async Task RefreshCurrentDirectoryAsync()
+    public Task RefreshCurrentDirectoryAsync() => NavigateToPathAsync(CurrentServerDirectory);
+
+    public Task GoToCurrentDirectoryAsync() => NavigateToPathAsync(CurrentServerDirectory);
+
+    public async Task EnterParentDirectoryAsync()
+    {
+        var parent = GetParentRemotePath(CurrentServerDirectory);
+        if (PathsEqual(parent, CurrentServerDirectory))
+        {
+            return;
+        }
+
+        await NavigateToPathAsync(parent);
+    }
+
+    public async Task NavigateToPathAsync(string directoryPath, string? selectItemFullPath = null)
     {
         if (!EnsureConnected())
         {
@@ -355,16 +489,30 @@ public class RemoteFileManagerViewModel : ReactiveObject
         IsBusy = true;
         try
         {
+            var normalizedPath = NormalizeDirectoryInput(directoryPath);
             ClearSearchInternal();
-            var items = await BrowseDirectoryAsync(CurrentServerDirectory);
-            _currentDirectoryItems.Clear();
-            _currentDirectoryItems.AddRange(items.OrderByDescending(item => item.IsDirectory).ThenBy(item => item.Name));
-            RefreshVisibleItems();
+
+            var items = await BrowseDirectoryAsync(normalizedPath);
+            ApplyDirectoryItems(normalizedPath, items);
+
+            var matchedNode = await EnsureTreeNodeForPathAsync(normalizedPath, items);
+            if (matchedNode != null)
+            {
+                matchedNode.IsExpanded = true;
+                matchedNode.IsSelected = true;
+                SelectedTreeNode = matchedNode;
+            }
+
+            if (!string.IsNullOrWhiteSpace(selectItemFullPath))
+            {
+                SelectVisibleItem(selectItemFullPath);
+            }
+
             StatusText = $"已打开目录：{CurrentServerDirectory}";
         }
         catch (Exception ex)
         {
-            Logger.Error($"浏览目录失败：{CurrentServerDirectory}", ex);
+            Logger.Error($"打开目录失败：{directoryPath}", ex);
             StatusText = ex.Message;
         }
         finally
@@ -373,39 +521,25 @@ public class RemoteFileManagerViewModel : ReactiveObject
         }
     }
 
-    private Task GoToCurrentDirectoryAsync() => RefreshCurrentDirectoryAsync();
-
-    private async Task EnterParentDirectoryAsync()
-    {
-        var parent = GetParentRemotePath(CurrentServerDirectory);
-        if (string.Equals(parent, CurrentServerDirectory, StringComparison.OrdinalIgnoreCase))
-        {
-            return;
-        }
-
-        CurrentServerDirectory = parent;
-        await RefreshCurrentDirectoryAsync();
-    }
-
     private async Task OpenItemAsync(ServerDirectoryItem item)
     {
         if (item.IsDirectory)
         {
-            CurrentServerDirectory = item.FullPath;
-            await RefreshCurrentDirectoryAsync();
+            await NavigateToPathAsync(item.FullPath);
             return;
         }
 
         if (IsSearchMode)
         {
-            CurrentServerDirectory = GetParentRemotePath(item.FullPath);
-            await RefreshCurrentDirectoryAsync();
-            SelectedServerItem = VisibleItems.FirstOrDefault(entry =>
-                string.Equals(NormalizePath(entry.FullPath), NormalizePath(item.FullPath), StringComparison.OrdinalIgnoreCase));
+            await NavigateToPathAsync(GetParentRemotePath(item.FullPath), item.FullPath);
+            return;
         }
+
+        SelectedServerItem = item;
+        StatusText = $"已选中文件：{item.Name}。可通过右键菜单或工具栏执行下载。";
     }
 
-    private async Task StartSearchAsync()
+    public async Task StartSearchAsync()
     {
         if (!EnsureConnected())
         {
@@ -440,12 +574,12 @@ public class RemoteFileManagerViewModel : ReactiveObject
                 _searchCancellationTokenSource.Token.ThrowIfCancellationRequested();
 
                 var remotePath = queue.Dequeue();
-                if (!visited.Add(NormalizePath(remotePath)))
+                if (!visited.Add(NormalizeComparisonPath(remotePath)))
                 {
                     continue;
                 }
 
-                StatusText = $"正在搜索：已扫描 {visited.Count} 个目录";
+                StatusText = $"正在搜索，已扫描 {visited.Count} 个目录...";
                 var items = await BrowseDirectoryAsync(remotePath, _searchCancellationTokenSource.Token);
                 foreach (var item in items)
                 {
@@ -454,7 +588,7 @@ public class RemoteFileManagerViewModel : ReactiveObject
                         _searchResults.Add(item);
                     }
 
-                    if (SearchRecursive && item.IsDirectory)
+                    if (SearchRecursive && item.IsDirectory && !item.IsDrive)
                     {
                         queue.Enqueue(item.FullPath);
                     }
@@ -520,9 +654,17 @@ public class RemoteFileManagerViewModel : ReactiveObject
 
     private void ShowCreateDirectoryDialog(ServerDirectoryItem? targetItem)
     {
-        _createDirectoryBasePath = targetItem?.IsDirectory == true
+        var targetPath = targetItem?.IsDirectory == true
             ? targetItem.FullPath
             : CurrentServerDirectory;
+
+        if (!CanWriteToPath(targetPath))
+        {
+            StatusText = "请先进入具体磁盘或目录后再创建文件夹。";
+            return;
+        }
+
+        _createDirectoryBasePath = targetPath;
         CreateDialogHint = $"将在 {_createDirectoryBasePath} 中创建目录";
         PendingDirectoryName = "新建文件夹";
         IsCreateDialogOpen = true;
@@ -542,8 +684,8 @@ public class RemoteFileManagerViewModel : ReactiveObject
         {
             var remotePath = CombineRemotePath(_createDirectoryBasePath, directoryName);
             await CreateDirectoryRequestAsync(remotePath);
+            await NavigateToPathAsync(_createDirectoryBasePath);
             StatusText = $"已创建目录：{remotePath}";
-            await RefreshCurrentDirectoryAsync();
         }
         catch (Exception ex)
         {
@@ -566,9 +708,16 @@ public class RemoteFileManagerViewModel : ReactiveObject
             return;
         }
 
+        if (_pendingDeleteItem.IsDrive)
+        {
+            StatusText = "不支持删除磁盘根节点。";
+            _pendingDeleteItem = null;
+            return;
+        }
+
         DeleteDialogMessage = _pendingDeleteItem.IsDirectory
-            ? $"确定删除文件夹“{_pendingDeleteItem.Name}”吗？空文件夹会立即删除。"
-            : $"确定删除文件“{_pendingDeleteItem.Name}”吗？";
+            ? $"确认删除文件夹“{_pendingDeleteItem.Name}”吗？目录必须为空才能删除。"
+            : $"确认删除文件“{_pendingDeleteItem.Name}”吗？";
         IsDeleteDialogOpen = true;
     }
 
@@ -581,22 +730,24 @@ public class RemoteFileManagerViewModel : ReactiveObject
         }
 
         var item = _pendingDeleteItem;
+        _pendingDeleteItem = null;
         IsDeleteDialogOpen = false;
 
         try
         {
             await DeletePathRequestAsync(item.FullPath, item.IsDirectory);
+
+            var refreshPath = item.IsDirectory && PathsEqual(item.FullPath, CurrentServerDirectory)
+                ? GetParentRemotePath(item.FullPath)
+                : CurrentServerDirectory;
+
+            await NavigateToPathAsync(refreshPath);
             StatusText = $"已删除：{item.FullPath}";
-            await RefreshCurrentDirectoryAsync();
         }
         catch (Exception ex)
         {
-            Logger.Error("删除远程文件失败", ex);
+            Logger.Error("删除远程路径失败", ex);
             StatusText = ex.Message;
-        }
-        finally
-        {
-            _pendingDeleteItem = null;
         }
     }
 
@@ -609,7 +760,7 @@ public class RemoteFileManagerViewModel : ReactiveObject
     private async Task<List<ServerDirectoryItem>> BrowseDirectoryAsync(string directoryPath,
         CancellationToken cancellationToken = default)
     {
-        var normalizedRequestPath = string.Equals(directoryPath, "/", StringComparison.OrdinalIgnoreCase)
+        var normalizedRequestPath = PathsEqual(directoryPath, "/")
             ? string.Empty
             : directoryPath;
         var taskId = NetHelper.GetTaskId();
@@ -673,6 +824,143 @@ public class RemoteFileManagerViewModel : ReactiveObject
         }
     }
 
+    private async Task<RemoteTreeNode?> EnsureTreeNodeForPathAsync(string directoryPath,
+        IReadOnlyCollection<ServerDirectoryItem>? currentItems = null)
+    {
+        var normalizedPath = NormalizeDirectoryInput(directoryPath);
+        var rootNode = await EnsureRootNodeLoadedAsync(PathsEqual(normalizedPath, "/") ? currentItems : null);
+        if (rootNode == null)
+        {
+            return null;
+        }
+
+        if (PathsEqual(normalizedPath, "/"))
+        {
+            return rootNode;
+        }
+
+        var currentNode = FindChildByPath(rootNode, GetDriveRootPath(normalizedPath) ?? normalizedPath);
+        if (currentNode == null)
+        {
+            return rootNode;
+        }
+
+        foreach (var segment in GetRelativeSegments(normalizedPath))
+        {
+            if (!currentNode.ChildrenLoaded)
+            {
+                await ExpandTreeNodeAsync(currentNode);
+            }
+
+            var nextNode = currentNode.Children.FirstOrDefault(child =>
+                !child.IsPlaceholder &&
+                string.Equals(child.Name, segment, StringComparison.OrdinalIgnoreCase));
+
+            if (nextNode == null)
+            {
+                return currentNode;
+            }
+
+            currentNode.IsExpanded = true;
+            currentNode = nextNode;
+        }
+
+        if (currentItems != null)
+        {
+            PopulateNodeChildren(currentNode, currentItems);
+        }
+
+        return currentNode;
+    }
+
+    private async Task<RemoteTreeNode?> EnsureRootNodeLoadedAsync(IReadOnlyCollection<ServerDirectoryItem>? rootItems = null)
+    {
+        var rootNode = GetOrCreateRootNode();
+        if (rootNode.ChildrenLoaded)
+        {
+            return rootNode;
+        }
+
+        var items = rootItems?.ToList() ?? await BrowseDirectoryAsync("/");
+        PopulateNodeChildren(rootNode, items);
+        rootNode.IsExpanded = true;
+        return rootNode;
+    }
+
+    private RemoteTreeNode GetOrCreateRootNode()
+    {
+        if (NavigationRoots.Count > 0)
+        {
+            return NavigationRoots[0];
+        }
+
+        var rootNode = new RemoteTreeNode
+        {
+            Name = "此电脑",
+            FullPath = "/",
+            IsDirectory = true,
+            IsVirtual = true,
+            ChildrenLoaded = false,
+            IsExpanded = true
+        };
+
+        NavigationRoots.Add(rootNode);
+        return rootNode;
+    }
+
+    private void ApplyDirectoryItems(string directoryPath, IEnumerable<ServerDirectoryItem> items)
+    {
+        CurrentServerDirectory = NormalizeDirectoryInput(directoryPath);
+        _currentDirectoryItems.Clear();
+        _currentDirectoryItems.AddRange(items
+            .OrderByDescending(item => item.IsDirectory)
+            .ThenBy(item => item.Name, StringComparer.OrdinalIgnoreCase));
+
+        if (PathsEqual(directoryPath, "/"))
+        {
+            _rootDisplaysDriveList = _currentDirectoryItems.Count > 0 && _currentDirectoryItems.All(item => item.IsDrive);
+        }
+
+        SelectedServerItem = null;
+        RefreshVisibleItems();
+    }
+
+    private void PopulateNodeChildren(RemoteTreeNode node, IEnumerable<ServerDirectoryItem> items)
+    {
+        node.Children.Clear();
+        foreach (var child in items.Where(item => item.IsDirectory)
+                     .OrderBy(item => item.Name, StringComparer.OrdinalIgnoreCase))
+        {
+            node.Children.Add(CreateTreeNode(child));
+        }
+
+        node.ChildrenLoaded = true;
+    }
+
+    private static RemoteTreeNode CreateTreeNode(ServerDirectoryItem item)
+    {
+        var node = new RemoteTreeNode
+        {
+            Name = item.Name,
+            FullPath = item.FullPath,
+            IsDirectory = item.IsDirectory,
+            IsDrive = item.IsDrive
+        };
+
+        if (item.IsDirectory)
+        {
+            node.Children.Add(new RemoteTreeNode
+            {
+                Name = "加载中...",
+                FullPath = item.FullPath,
+                IsDirectory = false,
+                IsPlaceholder = true
+            });
+        }
+
+        return node;
+    }
+
     private void RefreshVisibleItems()
     {
         VisibleItems.Clear();
@@ -690,6 +978,12 @@ public class RemoteFileManagerViewModel : ReactiveObject
         this.RaisePropertyChanged(nameof(CanGoNextSearchPage));
     }
 
+    private void SelectVisibleItem(string fullPath)
+    {
+        SelectedServerItem = VisibleItems.FirstOrDefault(item =>
+            PathsEqual(item.FullPath, fullPath));
+    }
+
     private bool EnsureConnected()
     {
         if (_tcpHelper.IsRunning)
@@ -697,19 +991,83 @@ public class RemoteFileManagerViewModel : ReactiveObject
             return true;
         }
 
-        StatusText = "请先在“进程监控”模块连接 TCP 服务端。";
+        StatusText = "请先在顶部连接服务端。";
         return false;
     }
 
-    private string GetTargetDirectoryPath(ServerDirectoryItem? targetDirectory)
+    private bool TryGetWritableTargetDirectory(ServerDirectoryItem? targetDirectory, out string remoteDirectory)
     {
-        if (targetDirectory?.IsDirectory == true)
+        remoteDirectory = targetDirectory?.IsDirectory == true
+            ? targetDirectory.FullPath
+            : CurrentServerDirectory;
+
+        if (!EnsureConnected())
         {
-            return targetDirectory.FullPath;
+            return false;
         }
 
-        return CurrentServerDirectory;
+        if (!CanWriteToPath(remoteDirectory))
+        {
+            StatusText = "请先进入具体磁盘或目录后再执行此操作。";
+            return false;
+        }
+
+        return true;
     }
+
+    private bool CanWriteToPath(string path) => !_rootDisplaysDriveList || !PathsEqual(path, "/");
+
+    private void ResetExplorer(string statusText)
+    {
+        _searchCancellationTokenSource?.Cancel();
+        _searchCancellationTokenSource?.Dispose();
+        _searchCancellationTokenSource = null;
+
+        FailPendingRequests("连接已断开。");
+
+        NavigationRoots.Clear();
+        VisibleItems.Clear();
+        _currentDirectoryItems.Clear();
+        _searchResults.Clear();
+        SelectedTreeNode = null;
+        SelectedServerItem = null;
+        CurrentServerDirectory = "/";
+        SearchKeyword = string.Empty;
+        PendingDirectoryName = "新建文件夹";
+        IsSearchMode = false;
+        IsBusy = false;
+        IsCreateDialogOpen = false;
+        IsDeleteDialogOpen = false;
+        StatusText = statusText;
+    }
+
+    private void FailPendingRequests(string message)
+    {
+        while (_pendingBrowseRequests.TryRemove(_pendingBrowseRequests.Keys.FirstOrDefault(), out var pendingBrowse))
+        {
+            pendingBrowse.CompletionSource.TrySetException(new InvalidOperationException(message));
+        }
+
+        while (_pendingCreateRequests.TryRemove(_pendingCreateRequests.Keys.FirstOrDefault(), out var pendingCreate))
+        {
+            pendingCreate.TrySetException(new InvalidOperationException(message));
+        }
+
+        while (_pendingDeleteRequests.TryRemove(_pendingDeleteRequests.Keys.FirstOrDefault(), out var pendingDelete))
+        {
+            pendingDelete.TrySetException(new InvalidOperationException(message));
+        }
+    }
+
+    private static ServerDirectoryItem ToDirectoryItem(RemoteTreeNode node) => new()
+    {
+        Name = node.Name,
+        FullPath = node.FullPath,
+        IsDirectory = node.IsDirectory,
+        IsDrive = node.IsDrive,
+        Size = 0,
+        LastModifiedTime = DateTime.MinValue
+    };
 
     private static string NormalizeDirectoryInput(string value)
     {
@@ -721,7 +1079,44 @@ public class RemoteFileManagerViewModel : ReactiveObject
         return value.Trim();
     }
 
-    private static string NormalizePath(string path) => path.Replace('\\', '/').TrimEnd('/');
+    private static bool PathsEqual(string left, string right) =>
+        string.Equals(NormalizeComparisonPath(left), NormalizeComparisonPath(right), StringComparison.OrdinalIgnoreCase);
+
+    private static string NormalizeComparisonPath(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path) || path is "/" or "\\")
+        {
+            return "/";
+        }
+
+        return path.Replace('\\', '/').Trim().TrimEnd('/');
+    }
+
+    private static string? GetDriveRootPath(string path)
+    {
+        var normalized = NormalizeDirectoryInput(path).Replace('/', '\\');
+        if (normalized.Length >= 2 && normalized[1] == ':')
+        {
+            return normalized.Length >= 3 ? normalized[..3] : $"{normalized}\\";
+        }
+
+        return null;
+    }
+
+    private static IEnumerable<string> GetRelativeSegments(string path)
+    {
+        var normalized = NormalizeDirectoryInput(path).Replace('/', '\\');
+        if (normalized.Length < 2 || normalized[1] != ':')
+        {
+            return [];
+        }
+
+        var remainder = normalized.Length > 3 ? normalized[3..] : string.Empty;
+        return remainder.Split(['\\', '/'], StringSplitOptions.RemoveEmptyEntries);
+    }
+
+    private static RemoteTreeNode? FindChildByPath(RemoteTreeNode parent, string path) =>
+        parent.Children.FirstOrDefault(child => !child.IsPlaceholder && PathsEqual(child.FullPath, path));
 
     private static string GetParentRemotePath(string currentPath)
     {
@@ -744,10 +1139,10 @@ public class RemoteFileManagerViewModel : ReactiveObject
 
         if (lastSlash == 2 && normalized.Length >= 2 && normalized[1] == ':')
         {
-            return normalized.Substring(0, 3);
+            return normalized[..3];
         }
 
-        return normalized.Substring(0, lastSlash);
+        return normalized[..lastSlash];
     }
 
     private static string CombineRemotePath(string basePath, string childName)
@@ -834,10 +1229,11 @@ public class RemoteFileManagerViewModel : ReactiveObject
                 Name = disk.Name,
                 FullPath = disk.Name,
                 IsDirectory = true,
+                IsDrive = true,
                 Size = disk.TotalSize,
                 LastModifiedTime = DateTime.MinValue
             })
-            .OrderBy(item => item.Name)
+            .OrderBy(item => item.Name, StringComparer.OrdinalIgnoreCase)
             .ToList() ?? [];
 
         pendingRequest.CompletionSource.TrySetResult(items);
@@ -887,6 +1283,7 @@ public class RemoteFileManagerViewModel : ReactiveObject
             Name = entry.Name,
             FullPath = CombineRemotePath(normalizedBasePath, entry.Name),
             IsDirectory = entry.EntryType == FileType.Directory,
+            IsDrive = false,
             Size = entry.Size,
             LastModifiedTime = entry.LastModifiedTime > 0
                 ? new DateTime(entry.LastModifiedTime)

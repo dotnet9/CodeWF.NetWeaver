@@ -1,4 +1,5 @@
 ﻿using CodeWF.Log.Core;
+using CodeWF.NetWrapper.Abstractions;
 using CodeWF.NetWrapper.Commands;
 using CodeWF.NetWrapper.Models;
 using CodeWF.NetWrapper.Requests;
@@ -25,6 +26,11 @@ public partial class TcpSocketServer
     /// 服务端文件管理根目录。设置后，查询/创建/删除/上传/下载都会限制在该目录内。
     /// </summary>
     public string? FileSaveDirectory { get; set; }
+
+    /// <summary>
+    /// 服务端文件系统抽象。默认使用物理文件系统，后续可替换为移动端容器或沙箱实现。
+    /// </summary>
+    public IManagedFileSystem ManagedFileSystem { get; set; } = ManagedFileSystemFactory.CreateDefault();
 
     /// <summary>
     /// 服务端文件传输进度事件。
@@ -118,7 +124,7 @@ public partial class TcpSocketServer
             return;
         }
 
-        if (!Directory.Exists(directoryPath))
+        if (!ManagedFileSystem.DirectoryExists(directoryPath))
         {
             await SendDirectoryNotFoundErrorAsync(client, taskId, requestedDirectoryPath, clientKey);
             return;
@@ -132,29 +138,13 @@ public partial class TcpSocketServer
     /// </summary>
     private async Task SendDiskInfoListAsync(Socket client, int taskId, string clientKey)
     {
-        var drives = DriveInfo.GetDrives().Where(d => d.IsReady).ToList();
-        var diskInfos = new List<DiskInfo>();
-        foreach (var drive in drives)
-        {
-            try
-            {
-                diskInfos.Add(new DiskInfo
-                {
-                    Name = drive.Name,
-                    TotalSize = drive.TotalSize,
-                    FreeSpace = drive.AvailableFreeSpace
-                });
-            }
-            catch { }
-        }
-
         var response = new DriveListResponse
         {
             TaskId = taskId,
-            Disks = diskInfos
+            Disks = ManagedFileSystem.GetDrives().ToList()
         };
         await SendCommandAsync(client, response);
-        Logger.Info($"{ServerMark} 客户端({clientKey})查询磁盘信息完成，共{diskInfos.Count}个磁盘");
+        Logger.Info($"{ServerMark} 客户端({clientKey})查询磁盘信息完成，共{response.Disks?.Count ?? 0}个磁盘");
     }
 
     /// <summary>
@@ -197,12 +187,12 @@ public partial class TcpSocketServer
     {
         try
         {
-            var entries = Directory.GetFileSystemEntries(directoryPath);
+            var entries = ManagedFileSystem.GetFileSystemEntries(directoryPath);
             var directoryEntries = new List<FileSystemEntry>();
 
             foreach (var entry in entries)
             {
-                var fileSystemEntry = CreateFileSystemEntry(entry);
+                var fileSystemEntry = CreateFileSystemEntry(ManagedFileSystem.GetEntry(entry));
                 directoryEntries.Add(fileSystemEntry);
             }
 
@@ -260,13 +250,9 @@ public partial class TcpSocketServer
     /// <summary>
     /// 创建文件系统条目
     /// </summary>
-    private static FileSystemEntry CreateFileSystemEntry(string entryPath)
+    private static FileSystemEntry CreateFileSystemEntry(ManagedFileSystemEntry entry)
     {
-        // FileSystemInfo 是 FileInfo / DirectoryInfo 的公共父类，便于统一读取名称、时间、属性等元数据。
-        FileSystemInfo info = Directory.Exists(entryPath)
-            ? new DirectoryInfo(entryPath)
-            : new FileInfo(entryPath);
-        var attributes = info.Attributes;
+        var attributes = entry.Attributes;
         var entryType = FileType.Unknown;
 
         // HasFlag 用来判断某个枚举位是否存在，适合读取 FileAttributes 这种“按位组合”的标志枚举。
@@ -282,7 +268,7 @@ public partial class TcpSocketServer
                 entryType = FileType.Directory;
             }
         }
-        else if (info.Extension.Equals(".lnk", StringComparison.OrdinalIgnoreCase))
+        else if (string.Equals(entry.Extension, ".lnk", StringComparison.OrdinalIgnoreCase))
         {
             entryType = FileType.Shortcut;
         }
@@ -293,9 +279,9 @@ public partial class TcpSocketServer
 
         return new FileSystemEntry
         {
-            Name = info.Name,
-            Size = info is FileInfo fileInfo && fileInfo.Exists ? fileInfo.Length : 0,
-            LastModifiedTime = info.Exists ? info.LastWriteTime.Ticks : DateTime.Now.Ticks,
+            Name = entry.Name,
+            Size = entry.Size,
+            LastModifiedTime = entry.LastModifiedTime.Ticks,
             EntryType = entryType
         };
     }
@@ -324,7 +310,7 @@ public partial class TcpSocketServer
             return;
         }
 
-        if (Directory.Exists(directoryPath))
+        if (ManagedFileSystem.DirectoryExists(directoryPath))
         {
             var ack = new CreateDirectoryResponse
             {
@@ -340,7 +326,7 @@ public partial class TcpSocketServer
 
         try
         {
-            Directory.CreateDirectory(directoryPath);
+            ManagedFileSystem.CreateDirectory(directoryPath);
             var ack = new CreateDirectoryResponse
             {
                 TaskId = taskId,
@@ -390,7 +376,7 @@ public partial class TcpSocketServer
 
         if (deleteInfo.IsDirectory)
         {
-            if (!Directory.Exists(filePath))
+            if (!ManagedFileSystem.DirectoryExists(filePath))
             {
                 var ack = new DeletePathResponse
                 {
@@ -406,7 +392,7 @@ public partial class TcpSocketServer
 
             try
             {
-                Directory.Delete(filePath, false);
+                ManagedFileSystem.DeleteDirectory(filePath, false);
                 var ack = new DeletePathResponse
                 {
                     TaskId = taskId,
@@ -432,7 +418,7 @@ public partial class TcpSocketServer
         }
         else
         {
-            if (!File.Exists(filePath))
+            if (!ManagedFileSystem.FileExists(filePath))
             {
                 var ack = new DeletePathResponse
                 {
@@ -448,7 +434,7 @@ public partial class TcpSocketServer
 
             try
             {
-                File.Delete(filePath);
+                ManagedFileSystem.DeleteFile(filePath);
                 var ack = new DeletePathResponse
                 {
                     TaskId = taskId,
@@ -502,7 +488,7 @@ public partial class TcpSocketServer
 
         var contextKey = GetTransferKey(clientKey, requestedRemoteFilePath, taskId);
 
-        if (!File.Exists(remoteFilePath))
+        if (!ManagedFileSystem.FileExists(remoteFilePath))
         {
             _uploadContexts[contextKey] = new ServerUploadContext
             {
@@ -528,8 +514,7 @@ public partial class TcpSocketServer
             return;
         }
 
-        var fileInfo = new FileInfo(remoteFilePath);
-        var actualTransferredBytes = fileInfo.Length;
+        var actualTransferredBytes = ManagedFileSystem.GetEntry(remoteFilePath).Size;
 
         if (actualTransferredBytes > alreadyTransferredBytes)
         {
@@ -642,14 +627,18 @@ public partial class TcpSocketServer
         try
         {
             var remoteFilePath = context.ActualFilePath;
-            var directory = Path.GetDirectoryName(remoteFilePath) ?? ".";
-            if (!Directory.Exists(directory))
+            var directory = ManagedFileSystem.GetDirectoryName(remoteFilePath) ?? ".";
+            if (!ManagedFileSystem.DirectoryExists(directory))
             {
-                Directory.CreateDirectory(directory);
+                ManagedFileSystem.CreateDirectory(directory);
             }
 
             // FileMode.OpenOrCreate: 支持首次上传时自动建文件，也支持断点续传时继续写入同一文件。
-            await using var fs = new FileStream(remoteFilePath, FileMode.OpenOrCreate, FileAccess.Write, FileShare.Read);
+            await using var fs = ManagedFileSystem.OpenFile(
+                remoteFilePath,
+                FileMode.OpenOrCreate,
+                FileAccess.Write,
+                FileShare.Read);
             // Position 指定实际写入偏移量，只有这样才能正确覆盖/续传指定区块，而不是无脑 Append。
             fs.Position = chunkData.Offset;
             await fs.WriteAsync(chunkData.Data.AsMemory(0, chunkData.BlockSize));
@@ -726,7 +715,7 @@ public partial class TcpSocketServer
             return;
         }
 
-        if (!File.Exists(remoteFilePath))
+        if (!ManagedFileSystem.FileExists(remoteFilePath))
         {
             Logger.Error($"{ServerMark} 文件不存在：{remoteFilePath}");
             var reject = new FileTransferReject
@@ -741,8 +730,7 @@ public partial class TcpSocketServer
             return;
         }
 
-        var fileInfo = new FileInfo(remoteFilePath);
-        var totalFileSize = fileInfo.Length;
+        var totalFileSize = ManagedFileSystem.GetEntry(remoteFilePath).Size;
 
         if (totalFileSize < alreadyTransferredBytes)
         {
@@ -821,12 +809,12 @@ public partial class TcpSocketServer
             totalFileSize, request.FileName, resolvedFileHash, taskId);
     }
 
-    private static string ComputeFileHash(string filePath)
+    private string ComputeFileHash(string filePath)
     {
         try
         {
             using var sha256 = System.Security.Cryptography.SHA256.Create();
-            using var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+            using var fs = ManagedFileSystem.OpenFile(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
             var hash = sha256.ComputeHash(fs);
             return Convert.ToHexString(hash);
         }
@@ -892,13 +880,13 @@ public partial class TcpSocketServer
             return;
         }
 
-        if (!File.Exists(localFilePath))
+        if (!ManagedFileSystem.FileExists(localFilePath))
         {
             Logger.Error($"{ServerMark} 文件不存在：{localFilePath}");
             return;
         }
 
-        await using var fs = new FileStream(localFilePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+        await using var fs = ManagedFileSystem.OpenFile(localFilePath, FileMode.Open, FileAccess.Read, FileShare.Read);
         fs.Position = alreadyTransferredBytes;
 
         var blockSize = (int)Math.Min(FileTransferBlockSize, fileSize - alreadyTransferredBytes);
@@ -959,10 +947,10 @@ public partial class TcpSocketServer
     /// </summary>
     /// <param name="filePath">文件路径</param>
     /// <returns>十六进制哈希字符串</returns>
-    private static async Task<string> ComputeFileHashAsync(string filePath)
+    private async Task<string> ComputeFileHashAsync(string filePath)
     {
         using var sha256 = System.Security.Cryptography.SHA256.Create();
-        await using var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+        await using var fs = ManagedFileSystem.OpenFile(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
         var hash = await sha256.ComputeHashAsync(fs);
         return Convert.ToHexString(hash);
     }
@@ -976,9 +964,9 @@ public partial class TcpSocketServer
     private long GetExistingTransferBytes(string fileName, string fileHash)
     {
         var progressFile = GetProgressFilePath(fileName, fileHash);
-        if (File.Exists(progressFile))
+        if (ManagedFileSystem.FileExists(progressFile))
         {
-            var content = File.ReadAllText(progressFile);
+            var content = ManagedFileSystem.ReadAllText(progressFile);
             if (long.TryParse(content.Trim(), out var bytes))
             {
                 return bytes;
@@ -997,7 +985,7 @@ public partial class TcpSocketServer
     private void SaveTransferProgress(string fileName, string fileHash, long totalBytes)
     {
         var progressFile = GetProgressFilePath(fileName, fileHash);
-        File.WriteAllText(progressFile, totalBytes.ToString());
+        ManagedFileSystem.WriteAllText(progressFile, totalBytes.ToString());
     }
 
     /// <summary>
@@ -1006,8 +994,10 @@ public partial class TcpSocketServer
     /// <param name="fileName">文件名</param>
     /// <param name="fileHash">文件哈希</param>
     /// <returns>进度文件路径</returns>
-    private static string GetProgressFilePath(string fileName, string fileHash) =>
-        Path.Combine(Path.GetTempPath(), $"file_transfer_server_{fileName}_{fileHash}.progress");
+    private string GetProgressFilePath(string fileName, string fileHash) =>
+        ManagedFileSystem.Combine(
+            ManagedFileSystem.GetTempPath(),
+            $"file_transfer_server_{fileName}_{fileHash}.progress");
 
     private void NotifyServerTransferProgress(string fileName, long transferredBytes, long totalBytes, bool isUpload)
     {
@@ -1064,12 +1054,12 @@ public partial class TcpSocketServer
                 return false;
             }
 
-            resolvedPath = Path.GetFullPath(requestedPath);
+            resolvedPath = ManagedFileSystem.GetFullPath(requestedPath);
             return true;
         }
 
-        var rootPath = Path.GetFullPath(FileSaveDirectory);
-        Directory.CreateDirectory(rootPath);
+        var rootPath = ManagedFileSystem.GetFullPath(FileSaveDirectory);
+        ManagedFileSystem.CreateDirectory(rootPath);
 
         if (treatEmptyAsRoot && (string.IsNullOrWhiteSpace(requestedPath) || requestedPath is "/" or "\\"))
         {
@@ -1084,13 +1074,14 @@ public partial class TcpSocketServer
         }
 
         // Path.IsPathRooted 用来判断是否是绝对路径；若是相对路径，就把它拼到 FileSaveDirectory 下面。
-        var candidatePath = Path.IsPathRooted(requestedPath)
-            ? Path.GetFullPath(requestedPath)
-            : Path.GetFullPath(Path.Combine(rootPath,
+        var candidatePath = ManagedFileSystem.PathIsRooted(requestedPath)
+            ? ManagedFileSystem.GetFullPath(requestedPath)
+            : ManagedFileSystem.GetFullPath(ManagedFileSystem.Combine(
+                rootPath,
                 requestedPath.TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)));
 
-        // StartsWith(rootPath) 是最终的越权保护，确保规范化后的真实路径仍然落在允许根目录下。
-        if (!candidatePath.StartsWith(rootPath, StringComparison.OrdinalIgnoreCase))
+        // 这里要同时判断完整前缀和目录边界，避免 /data/root2 这种路径误判为在 /data/root 下。
+        if (!IsPathWithinRoot(rootPath, candidatePath))
         {
             errorMessage = "路径超出服务端允许访问的根目录";
             return false;
@@ -1098,6 +1089,19 @@ public partial class TcpSocketServer
 
         resolvedPath = candidatePath;
         return true;
+    }
+
+    private static bool IsPathWithinRoot(string rootPath, string candidatePath)
+    {
+        var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+        if (string.Equals(rootPath, candidatePath, comparison))
+        {
+            return true;
+        }
+
+        var normalizedRoot = rootPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var rootWithSeparator = normalizedRoot + Path.DirectorySeparatorChar;
+        return candidatePath.StartsWith(rootWithSeparator, comparison);
     }
 }
 
