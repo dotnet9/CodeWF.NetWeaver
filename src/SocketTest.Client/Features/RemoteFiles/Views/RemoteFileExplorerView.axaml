@@ -1,0 +1,372 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:SocketTest.Client.Features.RemoteFiles.ViewModels"
+             xmlns:models="using:SocketTest.Client.Features.RemoteFiles.Models"
+             mc:Ignorable="d"
+             d:DesignWidth="1360"
+             d:DesignHeight="800"
+             x:Class="SocketTest.Client.Features.RemoteFiles.Views.RemoteFileExplorerView"
+             x:DataType="vm:RemoteFileExplorerViewModel">
+    <UserControl.Styles>
+        <Style Selector="Border.surface">
+            <Setter Property="Background" Value="#FFFFFF" />
+            <Setter Property="CornerRadius" Value="14" />
+            <Setter Property="BorderBrush" Value="#D7DEEA" />
+            <Setter Property="BorderThickness" Value="1" />
+        </Style>
+        <Style Selector="Border.tree-node">
+            <Setter Property="Padding" Value="8,6" />
+            <Setter Property="CornerRadius" Value="8" />
+        </Style>
+        <Style Selector="Border.tile-card">
+            <Setter Property="Padding" Value="14" />
+            <Setter Property="Margin" Value="0,0,12,12" />
+            <Setter Property="Width" Value="220" />
+            <Setter Property="Height" Value="156" />
+            <Setter Property="CornerRadius" Value="16" />
+            <Setter Property="BorderBrush" Value="#D0D5DD" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Background" Value="#FFFFFF" />
+        </Style>
+    </UserControl.Styles>
+
+    <Grid Margin="10" ColumnDefinitions="300,8,*">
+        <Border Classes="surface" Padding="14">
+            <Grid RowDefinitions="Auto,*">
+                <StackPanel Spacing="4">
+                    <TextBlock FontSize="18" FontWeight="SemiBold" Text="远程目录树" />
+                    <TextBlock Foreground="#667085" Text="按磁盘和目录层级快速定位远程资源。" />
+                </StackPanel>
+
+                <Border Grid.Row="1"
+                        Margin="0,12,0,0"
+                        Background="#F8FAFC"
+                        CornerRadius="12"
+                        Padding="8"
+                        BorderBrush="#E2E8F0"
+                        BorderThickness="1">
+                    <TreeView Name="NavigationTree"
+                              ItemsSource="{Binding RootNodes}"
+                              SelectionChanged="NavigationTree_OnSelectionChanged">
+                        <TreeView.ItemTemplate>
+                            <TreeDataTemplate x:DataType="models:RemoteDirectoryNode"
+                                              ItemsSource="{Binding Children}">
+                                <Border Classes="tree-node">
+                                    <Border.ContextMenu>
+                                        <ContextMenu>
+                                            <MenuItem Header="打开"
+                                                      Click="OpenTreeNodeMenuItem_OnClick" />
+                                            <MenuItem Header="新建目录"
+                                                      Click="CreateDirectoryForTreeNodeMenuItem_OnClick" />
+                                            <MenuItem Header="删除"
+                                                      Click="DeleteTreeNodeMenuItem_OnClick" />
+                                            <Separator />
+                                            <MenuItem Header="上传文件到此处"
+                                                      Click="UploadFilesForTreeNodeMenuItem_OnClick" />
+                                            <MenuItem Header="上传文件夹到此处"
+                                                      Click="UploadFolderForTreeNodeMenuItem_OnClick" />
+                                            <MenuItem Header="下载此目录"
+                                                      Click="DownloadTreeNodeMenuItem_OnClick" />
+                                        </ContextMenu>
+                                    </Border.ContextMenu>
+                                    <StackPanel Orientation="Horizontal" Spacing="10">
+                                        <Border Width="34"
+                                                Height="34"
+                                                CornerRadius="10"
+                                                Background="#E8EEF9">
+                                            <TextBlock HorizontalAlignment="Center"
+                                                       VerticalAlignment="Center"
+                                                       FontWeight="Bold"
+                                                       Text="{Binding IconText}" />
+                                        </Border>
+                                        <StackPanel>
+                                            <TextBlock FontWeight="SemiBold"
+                                                       Text="{Binding Name}" />
+                                            <TextBlock Foreground="#667085"
+                                                       FontSize="12"
+                                                       Text="{Binding FullPath}" />
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Border>
+                            </TreeDataTemplate>
+                        </TreeView.ItemTemplate>
+                    </TreeView>
+                </Border>
+            </Grid>
+        </Border>
+
+        <GridSplitter Grid.Column="1"
+                      Width="8"
+                      Background="#E5E7EB"
+                      HorizontalAlignment="Stretch" />
+
+        <Border Grid.Column="2" Classes="surface" Padding="16">
+            <Grid RowDefinitions="Auto,Auto,Auto,*,Auto">
+                <Grid ColumnDefinitions="*,12,*">
+                    <TextBox Name="CurrentDirectoryTextBox"
+                             Grid.Column="0"
+                             Text="{Binding CurrentDirectoryPath, Mode=TwoWay}"
+                             Watermark="输入远程目录路径后按回车"
+                             KeyDown="CurrentDirectoryTextBox_OnKeyDown" />
+                    <TextBox Name="SearchTextBox"
+                             Grid.Column="2"
+                             Text="{Binding SearchKeyword, Mode=TwoWay}"
+                             Watermark="搜索当前目录，按回车执行"
+                             KeyDown="SearchTextBox_OnKeyDown" />
+                </Grid>
+
+                <Grid Grid.Row="1"
+                      Margin="0,14,0,14"
+                      ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,*,Auto,Auto">
+                    <Button Command="{Binding RefreshDirectoryCommand}" Content="刷新" />
+                    <Button Grid.Column="1"
+                            Margin="8,0,0,0"
+                            Command="{Binding EnterParentDirectoryCommand}"
+                            Content="上一级" />
+                    <Button Grid.Column="2"
+                            Margin="8,0,0,0"
+                            Click="CreateDirectoryButton_OnClick"
+                            Content="新建目录" />
+                    <Button Grid.Column="3"
+                            Margin="8,0,0,0"
+                            Click="UploadFilesButton_OnClick"
+                            Content="上传文件" />
+                    <Button Grid.Column="4"
+                            Margin="8,0,0,0"
+                            Click="UploadFolderButton_OnClick"
+                            Content="上传文件夹" />
+                    <Button Grid.Column="5"
+                            Margin="8,0,0,0"
+                            Click="DownloadSelectionButton_OnClick"
+                            Content="下载选中" />
+                    <Button Grid.Column="6"
+                            Margin="8,0,0,0"
+                            Click="DeleteButton_OnClick"
+                            Content="删除选中" />
+                    <CheckBox Grid.Column="8"
+                              VerticalAlignment="Center"
+                              IsChecked="{Binding SearchRecursive, Mode=TwoWay}"
+                              Content="递归搜索" />
+                    <StackPanel Grid.Column="9"
+                                Orientation="Horizontal"
+                                Spacing="8">
+                        <Button Command="{Binding SwitchToListViewCommand}" Content="列表" />
+                        <Button Command="{Binding SwitchToTileViewCommand}" Content="方块" />
+                    </StackPanel>
+                </Grid>
+
+                <StackPanel Grid.Row="2" Margin="0,0,0,12" Spacing="4">
+                    <TextBlock FontSize="16" FontWeight="SemiBold" Text="{Binding ExplorerSummary}" />
+                    <TextBlock Foreground="#667085" Text="{Binding CurrentDirectoryPath}" />
+                </StackPanel>
+
+                <Border Grid.Row="3"
+                        Background="#F8FAFC"
+                        CornerRadius="12"
+                        BorderBrush="#E2E8F0"
+                        BorderThickness="1"
+                        Padding="10">
+                    <Border.ContextMenu>
+                        <ContextMenu>
+                            <MenuItem Header="刷新当前目录"
+                                      Command="{Binding RefreshDirectoryCommand}" />
+                            <MenuItem Header="新建目录"
+                                      Click="CreateDirectoryButton_OnClick" />
+                            <MenuItem Header="上传文件"
+                                      Click="UploadFilesButton_OnClick" />
+                            <MenuItem Header="上传文件夹"
+                                      Click="UploadFolderButton_OnClick" />
+                        </ContextMenu>
+                    </Border.ContextMenu>
+
+                    <Grid>
+                        <DataGrid IsVisible="{Binding IsListView}"
+                                  CanUserReorderColumns="True"
+                                  CanUserResizeColumns="True"
+                                  CanUserSortColumns="True"
+                                  GridLinesVisibility="Horizontal"
+                                  HeadersVisibility="Column"
+                                  IsReadOnly="True"
+                                  BorderThickness="0"
+                                  ItemsSource="{Binding VisibleEntries}"
+                                  SelectedItem="{Binding SelectedEntry, Mode=TwoWay}">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Width="84" Binding="{Binding IconText}" Header="图标" />
+                                <DataGridTemplateColumn Width="280" Header="名称">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate x:DataType="models:RemoteFileEntry">
+                                            <Button Background="Transparent"
+                                                    BorderThickness="0"
+                                                    Padding="0"
+                                                    HorizontalAlignment="Stretch"
+                                                    HorizontalContentAlignment="Left"
+                                                    Command="{Binding $parent[UserControl].((vm:RemoteFileExplorerViewModel)DataContext).OpenEntryCommand}"
+                                                    CommandParameter="{Binding}">
+                                                <Button.ContextMenu>
+                                                    <ContextMenu>
+                                                        <MenuItem Header="打开"
+                                                                  Click="OpenEntryMenuItem_OnClick" />
+                                                        <MenuItem Header="新建目录"
+                                                                  Click="CreateDirectoryForEntryMenuItem_OnClick" />
+                                                        <MenuItem Header="删除"
+                                                                  Click="DeleteEntryMenuItem_OnClick" />
+                                                        <Separator />
+                                                        <MenuItem Header="上传文件到此处"
+                                                                  Click="UploadFilesForEntryMenuItem_OnClick" />
+                                                        <MenuItem Header="上传文件夹到此处"
+                                                                  Click="UploadFolderForEntryMenuItem_OnClick" />
+                                                        <MenuItem Header="下载此项"
+                                                                  Click="DownloadEntryMenuItem_OnClick" />
+                                                    </ContextMenu>
+                                                </Button.ContextMenu>
+                                                <StackPanel Orientation="Horizontal" Spacing="10">
+                                                    <Border Width="36"
+                                                            Height="36"
+                                                            CornerRadius="10"
+                                                            Background="#E8EEF9">
+                                                        <TextBlock HorizontalAlignment="Center"
+                                                                   VerticalAlignment="Center"
+                                                                   FontWeight="Bold"
+                                                                   Text="{Binding IconText}" />
+                                                    </Border>
+                                                    <StackPanel>
+                                                        <TextBlock FontWeight="SemiBold"
+                                                                   Text="{Binding Name}" />
+                                                        <TextBlock Foreground="#667085"
+                                                                   Text="{Binding FullPath}" />
+                                                    </StackPanel>
+                                                </StackPanel>
+                                            </Button>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                                <DataGridTextColumn Width="110" Binding="{Binding EntryTypeText}" Header="类型" />
+                                <DataGridTextColumn Width="140" Binding="{Binding SizeText}" Header="大小" />
+                                <DataGridTextColumn Width="180" Binding="{Binding LastModifiedText}" Header="修改时间" />
+                                <DataGridTextColumn Width="360" Binding="{Binding FullPath}" Header="完整路径" />
+                            </DataGrid.Columns>
+                        </DataGrid>
+
+                        <ScrollViewer IsVisible="{Binding IsTileView}"
+                                      HorizontalScrollBarVisibility="Disabled">
+                            <ItemsControl ItemsSource="{Binding VisibleEntries}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <WrapPanel />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="models:RemoteFileEntry">
+                                        <Border Classes="tile-card">
+                                            <Border.ContextMenu>
+                                                <ContextMenu>
+                                                    <MenuItem Header="打开"
+                                                              Click="OpenEntryMenuItem_OnClick" />
+                                                    <MenuItem Header="新建目录"
+                                                              Click="CreateDirectoryForEntryMenuItem_OnClick" />
+                                                    <MenuItem Header="删除"
+                                                              Click="DeleteEntryMenuItem_OnClick" />
+                                                    <Separator />
+                                                    <MenuItem Header="上传文件到此处"
+                                                              Click="UploadFilesForEntryMenuItem_OnClick" />
+                                                    <MenuItem Header="上传文件夹到此处"
+                                                              Click="UploadFolderForEntryMenuItem_OnClick" />
+                                                    <MenuItem Header="下载此项"
+                                                              Click="DownloadEntryMenuItem_OnClick" />
+                                                </ContextMenu>
+                                            </Border.ContextMenu>
+                                            <Button Background="Transparent"
+                                                    BorderThickness="0"
+                                                    Padding="0"
+                                                    HorizontalAlignment="Stretch"
+                                                    VerticalAlignment="Stretch"
+                                                    Command="{Binding $parent[UserControl].((vm:RemoteFileExplorerViewModel)DataContext).OpenEntryCommand}"
+                                                    CommandParameter="{Binding}">
+                                                <StackPanel Spacing="10">
+                                                    <Border Width="56"
+                                                            Height="56"
+                                                            CornerRadius="14"
+                                                            Background="#E8EEF9">
+                                                        <TextBlock HorizontalAlignment="Center"
+                                                                   VerticalAlignment="Center"
+                                                                   FontSize="14"
+                                                                   FontWeight="Bold"
+                                                                   Text="{Binding IconText}" />
+                                                    </Border>
+                                                    <TextBlock FontWeight="SemiBold"
+                                                               TextWrapping="Wrap"
+                                                               MaxHeight="40"
+                                                               Text="{Binding Name}" />
+                                                    <TextBlock Foreground="#667085" Text="{Binding EntryTypeText}" />
+                                                    <TextBlock Foreground="#667085" Text="{Binding SizeText}" />
+                                                    <TextBlock Foreground="#667085"
+                                                               TextWrapping="Wrap"
+                                                               MaxHeight="36"
+                                                               Text="{Binding FullPath}" />
+                                                </StackPanel>
+                                            </Button>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                    </Grid>
+                </Border>
+
+                <Border Grid.Row="4"
+                        IsVisible="{Binding IsSearchMode}"
+                        Padding="12,10"
+                        Background="#101828"
+                        CornerRadius="12"
+                        Margin="0,12,0,0">
+                    <Grid ColumnDefinitions="*,Auto,Auto">
+                        <TextBlock Foreground="White" Text="{Binding ExplorerSummary}" />
+                        <Button Grid.Column="1"
+                                Margin="10,0,0,0"
+                                Command="{Binding PreviousSearchPageCommand}"
+                                IsEnabled="{Binding CanGoPreviousSearchPage}"
+                                Content="上一页" />
+                        <Button Grid.Column="2"
+                                Margin="8,0,0,0"
+                                Command="{Binding NextSearchPageCommand}"
+                                IsEnabled="{Binding CanGoNextSearchPage}"
+                                Content="下一页" />
+                    </Grid>
+                </Border>
+            </Grid>
+        </Border>
+
+        <Border IsVisible="{Binding IsCreateDialogOpen}" Background="#66000000" ZIndex="20">
+            <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
+                <Border Width="420" Classes="surface" Padding="20">
+                    <StackPanel Spacing="14">
+                        <TextBlock FontSize="18" FontWeight="SemiBold" Text="创建目录" />
+                        <TextBlock Foreground="#667085" Text="{Binding CreateDialogHint}" />
+                        <TextBox Text="{Binding PendingDirectoryName, Mode=TwoWay}" Watermark="请输入目录名称" />
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+                            <Button Command="{Binding ConfirmCreateDirectoryCommand}" Content="确认创建" />
+                            <Button Grid.Column="1" Command="{Binding CancelCreateDirectoryCommand}" Content="取消" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </Border>
+
+        <Border IsVisible="{Binding IsDeleteDialogOpen}" Background="#66000000" ZIndex="20">
+            <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
+                <Border Width="420" Classes="surface" Padding="20">
+                    <StackPanel Spacing="14">
+                        <TextBlock FontSize="18" FontWeight="SemiBold" Text="确认删除" />
+                        <TextBlock TextWrapping="Wrap" Text="{Binding DeleteDialogMessage}" />
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+                            <Button Command="{Binding ConfirmDeleteCommand}" Content="确认删除" />
+                            <Button Grid.Column="1" Command="{Binding CancelDeleteCommand}" Content="取消" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>
