@@ -1,20 +1,13 @@
+using System;
 using CodeWF.NetWeaver.Base;
 
 namespace CodeWF.NetWrapper.Models;
 
 /// <summary>
-/// 查询目录请求 DTO
+/// 兼容旧版“查询文件系统”请求名称，请改用 <see cref="CodeWF.NetWrapper.Requests.BrowseFileSystemRequest"/>。
 /// </summary>
-[NetHead(SocketConstants.QueryFileStartObjectId, 1)]
-public class QueryFileStart : INetObject
+[Obsolete("Use BrowseFileSystemRequest instead.")]
+[NetHead(SocketConstants.BrowseFileSystemRequestObjectId, 1)]
+public class QueryFileStart : CodeWF.NetWrapper.Requests.BrowseFileSystemRequest
 {
-    /// <summary>
-    /// 获取或设置任务 ID
-    /// </summary>
-    public int TaskId { get; set; }
-
-    /// <summary>
-    /// 服务端目录路径
-    /// </summary>
-    public string DirectoryPath { get; set; } = string.Empty;
 }

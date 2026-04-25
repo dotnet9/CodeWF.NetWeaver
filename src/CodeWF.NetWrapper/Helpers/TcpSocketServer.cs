@@ -307,9 +307,9 @@ public partial class TcpSocketServer
                     command.IsCommand<FileDownloadStart>() ||
                     command.IsCommand<FileBlockData>() ||
                     command.IsCommand<FileBlockAck>() ||
-                    command.IsCommand<QueryFileStart>() ||
-                    command.IsCommand<CreateDirectoryStart>() ||
-                    command.IsCommand<DeleteFileStart>())
+                    command.IsCommand<BrowseFileSystemRequest>() ||
+                    command.IsCommand<CreateDirectoryRequest>() ||
+                    command.IsCommand<DeletePathRequest>())
                 {
                     await _fileTransferRequests.Writer.WriteAsync((clientKey, command));
                 }

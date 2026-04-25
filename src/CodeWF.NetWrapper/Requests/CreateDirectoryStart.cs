@@ -1,11 +1,13 @@
+using System;
 using CodeWF.NetWeaver.Base;
 
 namespace CodeWF.NetWrapper.Requests;
 
-[NetHead(SocketConstants.CreateDirectoryStartObjectId, 1)]
-public class CreateDirectoryStart : INetObject
+/// <summary>
+/// 兼容旧版“创建目录”请求名称，请改用 <see cref="CreateDirectoryRequest"/>。
+/// </summary>
+[Obsolete("Use CreateDirectoryRequest instead.")]
+[NetHead(SocketConstants.CreateDirectoryRequestObjectId, 1)]
+public class CreateDirectoryStart : CreateDirectoryRequest
 {
-    public int TaskId { get; set; }
-
-    public string DirectoryPath { get; set; } = string.Empty;
 }

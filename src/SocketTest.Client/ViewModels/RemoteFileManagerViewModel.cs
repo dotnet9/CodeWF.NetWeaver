@@ -66,10 +66,7 @@ public class RemoteFileManagerViewModel : ReactiveObject
         }
 
         ServerDirectoryItems.Clear();
-        _ = TcpHelper.SendCommandAsync(new QueryFileStart
-        {
-            DirectoryPath = CurrentServerDirectory
-        });
+        _ = TcpHelper.BrowseFileSystemAsync(CurrentServerDirectory);
         Logger.Info($"请求刷新目录：{CurrentServerDirectory}");
     }
 
@@ -96,10 +93,7 @@ public class RemoteFileManagerViewModel : ReactiveObject
 
         var newDirName = "新建目录";
         var newDirPath = CurrentServerDirectory.TrimEnd('/') + "/" + newDirName;
-        _ = TcpHelper.SendCommandAsync(new CreateDirectoryStart
-        {
-            DirectoryPath = newDirPath
-        });
+        _ = TcpHelper.CreateDirectoryAsync(newDirPath);
         Logger.Info($"请求创建目录：{newDirPath}");
         HandleRefreshServerDirectory();
     }
@@ -118,11 +112,7 @@ public class RemoteFileManagerViewModel : ReactiveObject
             return;
         }
 
-        _ = TcpHelper.SendCommandAsync(new DeleteFileStart
-        {
-            FilePath = SelectedServerItem.FullPath,
-            IsDirectory = SelectedServerItem.IsDirectory
-        });
+        _ = TcpHelper.DeletePathAsync(SelectedServerItem.FullPath, SelectedServerItem.IsDirectory);
         Logger.Info($"请求删除：{SelectedServerItem.FullPath}");
         HandleRefreshServerDirectory();
     }
@@ -141,25 +131,25 @@ public class RemoteFileManagerViewModel : ReactiveObject
 
     public void ReceivedSocketCommand(SocketCommand message)
     {
-        if (message.IsCommand<DirectoryEntryResponse>())
+        if (message.IsCommand<BrowseFileSystemResponse>())
         {
-            ReceivedSocketMessage(message.GetCommand<DirectoryEntryResponse>());
+            ReceivedSocketMessage(message.GetCommand<BrowseFileSystemResponse>());
         }
-        else if (message.IsCommand<DiskInfoListResponse>())
+        else if (message.IsCommand<DriveListResponse>())
         {
-            ReceivedSocketMessage(message.GetCommand<DiskInfoListResponse>());
+            ReceivedSocketMessage(message.GetCommand<DriveListResponse>());
         }
-        else if (message.IsCommand<CreateDirectoryStartAck>())
+        else if (message.IsCommand<CreateDirectoryResponse>())
         {
-            ReceivedSocketMessage(message.GetCommand<CreateDirectoryStartAck>());
+            ReceivedSocketMessage(message.GetCommand<CreateDirectoryResponse>());
         }
-        else if (message.IsCommand<DeleteFileStartAck>())
+        else if (message.IsCommand<DeletePathResponse>())
         {
-            ReceivedSocketMessage(message.GetCommand<DeleteFileStartAck>());
+            ReceivedSocketMessage(message.GetCommand<DeletePathResponse>());
         }
     }
 
-    private void ReceivedSocketMessage(DirectoryEntryResponse response)
+    private void ReceivedSocketMessage(BrowseFileSystemResponse response)
     {
         if (response.Entries == null || response.Entries.Count == 0)
         {
@@ -180,7 +170,7 @@ public class RemoteFileManagerViewModel : ReactiveObject
         }
     }
 
-    private void ReceivedSocketMessage(DiskInfoListResponse response)
+    private void ReceivedSocketMessage(DriveListResponse response)
     {
         if (response.Disks == null || response.Disks.Count == 0)
         {
@@ -201,7 +191,7 @@ public class RemoteFileManagerViewModel : ReactiveObject
         }
     }
 
-    private void ReceivedSocketMessage(CreateDirectoryStartAck response)
+    private void ReceivedSocketMessage(CreateDirectoryResponse response)
     {
         if (response.Success)
         {
@@ -213,7 +203,7 @@ public class RemoteFileManagerViewModel : ReactiveObject
         }
     }
 
-    private void ReceivedSocketMessage(DeleteFileStartAck response)
+    private void ReceivedSocketMessage(DeletePathResponse response)
     {
         if (response.Success)
         {

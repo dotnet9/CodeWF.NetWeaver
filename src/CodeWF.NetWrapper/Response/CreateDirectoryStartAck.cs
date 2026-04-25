@@ -1,15 +1,13 @@
+using System;
 using CodeWF.NetWeaver.Base;
 
 namespace CodeWF.NetWrapper.Response;
 
-[NetHead(SocketConstants.CreateDirectoryStartAckObjectId, 1)]
-public class CreateDirectoryStartAck : INetObject
+/// <summary>
+/// 兼容旧版“创建目录响应”名称，请改用 <see cref="CreateDirectoryResponse"/>。
+/// </summary>
+[Obsolete("Use CreateDirectoryResponse instead.")]
+[NetHead(SocketConstants.CreateDirectoryResponseObjectId, 1)]
+public class CreateDirectoryStartAck : CreateDirectoryResponse
 {
-    public int TaskId { get; set; }
-
-    public bool Success { get; set; }
-
-    public string DirectoryPath { get; set; } = string.Empty;
-
-    public string Message { get; set; } = string.Empty;
 }

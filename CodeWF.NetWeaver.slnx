@@ -11,6 +11,7 @@
   <Folder Name="/test/">
     <Project Path="src/CodeWF.NetWeaver.AOTTest/CodeWF.NetWeaver.AOTTest.csproj">
     </Project>
+    <Project Path="src/CodeWF.NetWrapper.Tests/CodeWF.NetWrapper.Tests.csproj" />
     <Project Path="src/CodeWF.NetWeaver.Tests/CodeWF.NetWeaver.Tests.csproj">
     </Project>
     <Project Path="src/SocketDto.Test/SocketDto.Test.csproj" />

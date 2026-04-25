@@ -1,12 +1,13 @@
+using System;
 using CodeWF.NetWeaver.Base;
-using System.Collections.Generic;
 
 namespace CodeWF.NetWrapper.Response;
 
-[NetHead(SocketConstants.DiskInfoListResponseObjectId, 1)]
-public class DiskInfoListResponse : INetObject
+/// <summary>
+/// 兼容旧版“磁盘列表响应”名称，请改用 <see cref="DriveListResponse"/>。
+/// </summary>
+[Obsolete("Use DriveListResponse instead.")]
+[NetHead(SocketConstants.DriveListResponseObjectId, 1)]
+public class DiskInfoListResponse : DriveListResponse
 {
-    public int TaskId { get; set; }
-
-    public List<DiskInfo>? Disks { get; set; }
 }

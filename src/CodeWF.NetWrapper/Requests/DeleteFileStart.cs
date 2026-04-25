@@ -1,13 +1,13 @@
+using System;
 using CodeWF.NetWeaver.Base;
 
 namespace CodeWF.NetWrapper.Requests;
 
-[NetHead(SocketConstants.DeleteFileStartObjectId, 1)]
-public class DeleteFileStart : INetObject
+/// <summary>
+/// 兼容旧版“删除路径”请求名称，请改用 <see cref="DeletePathRequest"/>。
+/// </summary>
+[Obsolete("Use DeletePathRequest instead.")]
+[NetHead(SocketConstants.DeletePathRequestObjectId, 1)]
+public class DeleteFileStart : DeletePathRequest
 {
-    public int TaskId { get; set; }
-
-    public string FilePath { get; set; } = string.Empty;
-
-    public bool IsDirectory { get; set; }
 }

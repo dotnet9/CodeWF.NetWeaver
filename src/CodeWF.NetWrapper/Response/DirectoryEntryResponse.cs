@@ -1,5 +1,5 @@
+using System;
 using CodeWF.NetWeaver.Base;
-using System.Collections.Generic;
 using System.ComponentModel;
 
 namespace CodeWF.NetWrapper.Response;
@@ -25,20 +25,13 @@ public enum FileType
     ReparsePoint = 5
 }
 
-[NetHead(SocketConstants.DirectoryEntryResponseObjectId, 1)]
-public class DirectoryEntryResponse : INetObject
+/// <summary>
+/// 兼容旧版“浏览文件系统响应”名称，请改用 <see cref="BrowseFileSystemResponse"/>。
+/// </summary>
+[Obsolete("Use BrowseFileSystemResponse instead.")]
+[NetHead(SocketConstants.BrowseFileSystemResponseObjectId, 1)]
+public class DirectoryEntryResponse : BrowseFileSystemResponse
 {
-    public int TaskId { get; set; }
-
-    public int TotalCount { get; set; }
-
-    public int PageSize { get; set; }
-
-    public int PageCount { get; set; }
-
-    public int PageIndex { get; set; }
-
-    public List<FileSystemEntry>? Entries { get; set; }
 }
 
 public class FileSystemEntry

@@ -1,15 +1,13 @@
+using System;
 using CodeWF.NetWeaver.Base;
 
 namespace CodeWF.NetWrapper.Response;
 
-[NetHead(SocketConstants.DeleteFileStartAckObjectId, 1)]
-public class DeleteFileStartAck : INetObject
+/// <summary>
+/// 兼容旧版“删除路径响应”名称，请改用 <see cref="DeletePathResponse"/>。
+/// </summary>
+[Obsolete("Use DeletePathResponse instead.")]
+[NetHead(SocketConstants.DeletePathResponseObjectId, 1)]
+public class DeleteFileStartAck : DeletePathResponse
 {
-    public int TaskId { get; set; }
-
-    public bool Success { get; set; }
-
-    public string FilePath { get; set; } = string.Empty;
-
-    public string Message { get; set; } = string.Empty;
 }
