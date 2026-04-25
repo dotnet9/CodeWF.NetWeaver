@@ -68,7 +68,7 @@ public class MainWindowViewModel : ReactiveObject
     public ObservableCollection<KeyValuePair<string, Socket>> ConnectedClients { get; } = new();
     public KeyValuePair<string, Socket>? SelectedClient { get; set; }
 
-    public string? TcpIp
+    public string TcpIp
     {
         get;
         set => this.RaiseAndSetIfChanged(ref field, value);
@@ -80,7 +80,7 @@ public class MainWindowViewModel : ReactiveObject
         set => this.RaiseAndSetIfChanged(ref field, value);
     } = 5000;
 
-    public string? UdpIp
+    public string UdpIp
     {
         get;
         set => this.RaiseAndSetIfChanged(ref field, value);
@@ -133,6 +133,14 @@ public class MainWindowViewModel : ReactiveObject
 
     public async Task HandleRunCommandCommandAsync()
     {
+        var tcpIp = TcpIp;
+        var udpIp = UdpIp;
+        if (string.IsNullOrWhiteSpace(tcpIp) || string.IsNullOrWhiteSpace(udpIp))
+        {
+            await Log("TCP/UDP 地址不能为空", LogType.Error);
+            return;
+        }
+
         if (!TcpHelper.IsRunning)
         {
             await TcpHelper.StartAsync("TCP服务端", TcpIp, TcpPort);
@@ -338,7 +346,7 @@ public class MainWindowViewModel : ReactiveObject
             Logger.Info($"收到正确对象测试：{request.HeadInfo}");
             await TcpHelper.SendCommandAsync(client, CommonSocketResponse.Success(command.TaskId));
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             Logger.Error($"收到错误对象测试：{request.HeadInfo}");
             await TcpHelper.SendCommandAsync(client, CommonSocketResponse.Fail(default, $"{request.HeadInfo}"));
@@ -354,7 +362,7 @@ public class MainWindowViewModel : ReactiveObject
                 $"命令版本异常：命令ID: {request.HeadInfo.ObjectId}，服务端版本{currentNetHead.Version}，客户端版本{request.HeadInfo.ObjectVersion}，服务端不能正常解析";
             await TcpHelper.SendCommandAsync(client, CommonSocketResponse.Fail(default, errorMessage));
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             Logger.Error($"收到错误对象测试：{request.HeadInfo}");
             await TcpHelper.SendCommandAsync(client, CommonSocketResponse.Fail(default, $"{request.HeadInfo}"));

@@ -33,10 +33,9 @@ public class NetHeadInfo
     /// <summary>
     /// 返回网络头信息的字符串表示
     /// </summary>
-    /// <returns>网络头信息的字符串表示</returns>
     public override string ToString()
     {
         return
-            $"{nameof(BufferLen)}: {BufferLen}, {nameof(SystemId)}: {SystemId}，{nameof(ObjectId)}: {ObjectId}，{nameof(ObjectVersion)}: {ObjectVersion}";
+            $"{nameof(BufferLen)}: {BufferLen}, {nameof(SystemId)}: {SystemId}, {nameof(ObjectId)}: {ObjectId}, {nameof(ObjectVersion)}: {ObjectVersion}";
     }
 }

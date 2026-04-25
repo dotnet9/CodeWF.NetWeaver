@@ -1,10 +1,8 @@
+using CodeWF.NetWeaver.Base;
 using System;
 using System.Collections;
-using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Reflection;
-using CodeWF.NetWeaver.Base;
 
 namespace CodeWF.NetWeaver;
 
@@ -51,8 +49,7 @@ public partial class SerializeHelper
     {
         using var stream = new MemoryStream(buffer, readIndex, buffer.Length - readIndex);
         using var reader = new BinaryReader(stream);
-        var data = DeserializeValue(reader, type);
-        return data;
+        return DeserializeValue(reader, type);
     }
 
     /// <summary>
@@ -62,19 +59,13 @@ public partial class SerializeHelper
     /// <returns>创建的实例</returns>
     public static object CreateInstance(Type type)
     {
-        var itemTypes = type.GetGenericArguments();
-        if (typeof(IList).IsAssignableFrom(type))
+        // 这里复用前面统一的集合识别逻辑，避免在多个地方重复判断 List/Dictionary/接口集合。
+        if (!TryGetCollectionMetadata(type, out var itemTypes, out var isDictionary))
         {
-            var lstType = typeof(List<>);
-            var genericType = lstType.MakeGenericType(itemTypes.First());
-            return Activator.CreateInstance(genericType)!;
+            throw new InvalidOperationException($"Type {type.FullName} is not a supported collection type.");
         }
-        else
-        {
-            var dictType = typeof(Dictionary<,>);
-            var genericType = dictType.MakeGenericType(itemTypes.First(), itemTypes[1]);
-            return Activator.CreateInstance(genericType)!;
-        }
+
+        return CreateCollectionInstance(type, itemTypes, isDictionary);
     }
 
     /// <summary>
@@ -85,6 +76,8 @@ public partial class SerializeHelper
     /// <param name="data">要反序列化的对象</param>
     private static void DeserializeProperties<T>(BinaryReader reader, T data)
     {
+        if (data == null) throw new ArgumentNullException(nameof(data));
+
         var properties = GetProperties(data.GetType());
         foreach (var property in properties)
         {
@@ -113,11 +106,12 @@ public partial class SerializeHelper
     {
         object? value;
 
-        if (propertyType.IsPrimitive || propertyType == typeof(string) || propertyType.IsEnum)
+        // IsArray 用来判断是否为数组类型，例如 int[]、string[]。
+        if (IsScalarType(propertyType))
             value = DeserializeBaseValue(reader, propertyType);
         else if (propertyType.IsArray)
             value = DeserializeArrayValue(reader, propertyType);
-        else if (ComplexTypeNames.Contains(propertyType.Name))
+        else if (TryGetCollectionMetadata(propertyType, out _, out _))
             value = DeserializeComplexValue(reader, propertyType);
         else
             value = DeserializeObject(reader, propertyType);
@@ -136,10 +130,14 @@ public partial class SerializeHelper
     {
         if (propertyType.IsEnum)
         {
+            // Enum.ToObject 会把底层整数值重新包装成指定的枚举类型，
+            // 例如把 2 还原成 SampleEnum.SecondValue。
             return Enum.ToObject(propertyType, reader.ReadInt32());
         }
 
         if (propertyType == typeof(byte)) return reader.ReadByte();
+        if (propertyType == typeof(char)) return reader.ReadChar();
+        if (propertyType == typeof(sbyte)) return reader.ReadSByte();
 
         if (propertyType == typeof(short)) return reader.ReadInt16();
 
@@ -150,6 +148,8 @@ public partial class SerializeHelper
         if (propertyType == typeof(uint)) return reader.ReadUInt32();
 
         if (propertyType == typeof(long)) return reader.ReadInt64();
+
+        if (propertyType == typeof(ulong)) return reader.ReadUInt64();
 
         if (propertyType == typeof(float)) return reader.ReadSingle();
 
@@ -173,6 +173,8 @@ public partial class SerializeHelper
     private static object DeserializeComplexValue(BinaryReader reader, Type propertyType)
     {
         var count = reader.ReadInt32();
+        // GetGenericArguments() 用来取出泛型参数。
+        // 例如 List<int> 得到 [int]，Dictionary<string, double> 得到 [string, double]。
         var genericArguments = propertyType.GetGenericArguments();
         var complexObj = CreateInstance(propertyType);
 
@@ -182,11 +184,17 @@ public partial class SerializeHelper
             switch (genericArguments.Length)
             {
                 case 1:
+                    // 反序列化列表时，这里的 key 实际上就是列表项本身。
                     (complexObj as IList)?.Add(key);
                     break;
                 case 2:
                 {
                     var value = DeserializeValue(reader, genericArguments[1]);
+                    if (key == null)
+                    {
+                        throw new InvalidDataException($"Dictionary key for {propertyType.FullName} cannot be null.");
+                    }
+
                     (complexObj as IDictionary)?[key] = value;
                     break;
                 }
@@ -205,6 +213,7 @@ public partial class SerializeHelper
     private static object? DeserializeArrayValue(BinaryReader reader, Type propertyType)
     {
         var length = reader.ReadInt32();
+        // GetElementType() 返回数组元素类型，例如 int[] 返回 int。
         var elementType = propertyType.GetElementType();
         if (elementType == null) return null;
         var array = Array.CreateInstance(elementType, length);
@@ -226,7 +235,10 @@ public partial class SerializeHelper
     /// <returns>反序列化后的对象</returns>
     private static object? DeserializeObject(BinaryReader reader, Type type)
     {
-        var data = Activator.CreateInstance(type);
+        // Activator.CreateInstance(type) 会按运行时类型动态创建实例，
+        // 适合这里这种“编译期不知道具体 DTO 类型”的反射场景。
+        var data = Activator.CreateInstance(type)
+                   ?? throw new InvalidOperationException($"Cannot create instance of {type.FullName}.");
         DeserializeProperties(reader, data);
         return data;
     }

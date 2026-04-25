@@ -2,7 +2,7 @@
 
 public class EnumAndBool
 {
-    public string Name { get; set; }
+    public string Name { get; set; } = string.Empty;
     public bool Flag { get; set; }
     public SampleEnum Kind { get; set; }
 }

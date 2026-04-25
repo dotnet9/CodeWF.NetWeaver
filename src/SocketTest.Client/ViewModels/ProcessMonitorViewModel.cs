@@ -34,9 +34,9 @@ public class ProcessMonitorViewModel : ReactiveObject
 
     public RangObservableCollection<ProcessItemModel> DisplayProcesses { get; }
 
-    public string? TcpIp { get; set; } = "127.0.0.1";
+    public string TcpIp { get; set; } = "127.0.0.1";
     public int TcpPort { get; set; } = 5000;
-    public string? UdpIp { get; set; } = "239.255.255.250";
+    public string UdpIp { get; set; } = "239.255.255.250";
     public int UdpPort { get; set; } = 11012;
     public long SystemId { get; set; } = 1000;
 
@@ -72,7 +72,7 @@ public class ProcessMonitorViewModel : ReactiveObject
         }
         else
         {
-            _ = TcpHelper.ConnectAsync("TestClient", TcpIp!, TcpPort);
+            _ = TcpHelper.ConnectAsync("TestClient", TcpIp, TcpPort);
         }
         this.RaisePropertyChanged(nameof(IsRunning));
         this.RaisePropertyChanged(nameof(BaseInfo));
@@ -147,10 +147,10 @@ public class ProcessMonitorViewModel : ReactiveObject
 
     private void ReceivedSocketMessage(ResponseUdpAddress response)
     {
-        UdpIp = response.Ip;
+        UdpIp = response.Ip ?? UdpIp;
         UdpPort = response.Port;
         Logger.Info($"UDP组播地址：{UdpIp}:{UdpPort}");
-        _ = UdpHelper.ConnectAsync("Server", UdpIp!, UdpPort, string.Empty, SystemId);
+        _ = UdpHelper.ConnectAsync("Server", UdpIp, UdpPort, string.Empty, SystemId);
     }
 
     private void ReceivedSocketMessage(ResponseServiceInfo response)
@@ -171,7 +171,7 @@ public class ProcessMonitorViewModel : ReactiveObject
     private void ReceivedSocketMessage(ResponseProcessList response)
     {
         _receivedProcesses.Clear();
-        foreach (var process in response.Processes)
+        foreach (var process in response.Processes ?? [])
         {
             var item = new ProcessItemModel(process, 2020);
             _receivedProcesses.Add(item);
@@ -192,7 +192,7 @@ public class ProcessMonitorViewModel : ReactiveObject
 
     private void ReceivedSocketMessage(UpdateProcessList response)
     {
-        foreach (var updateInfo in response.Processes)
+        foreach (var updateInfo in response.Processes ?? [])
         {
             if (_processIdAndItems != null && _processIdAndItems.TryGetValue(updateInfo.Pid, out var process))
             {

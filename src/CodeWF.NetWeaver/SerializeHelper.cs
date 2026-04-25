@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Reflection;
 using System.Text;
@@ -16,15 +17,27 @@ public partial class SerializeHelper
     /// <summary>
     /// 缓存对象属性信息的字典，提高反射效率
     /// </summary>
-    private static readonly ConcurrentDictionary<string, List<PropertyInfo>> ObjectPropertyInfos = new();
+    private static readonly ConcurrentDictionary<Type, PropertyInfo[]> ObjectPropertyInfos = new();
 
     /// <summary>
-    /// 复杂类型名称列表，用于识别需要特殊处理的集合类型
+    /// 支持直接按标量读写的数据类型
     /// </summary>
-    private static readonly List<string> ComplexTypeNames =
+    private static readonly HashSet<Type> ScalarTypes =
     [
-        typeof(List<>).Name,
-        typeof(Dictionary<,>).Name
+        typeof(bool),
+        typeof(byte),
+        typeof(char),
+        typeof(decimal),
+        typeof(double),
+        typeof(float),
+        typeof(int),
+        typeof(long),
+        typeof(sbyte),
+        typeof(short),
+        typeof(string),
+        typeof(uint),
+        typeof(ulong),
+        typeof(ushort)
     ];
 
     /// <summary>
@@ -37,14 +50,116 @@ public partial class SerializeHelper
     /// </summary>
     /// <param name="type">要获取属性的类型</param>
     /// <returns>属性信息列表</returns>
-    private static List<PropertyInfo> GetProperties(Type type)
+    private static PropertyInfo[] GetProperties(Type type)
     {
-        var objectName = type.Name;
-        if (ObjectPropertyInfos.TryGetValue(objectName, out var propertyInfos)) return propertyInfos;
+        if (ObjectPropertyInfos.TryGetValue(type, out var propertyInfos)) return propertyInfos;
 
-        propertyInfos = type.GetProperties().ToList();
-        ObjectPropertyInfos[objectName] = propertyInfos;
+        propertyInfos = type.GetProperties();
+        ObjectPropertyInfos[type] = propertyInfos;
         return propertyInfos;
+    }
+
+    /// <summary>
+    /// 判断类型是否可按基础标量直接序列化
+    /// </summary>
+    private static bool IsScalarType(Type type)
+    {
+        return type.IsEnum || ScalarTypes.Contains(type);
+    }
+
+    /// <summary>
+    /// 判断类型是否为支持的集合类型，并返回集合泛型参数
+    /// </summary>
+    private static bool TryGetCollectionMetadata(Type type, out Type[] genericArguments, out bool isDictionary)
+    {
+        static bool IsListDefinition(Type definition)
+        {
+            return definition == typeof(List<>) ||
+                   definition == typeof(IList<>) ||
+                   definition == typeof(ICollection<>) ||
+                   definition == typeof(IEnumerable<>) ||
+                   definition == typeof(IReadOnlyList<>) ||
+                   definition == typeof(IReadOnlyCollection<>);
+        }
+
+        static bool IsDictionaryDefinition(Type definition)
+        {
+            return definition == typeof(Dictionary<,>) ||
+                   definition == typeof(IDictionary<,>) ||
+                   definition == typeof(IReadOnlyDictionary<,>);
+        }
+
+        isDictionary = false;
+        genericArguments = Type.EmptyTypes;
+
+        // IsGenericType 用来判断当前类型是否是泛型类型。
+        // 例如 List<int> / Dictionary<string, int> 会返回 true，普通类和数组则返回 false。
+        if (!type.IsGenericType)
+        {
+            return false;
+        }
+
+        // GetGenericTypeDefinition() 会把 List<int> 还原成 List<>，
+        // 方便我们统一判断“它属于哪一类泛型容器”。
+        var genericTypeDefinition = type.GetGenericTypeDefinition();
+        if (IsListDefinition(genericTypeDefinition))
+        {
+            genericArguments = type.GetGenericArguments();
+            return true;
+        }
+
+        if (IsDictionaryDefinition(genericTypeDefinition))
+        {
+            genericArguments = type.GetGenericArguments();
+            isDictionary = true;
+            return true;
+        }
+
+        // 有些属性声明的是自定义集合类型，本身未必就是 List<>/Dictionary<>，
+        // 但它可能实现了 IList<T> / IDictionary<TKey, TValue>，所以这里继续检查所有接口。
+        foreach (var interfaceType in type.GetInterfaces())
+        {
+            if (!interfaceType.IsGenericType)
+            {
+                continue;
+            }
+
+            var interfaceDefinition = interfaceType.GetGenericTypeDefinition();
+            if (IsListDefinition(interfaceDefinition))
+            {
+                genericArguments = interfaceType.GetGenericArguments();
+                return true;
+            }
+
+            if (IsDictionaryDefinition(interfaceDefinition))
+            {
+                genericArguments = interfaceType.GetGenericArguments();
+                isDictionary = true;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// 创建集合实例，优先使用目标类型本身，其次回退到 List/Dictionary
+    /// </summary>
+    private static object CreateCollectionInstance(Type type, Type[] genericArguments, bool isDictionary)
+    {
+        // 只有“非接口、非抽象类”才能直接 Activator.CreateInstance(type)。
+        if (!type.IsInterface && !type.IsAbstract && Activator.CreateInstance(type) is { } concreteInstance)
+        {
+            return concreteInstance;
+        }
+
+        // 如果属性类型是接口或抽象类型，就回退到一个可实例化的默认实现。
+        var fallbackType = isDictionary
+            ? typeof(Dictionary<,>).MakeGenericType(genericArguments)
+            : typeof(List<>).MakeGenericType(genericArguments[0]);
+
+        return Activator.CreateInstance(fallbackType)
+               ?? throw new InvalidOperationException($"Cannot create collection instance for {type.FullName}.");
     }
 
     /// <summary>
@@ -100,7 +215,7 @@ public partial class SerializeHelper
     /// <returns>是否成功读取头部信息</returns>
     public static bool ReadHead(this Span<byte> span, out NetHeadInfo netObjectHeadInfo, out int bytesConsumed)
     {
-        netObjectHeadInfo = null;
+        netObjectHeadInfo = null!;
         bytesConsumed = 0;
         // 检查缓冲区长度是否足够
         if (span.Length < PacketHeadLen) return false;

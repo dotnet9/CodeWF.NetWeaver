@@ -8,5 +8,5 @@ public class RequestStudentListDiffProps : INetObject
 {
     public int TaskId { get; set; }
 
-    public string Class { get; set; }
+    public string Class { get; set; } = string.Empty;
 }

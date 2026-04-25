@@ -155,9 +155,16 @@ public partial class TcpSocketServer
         {
             var client = Clients.Values.ElementAt(i);
             var clientKey = client.TcpSocket?.RemoteEndPoint?.ToString() ?? string.Empty;
+            var socket = client.TcpSocket;
+            if (socket == null)
+            {
+                await RemoveClientAsync(clientKey);
+                continue;
+            }
+
             try
             {
-                await SendCommandAsync(client.TcpSocket, command);
+                await SendCommandAsync(socket, command);
             }
             catch (SocketException ex)
             {

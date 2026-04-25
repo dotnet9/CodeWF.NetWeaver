@@ -51,6 +51,8 @@ public partial class SerializeHelper
     /// <returns>序列化后的字节数组</returns>
     public static byte[] SerializeObject<T>(this T data)
     {
+        if (data == null) throw new ArgumentNullException(nameof(data));
+
         using var stream = new MemoryStream();
         using var writer = new BinaryWriter(stream, DefaultEncoding);
         SerializeValue(writer, data, typeof(T));
@@ -65,6 +67,8 @@ public partial class SerializeHelper
     /// <returns>序列化后的字节数组</returns>
     public static byte[] SerializeObject(this object data, Type type)
     {
+        if (data == null) throw new ArgumentNullException(nameof(data));
+
         using var stream = new MemoryStream();
         using var writer = new BinaryWriter(stream, DefaultEncoding);
         SerializeValue(writer, data, type);
@@ -79,6 +83,8 @@ public partial class SerializeHelper
     /// <param name="data">要序列化的对象</param>
     private static void SerializeProperties<T>(BinaryWriter writer, T data)
     {
+        if (data == null) throw new ArgumentNullException(nameof(data));
+
         var properties = GetProperties(data.GetType())
             .Where(p => p.GetCustomAttribute(typeof(NetIgnoreMemberAttribute)) == null);
         foreach (var property in properties)
@@ -97,6 +103,7 @@ public partial class SerializeHelper
     private static void SerializeProperty<T>(BinaryWriter writer, T data, PropertyInfo property)
     {
         var propertyType = property.PropertyType;
+        // PropertyInfo.GetValue(...) 是反射取值，用属性元数据从对象里读出当前属性值。
         var propertyValue = property.GetValue(data);
         SerializeValue(writer, propertyValue, propertyType);
     }
@@ -107,16 +114,20 @@ public partial class SerializeHelper
     /// <param name="writer">BinaryWriter 实例</param>
     /// <param name="value">要序列化的值</param>
     /// <param name="valueType">值的类型</param>
-    private static void SerializeValue(BinaryWriter writer, object value, Type valueType)
+    private static void SerializeValue(BinaryWriter writer, object? value, Type valueType)
     {
-        if (valueType.IsPrimitive || valueType == typeof(string) || valueType.IsEnum)
+        if (IsScalarType(valueType))
             SerializeBaseValue(writer, value, valueType);
+        // IsArray 只负责识别“是否是数组”，元素类型还要再通过 GetElementType() 读取。
         else if (valueType.IsArray)
             SerializeArrayValue(writer, value, valueType);
-        else if (ComplexTypeNames.Contains(valueType.Name))
-            SerializeComplexValue(writer, value, valueType);
-        else
+        else if (TryGetCollectionMetadata(valueType, out var genericArguments, out var isDictionary))
+            SerializeComplexValue(writer, value, genericArguments, isDictionary);
+        else if (value != null)
             SerializeProperties(writer, value);
+        else
+            throw new InvalidOperationException(
+                $"Reference type {valueType.FullName} is null. Non-collection reference types do not support null serialization.");
     }
 
     /// <summary>
@@ -135,6 +146,10 @@ public partial class SerializeHelper
         else if (valueType == typeof(byte))
         {
             writer.Write(value == null ? (byte)0 : (byte)value);
+        }
+        else if (valueType == typeof(char))
+        {
+            writer.Write(value == null ? '\0' : (char)value);
         }
         else if (valueType == typeof(sbyte))
         {
@@ -208,6 +223,7 @@ public partial class SerializeHelper
         var length = array.Length;
         writer.Write(length);
 
+        // GetElementType() 用来拿到数组的元素类型，后面每一项都按这个类型递归序列化。
         var elementType = valueType.GetElementType()!;
         for (var i = 0; i < length; i++)
         {
@@ -222,7 +238,8 @@ public partial class SerializeHelper
     /// <param name="writer">BinaryWriter 实例</param>
     /// <param name="value">要序列化的对象</param>
     /// <param name="valueType">对象类型</param>
-    private static void SerializeComplexValue(BinaryWriter writer, object? value, Type valueType)
+    private static void SerializeComplexValue(BinaryWriter writer, object? value, Type[] genericArguments,
+        bool isDictionary)
     {
         if (value == null)
         {
@@ -230,30 +247,29 @@ public partial class SerializeHelper
             return;
         }
 
-        var genericArguments = valueType.GetGenericArguments();
-        switch (value)
+        if (!isDictionary && value is IList list)
         {
-            case IList list:
+            writer.Write(list.Count);
+            foreach (var item in list)
             {
-                writer.Write(list.Count);
-                foreach (var item in list)
-                {
-                    SerializeValue(writer, item, genericArguments[0]);
-                }
-
-                break;
+                SerializeValue(writer, item, genericArguments[0]);
             }
-            case IDictionary dictionary:
-            {
-                writer.Write(dictionary.Count);
-                foreach (DictionaryEntry item in dictionary)
-                {
-                    SerializeValue(writer, item.Key, genericArguments[0]);
-                    SerializeValue(writer, item.Value, genericArguments[1]);
-                }
 
-                break;
-            }
+            return;
         }
+
+        if (isDictionary && value is IDictionary dictionary)
+        {
+            writer.Write(dictionary.Count);
+            foreach (DictionaryEntry item in dictionary)
+            {
+                SerializeValue(writer, item.Key, genericArguments[0]);
+                SerializeValue(writer, item.Value, genericArguments[1]);
+            }
+
+            return;
+        }
+
+        throw new InvalidOperationException($"Unsupported collection value for {string.Join(", ", genericArguments.Select(x => x.Name))}.");
     }
 }

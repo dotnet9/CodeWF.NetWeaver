@@ -71,6 +71,8 @@ public static class Test
 
             Console.WriteLine($"直接获取数组长度：{arr.Length}");
 
+            // GetProperty(nameof(Array.Length)) 是“按名称取属性元数据”，
+            // 后面的 GetValue(arr) 才是真正从对象里读值。
             var arrLen1 = type.GetProperty(nameof(Array.Length))?.GetValue(arr);
             Console.WriteLine($"反射获取数组长度：{arrLen1}");
 
@@ -78,7 +80,11 @@ public static class Test
             var arrLen2 = arrObj.Length;
             Console.WriteLine($"转Array获取数组长度：{arrLen2}");
 
-            var elementType = type.GetElementType();
+            // GetElementType() 返回数组元素类型，例如 int[] -> int。
+            var elementType = type.GetElementType()
+                              ?? throw new InvalidOperationException("Array element type cannot be null.");
+            // Array.CreateInstance(...) 按“运行时元素类型 + 长度”动态创建数组，
+            // 这是 AOT/反射场景里常见但不太常手写的 API。
             var newObj = Array.CreateInstance(elementType, arrLen2);
             Console.WriteLine($"{newObj}");
 
@@ -99,6 +105,7 @@ public static class Test
 
             Console.WriteLine($"直接获取List长度：{lst.Count}");
 
+            // 这里通过接口属性名 IList.Count 取元数据，说明反射并不要求必须从具体类型名取属性。
             var listLen1 = type.GetProperty(nameof(IList.Count))?.GetValue(lst);
             Console.WriteLine($"反射获取List长度：{listLen1}");
 
@@ -109,6 +116,8 @@ public static class Test
             var newObj1 = CreateInstance(lst);
             Console.WriteLine($"ins1: {newObj1}");
 
+            // Activator.CreateInstance(type) 按运行时类型动态 new 一个对象，
+            // 等价于“已知类型时直接 new”，但适用于反射代码。
             var newObj2 = Activator.CreateInstance(type);
             Console.WriteLine($"ins2:{newObj2}");
 
@@ -129,6 +138,7 @@ public static class Test
 
             Console.WriteLine($"直接获取Dictionary长度：{dict.Count}");
 
+            // IDictionary.Count 这里同样是在演示：可以通过接口定义读取属性元数据。
             var dictLen1 = type.GetProperty(nameof(IDictionary.Count))?.GetValue(dict);
             Console.WriteLine($"反射获取Dictionary长度：{dictLen1}");
 
@@ -196,11 +206,11 @@ public static class Test
             var buffer = person.SerializeObject();
             var newPerson = buffer.DeserializeObject(typeof(PersonDto)) as PersonDto;
             Console.WriteLine($"名【{person.Name}】=》【{newPerson?.Name}】");
-            Console.WriteLine($"Tags【{person.Tags.Length}】=》【{newPerson.Tags?.Length}】");
-            Console.WriteLine($"Addresses【{person.Addresses.Length}】=》【{newPerson.Addresses?.Length}】");
-            Console.WriteLine($"Projects【{person.Projects.Count}】=》【{newPerson.Projects?.Count}】");
-            Console.WriteLine($"Records【{person.Records.Count}】=》【{newPerson.Records?.Count}】");
-            Console.WriteLine($"Course【{person.Course.Count}】=》【{newPerson.Course?.Count}】");
+            Console.WriteLine($"Tags【{person.Tags.Length}】=》【{newPerson?.Tags?.Length}】");
+            Console.WriteLine($"Addresses【{person.Addresses.Length}】=》【{newPerson?.Addresses?.Length}】");
+            Console.WriteLine($"Projects【{person.Projects.Count}】=》【{newPerson?.Projects?.Count}】");
+            Console.WriteLine($"Records【{person.Records.Count}】=》【{newPerson?.Records?.Count}】");
+            Console.WriteLine($"Course【{person.Course.Count}】=》【{newPerson?.Course?.Count}】");
         }
         catch (Exception ex)
         {
@@ -211,10 +221,13 @@ public static class Test
     private static object CreateInstance(object val)
     {
         var type = val.GetType();
+        // GetGenericArguments() 取得当前泛型实参，
+        // 例如 List<int> -> [int]，Dictionary<string, double> -> [string, double]。
         var itemTypes = type.GetGenericArguments();
         if (val is IList)
         {
             var lstType = typeof(List<>);
+            // MakeGenericType(...) 会把开放泛型 List<> 补全成封闭泛型 List<int>。
             var genericType = lstType.MakeGenericType(itemTypes.First());
             return Activator.CreateInstance(genericType)!;
         }

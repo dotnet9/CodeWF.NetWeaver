@@ -68,7 +68,7 @@ public static partial class SerializeHelper
         {
             if (!await socket.ReceiveExactAsync(lenBuffer, 0, 4, cancellationToken))
             {
-                return (false, Array.Empty<byte>(), default);
+                return (false, Array.Empty<byte>(), new NetHeadInfo());
             }
 
             var bufferLen = BitConverter.ToInt32(lenBuffer.AsSpan(0, 4));
@@ -80,12 +80,12 @@ public static partial class SerializeHelper
                 if (!await socket.ReceiveExactAsync(buffer, 4, bufferLen - 4, cancellationToken))
                 {
                     ArrayPool<byte>.Shared.Return(buffer);
-                    return (false, Array.Empty<byte>(), default);
+                    return (false, Array.Empty<byte>(), new NetHeadInfo());
                 }
 
                 var readIndex = 0;
                 var success = ReadHead(buffer, ref readIndex, out var netObject);
-                return (success, buffer, netObject);
+                return (success, buffer, netObject!);
             }
             catch
             {
