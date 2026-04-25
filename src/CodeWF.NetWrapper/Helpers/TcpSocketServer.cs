@@ -303,10 +303,10 @@ public partial class TcpSocketServer
             {
                 ActiveClient(clientKey);
 
-                if (command.IsCommand<FileUploadStart>() ||
-                    command.IsCommand<FileDownloadStart>() ||
-                    command.IsCommand<FileBlockData>() ||
-                    command.IsCommand<FileBlockAck>() ||
+                if (command.IsCommand<FileUploadRequest>() ||
+                    command.IsCommand<FileDownloadRequest>() ||
+                    command.IsCommand<FileChunkData>() ||
+                    command.IsCommand<FileChunkAck>() ||
                     command.IsCommand<BrowseFileSystemRequest>() ||
                     command.IsCommand<CreateDirectoryRequest>() ||
                     command.IsCommand<DeletePathRequest>())

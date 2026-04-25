@@ -3,13 +3,13 @@ using CodeWF.NetWeaver.Base;
 namespace CodeWF.NetWrapper.Models;
 
 /// <summary>
-/// 心跳类，用于 Socket 通信中的心跳检测
+/// 心跳通信对象，用于检测连接是否仍然存活。
 /// </summary>
 [NetHead(SocketConstants.HeartbeatObjectId, 1)]
 public class Heartbeat : INetObject
 {
     /// <summary>
-    /// 获取或设置任务 ID
+    /// 请求任务 ID，用于把响应与原请求对应起来。
     /// </summary>
     public int TaskId { get; set; }
 }

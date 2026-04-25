@@ -61,25 +61,25 @@ public partial class TcpSocketServer
                     var deleteInfo = command.GetCommand<DeletePathRequest>();
                     await HandleDeletePathAsync(command.Client!, deleteInfo);
                 }
-                else if (command.IsCommand<FileUploadStart>())
+                else if (command.IsCommand<FileUploadRequest>())
                 {
-                    var startInfo = command.GetCommand<FileUploadStart>();
-                    await HandleFileUploadStartAsync(command.Client!, startInfo);
+                    var request = command.GetCommand<FileUploadRequest>();
+                    await HandleFileUploadRequestAsync(command.Client!, request);
                 }
-                else if (command.IsCommand<FileBlockData>())
+                else if (command.IsCommand<FileChunkData>())
                 {
-                    var blockData = command.GetCommand<FileBlockData>();
-                    await HandleFileBlockDataAsync(command.Client!, blockData);
+                    var chunkData = command.GetCommand<FileChunkData>();
+                    await HandleFileChunkDataAsync(command.Client!, chunkData);
                 }
-                else if (command.IsCommand<FileDownloadStart>())
+                else if (command.IsCommand<FileDownloadRequest>())
                 {
-                    var startInfo = command.GetCommand<FileDownloadStart>();
-                    await HandleFileDownloadStartAsync(command.Client!, startInfo);
+                    var request = command.GetCommand<FileDownloadRequest>();
+                    await HandleFileDownloadRequestAsync(command.Client!, request);
                 }
-                else if (command.IsCommand<FileBlockAck>())
+                else if (command.IsCommand<FileChunkAck>())
                 {
-                    var blockAck = command.GetCommand<FileBlockAck>();
-                    await HandleFileBlockAckAsync(command.Client!, blockAck);
+                    var chunkAck = command.GetCommand<FileChunkAck>();
+                    await HandleFileChunkAckAsync(command.Client!, chunkAck);
                 }
             }
             catch (Exception ex)
@@ -473,13 +473,13 @@ public partial class TcpSocketServer
     /// 处理客户端上传文件请求
     /// </summary>
     /// <param name="client">客户端 Socket</param>
-    /// <param name="startInfo">文件上传开始信息</param>
-    public async Task HandleFileUploadStartAsync(Socket client, FileUploadStart startInfo)
+    /// <param name="request">文件上传请求</param>
+    public async Task HandleFileUploadRequestAsync(Socket client, FileUploadRequest request)
     {
         var clientKey = client.RemoteEndPoint?.ToString() ?? string.Empty;
-        var taskId = startInfo.TaskId;
-        var requestedRemoteFilePath = startInfo.RemoteFilePath;
-        var alreadyTransferredBytes = startInfo.AlreadyTransferredBytes;
+        var taskId = request.TaskId;
+        var requestedRemoteFilePath = request.RemoteFilePath;
+        var alreadyTransferredBytes = request.AlreadyTransferredBytes;
         if (!TryResolveServerPath(requestedRemoteFilePath, treatEmptyAsRoot: false, out var remoteFilePath,
                 out var errorMessage))
         {
@@ -489,27 +489,28 @@ public partial class TcpSocketServer
                 ErrorCode = FileTransferErrorCode.DirectoryAccessDenied,
                 Message = errorMessage,
                 RemoteFilePath = requestedRemoteFilePath,
-                FileName = startInfo.FileName
+                FileName = request.FileName
             };
             await SendCommandAsync(client, reject);
             return;
         }
 
-        var contextKey = GetTransferKey(clientKey, requestedRemoteFilePath);
+        var contextKey = GetTransferKey(clientKey, requestedRemoteFilePath, taskId);
 
         if (!File.Exists(remoteFilePath))
         {
             _uploadContexts[contextKey] = new ServerUploadContext
             {
+                TaskId = taskId,
                 ClientKey = clientKey,
                 RequestedRemoteFilePath = requestedRemoteFilePath,
                 ActualFilePath = remoteFilePath,
-                FileName = startInfo.FileName,
-                FileSize = startInfo.FileSize,
-                FileHash = startInfo.FileHash,
+                FileName = request.FileName,
+                FileSize = request.FileSize,
+                FileHash = request.FileHash,
                 AlreadyTransferredBytes = 0
             };
-            var uploadAck = new FileUploadStartAck
+            var uploadResponse = new FileUploadResponse
             {
                 TaskId = taskId,
                 Accept = true,
@@ -517,8 +518,8 @@ public partial class TcpSocketServer
                 RemoteFilePath = requestedRemoteFilePath,
                 Message = "文件不存在，将创建新文件"
             };
-            await SendCommandAsync(client, uploadAck);
-            Logger.Info($"{ServerMark} 收到客户端({clientKey})上传请求：{startInfo.FileName} -> {remoteFilePath}，文件不存在，创建新文件");
+            await SendCommandAsync(client, uploadResponse);
+            Logger.Info($"{ServerMark} 收到客户端({clientKey})上传请求：{request.FileName} -> {remoteFilePath}，文件不存在，创建新文件");
             return;
         }
 
@@ -533,16 +534,16 @@ public partial class TcpSocketServer
                 ErrorCode = FileTransferErrorCode.UploadServerFileLarger,
                 Message = "服务端文件大于客户端已有文件",
                 RemoteFilePath = requestedRemoteFilePath,
-                FileName = startInfo.FileName
+                FileName = request.FileName
             };
             await SendCommandAsync(client, reject);
-            Logger.Error($"{ServerMark} 收到客户端({clientKey})上传请求：{startInfo.FileName} -> {remoteFilePath}，服务端文件({actualTransferredBytes}字节)大于客户端已有文件({alreadyTransferredBytes}字节)");
+            Logger.Error($"{ServerMark} 收到客户端({clientKey})上传请求：{request.FileName} -> {remoteFilePath}，服务端文件({actualTransferredBytes}字节)大于客户端已有文件({alreadyTransferredBytes}字节)");
             return;
         }
 
         if (actualTransferredBytes == alreadyTransferredBytes && actualTransferredBytes > 0)
         {
-            if (startInfo.FileHash == ComputeFileHash(remoteFilePath))
+            if (request.FileHash == ComputeFileHash(remoteFilePath))
             {
                 var reject = new FileTransferReject
                 {
@@ -550,10 +551,10 @@ public partial class TcpSocketServer
                     ErrorCode = FileTransferErrorCode.UploadFileAlreadyExists,
                     Message = "文件已存在，无需重复上传",
                     RemoteFilePath = requestedRemoteFilePath,
-                    FileName = startInfo.FileName
+                    FileName = request.FileName
                 };
                 await SendCommandAsync(client, reject);
-                Logger.Error($"{ServerMark} 收到客户端({clientKey})上传请求：{startInfo.FileName} -> {remoteFilePath}，文件已存在无需重复上传");
+                Logger.Error($"{ServerMark} 收到客户端({clientKey})上传请求：{request.FileName} -> {remoteFilePath}，文件已存在无需重复上传");
                 return;
             }
             else
@@ -564,25 +565,26 @@ public partial class TcpSocketServer
                     ErrorCode = FileTransferErrorCode.UploadFileHashMismatch,
                     Message = "文件大小相同但Hash不同",
                     RemoteFilePath = requestedRemoteFilePath,
-                    FileName = startInfo.FileName
+                    FileName = request.FileName
                 };
                 await SendCommandAsync(client, reject);
-                Logger.Error($"{ServerMark} 收到客户端({clientKey})上传请求：{startInfo.FileName} -> {remoteFilePath}，文件大小相同但Hash不同");
+                Logger.Error($"{ServerMark} 收到客户端({clientKey})上传请求：{request.FileName} -> {remoteFilePath}，文件大小相同但Hash不同");
                 return;
             }
         }
 
         _uploadContexts[contextKey] = new ServerUploadContext
         {
+            TaskId = taskId,
             ClientKey = clientKey,
             RequestedRemoteFilePath = requestedRemoteFilePath,
             ActualFilePath = remoteFilePath,
-            FileName = startInfo.FileName,
-            FileSize = startInfo.FileSize,
-            FileHash = startInfo.FileHash,
+            FileName = request.FileName,
+            FileSize = request.FileSize,
+            FileHash = request.FileHash,
             AlreadyTransferredBytes = actualTransferredBytes
         };
-        var ack = new FileUploadStartAck
+        var response = new FileUploadResponse
         {
             TaskId = taskId,
             Accept = true,
@@ -590,9 +592,9 @@ public partial class TcpSocketServer
             RemoteFilePath = requestedRemoteFilePath,
             Message = "确认接收"
         };
-        await SendCommandAsync(client, ack);
+        await SendCommandAsync(client, response);
         Logger.Info(
-            $"{ServerMark} 收到客户端({clientKey})上传请求：{startInfo.FileName} -> {remoteFilePath}，客户端报已传输：{alreadyTransferredBytes}字节，服务端确认：{actualTransferredBytes}字节，等待客户端发送文件块...");
+            $"{ServerMark} 收到客户端({clientKey})上传请求：{request.FileName} -> {remoteFilePath}，客户端报已传输：{alreadyTransferredBytes}字节，服务端确认：{actualTransferredBytes}字节，等待客户端发送文件块...");
     }
 
 
@@ -605,10 +607,10 @@ public partial class TcpSocketServer
     /// 处理接收到的文件块数据（用于下载：服务器接收客户端发送的文件数据）
     /// </summary>
     /// <param name="client">客户端 Socket</param>
-    /// <param name="blockData">文件块数据</param>
-    public async Task HandleFileBlockDataAsync(Socket client, FileBlockData blockData)
+    /// <param name="chunkData">文件分块数据</param>
+    public async Task HandleFileChunkDataAsync(Socket client, FileChunkData chunkData)
     {
-        var requestedRemoteFilePath = blockData.RemoteFilePath;
+        var requestedRemoteFilePath = chunkData.RemoteFilePath;
         if (string.IsNullOrEmpty(requestedRemoteFilePath))
         {
             Logger.Error($"{ServerMark} 文件块数据缺少RemoteFilePath");
@@ -616,13 +618,14 @@ public partial class TcpSocketServer
         }
 
         var clientKey = client.RemoteEndPoint?.ToString() ?? string.Empty;
-        var contextKey = GetTransferKey(clientKey, requestedRemoteFilePath);
+        var contextKey = GetTransferKey(clientKey, requestedRemoteFilePath, chunkData.TaskId);
         if (!_uploadContexts.TryGetValue(contextKey, out var context))
         {
             Logger.Error($"{ServerMark} 未找到上传会话：{clientKey} -> {requestedRemoteFilePath}");
-            var missingAck = new FileBlockAck
+            var missingAck = new FileChunkAck
             {
-                BlockIndex = blockData.BlockIndex,
+                TaskId = chunkData.TaskId,
+                BlockIndex = chunkData.BlockIndex,
                 Success = false,
                 Message = "未找到上传会话",
                 RemoteFilePath = requestedRemoteFilePath
@@ -643,11 +646,11 @@ public partial class TcpSocketServer
             // FileMode.OpenOrCreate: 支持首次上传时自动建文件，也支持断点续传时继续写入同一文件。
             await using var fs = new FileStream(remoteFilePath, FileMode.OpenOrCreate, FileAccess.Write, FileShare.Read);
             // Position 指定实际写入偏移量，只有这样才能正确覆盖/续传指定区块，而不是无脑 Append。
-            fs.Position = blockData.Offset;
-            await fs.WriteAsync(blockData.Data.AsMemory(0, blockData.BlockSize));
+            fs.Position = chunkData.Offset;
+            await fs.WriteAsync(chunkData.Data.AsMemory(0, chunkData.BlockSize));
             await fs.FlushAsync();
 
-            var totalBytes = Math.Max(fs.Length, blockData.Offset + blockData.BlockSize);
+            var totalBytes = Math.Max(fs.Length, chunkData.Offset + chunkData.BlockSize);
             context.AlreadyTransferredBytes = totalBytes;
             NotifyServerTransferProgress(context.FileName, totalBytes, context.FileSize, isUpload: true);
 
@@ -670,9 +673,10 @@ public partial class TcpSocketServer
                 _uploadContexts.TryRemove(contextKey, out _);
             }
 
-            var ack = new FileBlockAck
+            var ack = new FileChunkAck
             {
-                BlockIndex = blockData.BlockIndex,
+                TaskId = context.TaskId,
+                BlockIndex = chunkData.BlockIndex,
                 Success = success,
                 Message = message,
                 RemoteFilePath = requestedRemoteFilePath,
@@ -682,10 +686,11 @@ public partial class TcpSocketServer
         }
         catch (Exception ex)
         {
-            Logger.Error($"{ServerMark} 处理文件块({blockData.BlockIndex})异常", ex);
-            var ack = new FileBlockAck
+            Logger.Error($"{ServerMark} 处理文件块({chunkData.BlockIndex})异常", ex);
+            var ack = new FileChunkAck
             {
-                BlockIndex = blockData.BlockIndex,
+                TaskId = context.TaskId,
+                BlockIndex = chunkData.BlockIndex,
                 Success = false,
                 Message = ex.Message,
                 RemoteFilePath = requestedRemoteFilePath
@@ -695,12 +700,12 @@ public partial class TcpSocketServer
     }
 
 
-    public async Task HandleFileDownloadStartAsync(Socket client, FileDownloadStart startInfo)
+    public async Task HandleFileDownloadRequestAsync(Socket client, FileDownloadRequest request)
     {
         var clientKey = client.RemoteEndPoint?.ToString() ?? string.Empty;
-        var taskId = startInfo.TaskId;
-        var requestedRemoteFilePath = startInfo.RemoteFilePath;
-        var alreadyTransferredBytes = startInfo.AlreadyTransferredBytes;
+        var taskId = request.TaskId;
+        var requestedRemoteFilePath = request.RemoteFilePath;
+        var alreadyTransferredBytes = request.AlreadyTransferredBytes;
         if (!TryResolveServerPath(requestedRemoteFilePath, treatEmptyAsRoot: false, out var remoteFilePath,
                 out var errorMessage))
         {
@@ -710,7 +715,7 @@ public partial class TcpSocketServer
                 ErrorCode = FileTransferErrorCode.DirectoryAccessDenied,
                 Message = errorMessage,
                 RemoteFilePath = requestedRemoteFilePath,
-                FileName = startInfo.FileName
+                FileName = request.FileName
             };
             await SendCommandAsync(client, reject);
             return;
@@ -725,7 +730,7 @@ public partial class TcpSocketServer
                 ErrorCode = FileTransferErrorCode.DownloadServerFileNotFound,
                 Message = "服务端文件不存在",
                 RemoteFilePath = requestedRemoteFilePath,
-                FileName = startInfo.FileName
+                FileName = request.FileName
             };
             await SendCommandAsync(client, reject);
             return;
@@ -743,7 +748,7 @@ public partial class TcpSocketServer
                 ErrorCode = FileTransferErrorCode.DownloadServerFileSmaller,
                 Message = "服务端文件小于客户端已有文件",
                 RemoteFilePath = requestedRemoteFilePath,
-                FileName = startInfo.FileName
+                FileName = request.FileName
             };
             await SendCommandAsync(client, reject);
             return;
@@ -752,7 +757,7 @@ public partial class TcpSocketServer
         if (totalFileSize == alreadyTransferredBytes)
         {
             var fileHash = ComputeFileHash(remoteFilePath);
-            if (fileHash == startInfo.FileHash)
+            if (fileHash == request.FileHash)
             {
                 Logger.Error($"{ServerMark} 文件相同，不需要下载：{remoteFilePath}");
                 var reject = new FileTransferReject
@@ -761,7 +766,7 @@ public partial class TcpSocketServer
                     ErrorCode = FileTransferErrorCode.DownloadFileIdentical,
                     Message = "文件相同，不需要下载",
                     RemoteFilePath = requestedRemoteFilePath,
-                    FileName = startInfo.FileName
+                    FileName = request.FileName
                 };
                 await SendCommandAsync(client, reject);
                 return;
@@ -775,7 +780,7 @@ public partial class TcpSocketServer
                     ErrorCode = FileTransferErrorCode.DownloadFileHashMismatch,
                     Message = "文件大小相同但Hash不同",
                     RemoteFilePath = requestedRemoteFilePath,
-                    FileName = startInfo.FileName
+                    FileName = request.FileName
                 };
                 await SendCommandAsync(client, reject);
                 return;
@@ -783,18 +788,19 @@ public partial class TcpSocketServer
         }
 
         var resolvedFileHash = ComputeFileHash(remoteFilePath);
-        _downloadContexts[GetTransferKey(clientKey, requestedRemoteFilePath)] = new ServerDownloadContext
+        _downloadContexts[GetTransferKey(clientKey, requestedRemoteFilePath, taskId)] = new ServerDownloadContext
         {
+            TaskId = taskId,
             ClientKey = clientKey,
             RequestedRemoteFilePath = requestedRemoteFilePath,
             ActualFilePath = remoteFilePath,
-            FileName = startInfo.FileName,
+            FileName = request.FileName,
             FileSize = totalFileSize,
             FileHash = resolvedFileHash,
             AlreadyTransferredBytes = alreadyTransferredBytes
         };
 
-        var ack = new FileDownloadStartAck
+        var response = new FileDownloadResponse
         {
             TaskId = taskId,
             Accept = true,
@@ -804,10 +810,10 @@ public partial class TcpSocketServer
             RemoteFilePath = requestedRemoteFilePath,
             Message = "确认传输"
         };
-        await SendCommandAsync(client, ack);
+        await SendCommandAsync(client, response);
         Logger.Info($"{ServerMark} 收到客户端({clientKey})下载请求：{remoteFilePath}，已传输：{alreadyTransferredBytes}字节，文件大小：{totalFileSize}字节，开始发送文件块...");
         await SendFileBlockAsync(clientKey, remoteFilePath, requestedRemoteFilePath, alreadyTransferredBytes,
-            totalFileSize, startInfo.FileName, resolvedFileHash);
+            totalFileSize, request.FileName, resolvedFileHash, taskId);
     }
 
     private static string ComputeFileHash(string filePath)
@@ -826,31 +832,31 @@ public partial class TcpSocketServer
     }
 
     /// <summary>
-    /// 处理文件块传输应答
+    /// 处理文件分块确认
     /// </summary>
     /// <param name="client">客户端 Socket</param>
-    /// <param name="blockAck">文件块应答信息</param>
-    public async Task HandleFileBlockAckAsync(Socket client, FileBlockAck blockAck)
+    /// <param name="chunkAck">文件分块确认信息</param>
+    public async Task HandleFileChunkAckAsync(Socket client, FileChunkAck chunkAck)
     {
         var clientKey = client.RemoteEndPoint?.ToString() ?? string.Empty;
-        if (!blockAck.Success)
+        if (!chunkAck.Success)
         {
-            Logger.Error($"{ServerMark} 客户端({clientKey})报告文件块({blockAck.BlockIndex})传输失败：{blockAck.Message}");
-            _downloadContexts.TryRemove(GetTransferKey(clientKey, blockAck.RemoteFilePath), out _);
+            Logger.Error($"{ServerMark} 客户端({clientKey})报告文件块({chunkAck.BlockIndex})传输失败：{chunkAck.Message}");
+            _downloadContexts.TryRemove(GetTransferKey(clientKey, chunkAck.RemoteFilePath, chunkAck.TaskId), out _);
         }
         else
         {
-            Logger.Info($"{ServerMark} 客户端({clientKey})确认文件块({blockAck.BlockIndex})传输成功");
-            var contextKey = GetTransferKey(clientKey, blockAck.RemoteFilePath);
+            Logger.Info($"{ServerMark} 客户端({clientKey})确认文件块({chunkAck.BlockIndex})传输成功");
+            var contextKey = GetTransferKey(clientKey, chunkAck.RemoteFilePath, chunkAck.TaskId);
             if (!_downloadContexts.TryGetValue(contextKey, out var context))
             {
                 return;
             }
 
-            context.AlreadyTransferredBytes = blockAck.AlreadyTransferredBytes;
-            NotifyServerTransferProgress(context.FileName, blockAck.AlreadyTransferredBytes, context.FileSize,
+            context.AlreadyTransferredBytes = chunkAck.AlreadyTransferredBytes;
+            NotifyServerTransferProgress(context.FileName, chunkAck.AlreadyTransferredBytes, context.FileSize,
                 isUpload: false);
-            if (blockAck.AlreadyTransferredBytes >= context.FileSize)
+            if (chunkAck.AlreadyTransferredBytes >= context.FileSize)
             {
                 _downloadContexts.TryRemove(contextKey, out _);
                 Logger.Info($"{ServerMark} 向客户端({clientKey})发送文件完成：{context.ActualFilePath}");
@@ -858,7 +864,8 @@ public partial class TcpSocketServer
             }
 
             await SendFileBlockAsync(clientKey, context.ActualFilePath, context.RequestedRemoteFilePath,
-                blockAck.AlreadyTransferredBytes, context.FileSize, context.FileName, context.FileHash);
+                chunkAck.AlreadyTransferredBytes, context.FileSize, context.FileName, context.FileHash,
+                context.TaskId);
         }
     }
 
@@ -872,7 +879,7 @@ public partial class TcpSocketServer
     /// <param name="fileName">文件名</param>
     /// <param name="fileHash">文件哈希</param>
     public async Task SendFileBlockAsync(string clientKey, string localFilePath, string remoteFilePath,
-        long alreadyTransferredBytes, long fileSize, string fileName, string fileHash)
+        long alreadyTransferredBytes, long fileSize, string fileName, string fileHash, int taskId)
     {
         if (!Clients.TryGetValue(clientKey, out var session) || session.TcpSocket == null)
         {
@@ -904,8 +911,9 @@ public partial class TcpSocketServer
         }
 
         var blockIndex = alreadyTransferredBytes / FileTransferBlockSize;
-        var blockData = new FileBlockData
+        var chunkData = new FileChunkData
         {
+            TaskId = taskId,
             BlockIndex = blockIndex,
             Offset = alreadyTransferredBytes,
             BlockSize = bytesRead,
@@ -913,7 +921,7 @@ public partial class TcpSocketServer
             RemoteFilePath = remoteFilePath
         };
 
-        await SendCommandAsync(session.TcpSocket, blockData);
+        await SendCommandAsync(session.TcpSocket, chunkData);
         Logger.Info($"{ServerMark} 向客户端({clientKey})发送文件块({blockIndex})：{bytesRead}字节");
         var newTransferredBytes = alreadyTransferredBytes + bytesRead;
         NotifyServerTransferProgress(fileName, newTransferredBytes, fileSize, isUpload: false);
@@ -924,7 +932,7 @@ public partial class TcpSocketServer
     /// </summary>
     /// <param name="clientKey">客户端标识键</param>
     /// <param name="fileHash">文件哈希</param>
-    public async Task SendFileTransferCompleteAsync(string clientKey, string fileHash)
+    public async Task SendFileTransferCompleteAsync(string clientKey, int taskId, string fileHash)
     {
         if (!Clients.TryGetValue(clientKey, out var session) || session.TcpSocket == null)
         {
@@ -933,6 +941,7 @@ public partial class TcpSocketServer
 
         var completeCommand = new FileTransferComplete
         {
+            TaskId = taskId,
             FileHash = fileHash,
             Success = true
         };
@@ -1006,7 +1015,8 @@ public partial class TcpSocketServer
             isUpload));
     }
 
-    private static string GetTransferKey(string clientKey, string remoteFilePath) => $"{clientKey}|{remoteFilePath}";
+    private static string GetTransferKey(string clientKey, string remoteFilePath, int taskId) =>
+        $"{clientKey}|{taskId}|{remoteFilePath}";
 
     private bool TryResolveServerPath(string requestedPath, bool treatEmptyAsRoot, out string resolvedPath,
         out string errorMessage)
@@ -1067,6 +1077,7 @@ public partial class TcpSocketServer
 
 internal sealed class ServerUploadContext
 {
+    public int TaskId { get; set; }
     public string ClientKey { get; set; } = string.Empty;
     public string RequestedRemoteFilePath { get; set; } = string.Empty;
     public string ActualFilePath { get; set; } = string.Empty;
@@ -1078,6 +1089,7 @@ internal sealed class ServerUploadContext
 
 internal sealed class ServerDownloadContext
 {
+    public int TaskId { get; set; }
     public string ClientKey { get; set; } = string.Empty;
     public string RequestedRemoteFilePath { get; set; } = string.Empty;
     public string ActualFilePath { get; set; } = string.Empty;

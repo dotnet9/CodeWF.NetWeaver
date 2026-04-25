@@ -78,10 +78,10 @@ public sealed class TcpSocketFileTransferTests : IAsyncLifetime
         await harness.Client.CreateDirectoryAsync("managed");
         await WaitForConditionAsync(() => Directory.Exists(Path.Combine(serverRoot, "managed")));
 
-        await harness.Client.DeleteDirectoryAsync("managed");
+        await harness.Client.DeletePathAsync("managed", true);
         await WaitForConditionAsync(() => !Directory.Exists(Path.Combine(serverRoot, "managed")));
 
-        await harness.Client.DeleteFileAsync(@"..\outside-root\outside.txt");
+        await harness.Client.DeletePathAsync(@"..\outside-root\outside.txt", false);
         await Task.Delay(500);
 
         Assert.True(File.Exists(outsideFile));

@@ -176,12 +176,12 @@ public partial class TcpSocketClient
     {
         await foreach (var command in _responses.Reader.ReadAllAsync())
         {
-            if (command.IsCommand<FileUploadStartAck>() ||
-                command.IsCommand<FileDownloadStartAck>() ||
-                command.IsCommand<FileBlockData>() ||
-                command.IsCommand<FileBlockAck>() ||
+            if (command.IsCommand<FileUploadResponse>() ||
+                command.IsCommand<FileDownloadResponse>() ||
+                command.IsCommand<FileChunkData>() ||
+                command.IsCommand<FileChunkAck>() ||
                 command.IsCommand<FileTransferReject>() ||
-                command.IsCommand<FileDownloadStart>())
+                command.IsCommand<FileDownloadRequest>())
             {
                 await _fileTransferResponses.Writer.WriteAsync(command);
             }

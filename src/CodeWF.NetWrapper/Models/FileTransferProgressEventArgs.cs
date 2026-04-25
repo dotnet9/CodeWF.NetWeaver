@@ -3,33 +3,43 @@ using System;
 namespace CodeWF.NetWrapper.Models;
 
 /// <summary>
-/// 文件传输进度事件参数
+/// 文件传输进度事件参数。
 /// </summary>
 public class FileTransferProgressEventArgs : EventArgs
 {
-    /// <summary>文件名</summary>
+    /// <summary>
+    /// 当前传输的文件名。
+    /// </summary>
     public string FileName { get; }
 
-    /// <summary>已传输字节数</summary>
+    /// <summary>
+    /// 已经传输完成的字节数。
+    /// </summary>
     public long TransferredBytes { get; }
 
-    /// <summary>总字节数</summary>
+    /// <summary>
+    /// 文件总字节数。
+    /// </summary>
     public long TotalBytes { get; }
 
-    /// <summary>进度百分比（0-100）</summary>
+    /// <summary>
+    /// 当前进度百分比，取值范围通常为 0 到 100。
+    /// </summary>
     public double Progress { get; }
 
-    /// <summary>是否为上传操作</summary>
+    /// <summary>
+    /// 标记当前是否为上传操作。
+    /// </summary>
     public bool IsUpload { get; }
 
     /// <summary>
-    /// 构造函数
+    /// 初始化一个文件传输进度事件参数对象。
     /// </summary>
-    /// <param name="fileName">文件名</param>
-    /// <param name="transferredBytes">已传输字节数</param>
-    /// <param name="totalBytes">总字节数</param>
-    /// <param name="progress">进度百分比</param>
-    /// <param name="isUpload">是否为上传操作</param>
+    /// <param name="fileName">文件名。</param>
+    /// <param name="transferredBytes">已传输字节数。</param>
+    /// <param name="totalBytes">总字节数。</param>
+    /// <param name="progress">当前进度百分比。</param>
+    /// <param name="isUpload">是否为上传操作。</param>
     public FileTransferProgressEventArgs(string fileName, long transferredBytes, long totalBytes, double progress,
         bool isUpload)
     {

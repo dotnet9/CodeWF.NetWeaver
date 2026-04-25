@@ -8,6 +8,8 @@
 
 `CodeWF.NetWrapper` builds on top of it and provides TCP/UDP helper classes, command dispatching, and file transfer / file management capabilities.
 
+Chinese version: [README.zh-CN.md](README.zh-CN.md)
+
 ## Projects
 
 | Project | Description |
@@ -110,13 +112,16 @@ EventBus.Default.Subscribe<SocketCommand>(async (sender, command) =>
 
 `TcpSocketClient` and `TcpSocketServer` now expose a clearer file management API:
 
+Every request/response-style communication object carries a `TaskId`.
+The same `TaskId` is propagated through request, response, chunk data, chunk acknowledgement, reject, and complete messages so callers can correlate a full transfer flow reliably.
+
 ### Client API
 
 ```csharp
 await client.BrowseFileSystemAsync("/");
 await client.CreateDirectoryAsync("uploads");
-await client.DeleteDirectoryAsync("old-folder");
-await client.DeleteFileAsync("uploads/old.bin");
+await client.DeletePathAsync("old-folder", true);
+await client.DeletePathAsync("uploads/old.bin", false);
 await client.UploadFileAsync(@"D:\local\demo.zip", "uploads/demo.zip");
 await client.DownloadFileAsync("uploads/demo.zip", @"D:\downloads");
 ```
@@ -151,21 +156,34 @@ When `FileSaveDirectory` is set:
 - Completed files are verified with SHA-256.
 - `FileTransferProgress` is raised on both client and server sides.
 
-## Renamed File Management DTOs
+## File Management DTOs
 
-The file management feature is new, so the public names were cleaned up:
+The file management feature now uses the cleaned-up names below:
 
-| New name | Old compatible name |
+| Category | Type |
 | --- | --- |
-| `BrowseFileSystemRequest` | `QueryFileStart` |
-| `BrowseFileSystemResponse` | `DirectoryEntryResponse` |
-| `DriveListResponse` | `DiskInfoListResponse` |
-| `CreateDirectoryRequest` | `CreateDirectoryStart` |
-| `CreateDirectoryResponse` | `CreateDirectoryStartAck` |
-| `DeletePathRequest` | `DeleteFileStart` |
-| `DeletePathResponse` | `DeleteFileStartAck` |
+| Browse request | `BrowseFileSystemRequest` |
+| Browse response | `BrowseFileSystemResponse` |
+| Drive list response | `DriveListResponse` |
+| Create directory request | `CreateDirectoryRequest` |
+| Create directory response | `CreateDirectoryResponse` |
+| Delete path request | `DeletePathRequest` |
+| Delete path response | `DeletePathResponse` |
 
-Old names remain available as `[Obsolete]` compatibility aliases for now.
+## File Transfer DTOs
+
+The file transfer pipeline now uses these names:
+
+| Category | Type |
+| --- | --- |
+| Upload request | `FileUploadRequest` |
+| Upload response | `FileUploadResponse` |
+| Download request | `FileDownloadRequest` |
+| Download response | `FileDownloadResponse` |
+| Chunk data | `FileChunkData` |
+| Chunk acknowledgement | `FileChunkAck` |
+| Transfer reject | `FileTransferReject` |
+| Transfer complete | `FileTransferComplete` |
 
 ## Tests
 
