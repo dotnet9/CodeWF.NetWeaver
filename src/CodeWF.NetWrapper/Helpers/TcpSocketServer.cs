@@ -307,6 +307,7 @@ public partial class TcpSocketServer
                     command.IsCommand<FileDownloadRequest>() ||
                     command.IsCommand<FileChunkData>() ||
                     command.IsCommand<FileChunkAck>() ||
+                    command.IsCommand<FileTransferReject>() ||
                     command.IsCommand<BrowseFileSystemRequest>() ||
                     command.IsCommand<CreateDirectoryRequest>() ||
                     command.IsCommand<DeletePathRequest>())

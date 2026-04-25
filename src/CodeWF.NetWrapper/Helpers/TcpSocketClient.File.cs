@@ -26,6 +26,11 @@ public partial class TcpSocketClient
     /// </summary>
     public event EventHandler<FileTransferProgressEventArgs>? FileTransferProgress;
 
+    /// <summary>
+    /// 文件传输结果事件，当文件完成、失败或被取消时触发。
+    /// </summary>
+    public event EventHandler<FileTransferOutcomeEventArgs>? FileTransferOutcome;
+
     private readonly ConcurrentDictionary<string, UploadContext> _uploadContexts = new();
     private readonly ConcurrentDictionary<string, DownloadContext> _downloadContexts = new();
 
@@ -141,7 +146,8 @@ public partial class TcpSocketClient
             LocalFilePath = localFilePath,
             RemoteFilePath = remoteFilePath,
             FileHash = fileHash,
-            AlreadyTransferredBytes = 0
+            AlreadyTransferredBytes = 0,
+            CancellationToken = cancellationToken
         };
         _uploadContexts[ClientTransferContextKeys.GetTransferKey(remoteFilePath, taskId)] = context;
 
@@ -197,7 +203,8 @@ public partial class TcpSocketClient
             FileHash = localFileHash,
             AlreadyTransferredBytes = alreadyTransferredBytes,
             LocalFilePath = localSavePath,
-            RemoteFilePath = serverFilePath
+            RemoteFilePath = serverFilePath,
+            CancellationToken = cancellationToken
         };
         _downloadContexts[ClientTransferContextKeys.GetTransferKey(serverFilePath, taskId)] = context;
 
@@ -252,7 +259,10 @@ public partial class TcpSocketClient
                 else if (command.IsCommand<FileTransferReject>())
                 {
                     var reject = command.GetCommand<FileTransferReject>();
-                    HandleFileTransferRejectCommand(reject);
+                    if (!HandleFileTransferRejectCommand(reject))
+                    {
+                        await EventBus.EventBus.Default.PublishAsync(command);
+                    }
                 }
             }
             catch (Exception ex)
@@ -281,7 +291,8 @@ public partial class TcpSocketClient
             FileHash = request.FileHash,
             LocalFilePath = localPath,
             RemoteFilePath = request.RemoteFilePath,
-            AlreadyTransferredBytes = request.AlreadyTransferredBytes
+            AlreadyTransferredBytes = request.AlreadyTransferredBytes,
+            CancellationToken = CancellationToken.None
         };
         _downloadContexts[ClientTransferContextKeys.GetTransferKey(request.RemoteFilePath, request.TaskId)] = context;
 
@@ -304,6 +315,12 @@ public partial class TcpSocketClient
     {
         if (_uploadContexts.TryGetValue(ClientTransferContextKeys.GetTransferKey(response.RemoteFilePath, response.TaskId), out var context))
         {
+            if (context.CancellationToken.IsCancellationRequested)
+            {
+                await CancelUploadAsync(context, "客户端已取消上传");
+                return;
+            }
+
             context.AlreadyTransferredBytes = response.AlreadyTransferredBytes;
             Logger.Info($"{ServerMark} 收到服务端上传响应：已传输{response.AlreadyTransferredBytes}字节，开始发送文件块...");
             await SendUploadBlockAsync(context.LocalFilePath, context.RemoteFilePath, context.FileSize,
@@ -322,10 +339,24 @@ public partial class TcpSocketClient
     {
         if (_downloadContexts.TryGetValue(ClientTransferContextKeys.GetTransferKey(response.RemoteFilePath, response.TaskId), out var context))
         {
+            if (context.CancellationToken.IsCancellationRequested)
+            {
+                await CancelDownloadAsync(context, "客户端已取消下载");
+                return;
+            }
+
             if (!response.Accept)
             {
                 Logger.Warn($"{ServerMark} 服务端拒绝下载请求：{response.Message}");
                 _downloadContexts.TryRemove(ClientTransferContextKeys.GetTransferKey(response.RemoteFilePath, response.TaskId), out _);
+                FileTransferOutcome?.Invoke(this, new FileTransferOutcomeEventArgs(
+                    response.TaskId,
+                    context.FileName,
+                    context.RemoteFilePath,
+                    false,
+                    false,
+                    false,
+                    response.Message));
                 return;
             }
 
@@ -349,6 +380,12 @@ public partial class TcpSocketClient
         if (chunkAck.Success &&
             _uploadContexts.TryGetValue(ClientTransferContextKeys.GetTransferKey(chunkAck.RemoteFilePath, chunkAck.TaskId), out var context))
         {
+            if (context.CancellationToken.IsCancellationRequested)
+            {
+                await CancelUploadAsync(context, "客户端已取消上传");
+                return;
+            }
+
             var nextOffset = chunkAck.AlreadyTransferredBytes;
             context.AlreadyTransferredBytes = nextOffset;
             if (nextOffset >= context.FileSize)
@@ -356,6 +393,14 @@ public partial class TcpSocketClient
                 _uploadContexts.TryRemove(ClientTransferContextKeys.GetTransferKey(chunkAck.RemoteFilePath, chunkAck.TaskId), out _);
                 TryDeleteTransferProgress(context.LocalFilePath);
                 Logger.Info($"{ServerMark} 文件上传完成：{context.LocalFilePath} -> {context.RemoteFilePath}");
+                FileTransferOutcome?.Invoke(this, new FileTransferOutcomeEventArgs(
+                    context.TaskId,
+                    context.FileName,
+                    context.RemoteFilePath,
+                    true,
+                    true,
+                    false,
+                    "上传完成"));
                 return;
             }
 
@@ -365,14 +410,24 @@ public partial class TcpSocketClient
         else if (!chunkAck.Success)
         {
             Logger.Error($"{ServerMark} 服务器报告文件块传输失败：{chunkAck.Message}");
-            _uploadContexts.TryRemove(ClientTransferContextKeys.GetTransferKey(chunkAck.RemoteFilePath, chunkAck.TaskId), out _);
+            if (_uploadContexts.TryRemove(ClientTransferContextKeys.GetTransferKey(chunkAck.RemoteFilePath, chunkAck.TaskId), out var failedContext))
+            {
+                FileTransferOutcome?.Invoke(this, new FileTransferOutcomeEventArgs(
+                    chunkAck.TaskId,
+                    failedContext.FileName,
+                    failedContext.RemoteFilePath,
+                    true,
+                    false,
+                    false,
+                    chunkAck.Message));
+            }
         }
     }
 
     /// <summary>
     /// 处理文件传输拒绝命令（内部方法）
     /// </summary>
-    private void HandleFileTransferRejectCommand(FileTransferReject reject)
+    private bool HandleFileTransferRejectCommand(FileTransferReject reject)
     {
         var errorMessage = reject.ErrorCode switch
         {
@@ -391,7 +446,9 @@ public partial class TcpSocketClient
         if (_uploadContexts.TryGetValue(ClientTransferContextKeys.GetTransferKey(reject.RemoteFilePath, reject.TaskId), out var uploadContext))
         {
             FileTransferProgress?.Invoke(this, new FileTransferProgressEventArgs(
+                reject.TaskId,
                 reject.FileName,
+                reject.RemoteFilePath,
                 uploadContext.AlreadyTransferredBytes,
                 uploadContext.FileSize,
                 uploadContext.FileSize > 0
@@ -399,11 +456,23 @@ public partial class TcpSocketClient
                     : 0,
                 true));
             _uploadContexts.TryRemove(ClientTransferContextKeys.GetTransferKey(reject.RemoteFilePath, reject.TaskId), out _);
+            FileTransferOutcome?.Invoke(this, new FileTransferOutcomeEventArgs(
+                reject.TaskId,
+                reject.FileName,
+                reject.RemoteFilePath,
+                true,
+                false,
+                false,
+                errorMessage));
+            return true;
         }
-        else if (_downloadContexts.TryGetValue(ClientTransferContextKeys.GetTransferKey(reject.RemoteFilePath, reject.TaskId), out var downloadContext))
+
+        if (_downloadContexts.TryGetValue(ClientTransferContextKeys.GetTransferKey(reject.RemoteFilePath, reject.TaskId), out var downloadContext))
         {
             FileTransferProgress?.Invoke(this, new FileTransferProgressEventArgs(
+                reject.TaskId,
                 reject.FileName,
+                reject.RemoteFilePath,
                 downloadContext.AlreadyTransferredBytes,
                 downloadContext.FileSize,
                 downloadContext.FileSize > 0
@@ -411,7 +480,18 @@ public partial class TcpSocketClient
                     : 0,
                 false));
             _downloadContexts.TryRemove(ClientTransferContextKeys.GetTransferKey(reject.RemoteFilePath, reject.TaskId), out _);
+            FileTransferOutcome?.Invoke(this, new FileTransferOutcomeEventArgs(
+                reject.TaskId,
+                reject.FileName,
+                reject.RemoteFilePath,
+                false,
+                false,
+                false,
+                errorMessage));
+            return true;
         }
+
+        return false;
     }
 
     /// <summary>
@@ -435,6 +515,12 @@ public partial class TcpSocketClient
 
         try
         {
+            if (context.CancellationToken.IsCancellationRequested)
+            {
+                await CancelDownloadAsync(context, "客户端已取消下载");
+                return;
+            }
+
             var localFilePath = context.LocalFilePath;
             var directory = Path.GetDirectoryName(localFilePath) ?? ".";
             if (!Directory.Exists(directory))
@@ -460,7 +546,9 @@ public partial class TcpSocketClient
 
             var progress = context.FileSize > 0 ? (double)totalBytes / context.FileSize * 100 : 0;
             FileTransferProgress?.Invoke(this, new FileTransferProgressEventArgs(
+                context.TaskId,
                 context.FileName,
+                context.RemoteFilePath,
                 totalBytes,
                 context.FileSize,
                 progress,
@@ -484,11 +572,38 @@ public partial class TcpSocketClient
                     if (!string.Equals(localHash, context.FileHash, StringComparison.OrdinalIgnoreCase))
                     {
                         Logger.Error($"{ServerMark} 文件下载完成但哈希校验失败：{localFilePath}");
+                        FileTransferOutcome?.Invoke(this, new FileTransferOutcomeEventArgs(
+                            context.TaskId,
+                            context.FileName,
+                            context.RemoteFilePath,
+                            false,
+                            false,
+                            false,
+                            "下载完成，但哈希校验失败"));
                     }
                     else
                     {
                         Logger.Info($"{ServerMark} 文件下载完成：{remoteFilePath} -> {localFilePath}");
+                        FileTransferOutcome?.Invoke(this, new FileTransferOutcomeEventArgs(
+                            context.TaskId,
+                            context.FileName,
+                            context.RemoteFilePath,
+                            false,
+                            true,
+                            false,
+                            "下载完成"));
                     }
+                }
+                else
+                {
+                    FileTransferOutcome?.Invoke(this, new FileTransferOutcomeEventArgs(
+                        context.TaskId,
+                        context.FileName,
+                        context.RemoteFilePath,
+                        false,
+                        true,
+                        false,
+                        "下载完成"));
                 }
 
                 _downloadContexts.TryRemove(ClientTransferContextKeys.GetTransferKey(remoteFilePath, chunkData.TaskId), out _);
@@ -562,11 +677,54 @@ public partial class TcpSocketClient
         var newTransferredBytes = alreadyTransferredBytes + bytesRead;
         var progress = fileSize > 0 ? (double)newTransferredBytes / fileSize * 100 : 0;
         FileTransferProgress?.Invoke(this, new FileTransferProgressEventArgs(
+            taskId,
             fileName,
+            remoteFilePath,
             newTransferredBytes,
             fileSize,
             progress,
             true));
+    }
+
+    private async Task CancelUploadAsync(UploadContext context, string message)
+    {
+        _uploadContexts.TryRemove(ClientTransferContextKeys.GetTransferKey(context.RemoteFilePath, context.TaskId), out _);
+        await NotifyTransferCancelledAsync(context.TaskId, context.FileName, context.RemoteFilePath, true, message);
+    }
+
+    private async Task CancelDownloadAsync(DownloadContext context, string message)
+    {
+        _downloadContexts.TryRemove(ClientTransferContextKeys.GetTransferKey(context.RemoteFilePath, context.TaskId), out _);
+        await NotifyTransferCancelledAsync(context.TaskId, context.FileName, context.RemoteFilePath, false, message);
+    }
+
+    private async Task NotifyTransferCancelledAsync(int taskId, string fileName, string remoteFilePath, bool isUpload,
+        string message)
+    {
+        try
+        {
+            await SendCommandAsync(new FileTransferReject
+            {
+                TaskId = taskId,
+                FileName = fileName,
+                RemoteFilePath = remoteFilePath,
+                ErrorCode = FileTransferErrorCode.UnknownError,
+                Message = message
+            });
+        }
+        catch (Exception ex)
+        {
+            Logger.Warn($"{ServerMark} 发送取消传输通知失败：{remoteFilePath}，{ex.Message}");
+        }
+
+        FileTransferOutcome?.Invoke(this, new FileTransferOutcomeEventArgs(
+            taskId,
+            fileName,
+            remoteFilePath,
+            isUpload,
+            false,
+            true,
+            message));
     }
 
     private static async Task<string> ComputeFileHashAsync(string filePath)
@@ -627,6 +785,7 @@ internal class UploadContext
     public long FileSize { get; set; }
     public string FileHash { get; set; } = string.Empty;
     public long AlreadyTransferredBytes { get; set; }
+    public CancellationToken CancellationToken { get; set; }
 }
 
 internal class DownloadContext
@@ -638,6 +797,7 @@ internal class DownloadContext
     public long FileSize { get; set; }
     public string FileHash { get; set; } = string.Empty;
     public long AlreadyTransferredBytes { get; set; }
+    public CancellationToken CancellationToken { get; set; }
 }
 
 internal static class ClientTransferContextKeys

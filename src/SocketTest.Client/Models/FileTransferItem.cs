@@ -1,39 +1,195 @@
 using ReactiveUI;
+using System;
+using System.IO;
+using System.Threading;
 
 namespace SocketTest.Client.Models;
 
 public class FileTransferItem : ReactiveObject
 {
+    private bool _isSelected;
     private double _progress;
     private long _transferredBytes;
-    private string _commandText = "取消";
-    private string _status = "等待";
+    private long _totalBytes;
+    private string _detail = "等待开始";
+    private FileTransferState _state = FileTransferState.Queued;
 
-    public string LocalPath { get; set; } = string.Empty;
-    public string RemotePath { get; set; } = string.Empty;
-    public string TransferType { get; set; } = string.Empty;
+    public Guid Id { get; } = Guid.NewGuid();
+
+    public int TaskId { get; set; }
+
+    public string DisplayName { get; init; } = string.Empty;
+
+    public string SourcePath { get; init; } = string.Empty;
+
+    public string DestinationPath { get; init; } = string.Empty;
+
+    public FileTransferDirection Direction { get; init; }
+
+    public DateTime CreatedAt { get; init; } = DateTime.Now;
+
+    public DateTime? StartedAt { get; set; }
+
+    public DateTime? CompletedAt { get; set; }
+
+    public CancellationTokenSource? CancellationSource { get; set; }
+
+    public bool IsSelected
+    {
+        get => _isSelected;
+        set => this.RaiseAndSetIfChanged(ref _isSelected, value);
+    }
 
     public double Progress
     {
         get => _progress;
-        set => this.RaiseAndSetIfChanged(ref _progress, value);
+        set
+        {
+            this.RaiseAndSetIfChanged(ref _progress, value);
+            this.RaisePropertyChanged(nameof(ProgressText));
+        }
     }
 
     public long TransferredBytes
     {
         get => _transferredBytes;
-        set => this.RaiseAndSetIfChanged(ref _transferredBytes, value);
+        set
+        {
+            this.RaiseAndSetIfChanged(ref _transferredBytes, value);
+            this.RaisePropertyChanged(nameof(TransferredText));
+        }
     }
 
-    public string Status
+    public long TotalBytes
     {
-        get => _status;
-        set => this.RaiseAndSetIfChanged(ref _status, value);
+        get => _totalBytes;
+        set
+        {
+            this.RaiseAndSetIfChanged(ref _totalBytes, value);
+            this.RaisePropertyChanged(nameof(TransferredText));
+        }
     }
 
-    public string CommandText
+    public FileTransferState State
     {
-        get => _commandText;
-        set => this.RaiseAndSetIfChanged(ref _commandText, value);
+        get => _state;
+        set
+        {
+            this.RaiseAndSetIfChanged(ref _state, value);
+            this.RaisePropertyChanged(nameof(StateText));
+            this.RaisePropertyChanged(nameof(ActionText));
+            this.RaisePropertyChanged(nameof(HasPrimaryAction));
+        }
+    }
+
+    public string Detail
+    {
+        get => _detail;
+        set => this.RaiseAndSetIfChanged(ref _detail, value);
+    }
+
+    public string DirectionText => Direction == FileTransferDirection.Upload ? "上传" : "下载";
+
+    public string StateText => State switch
+    {
+        FileTransferState.Queued => "排队中",
+        FileTransferState.Running => "传输中",
+        FileTransferState.Paused => "已暂停",
+        FileTransferState.Completed => "已完成",
+        FileTransferState.Failed => "失败",
+        _ => "未知"
+    };
+
+    public string ActionText => State switch
+    {
+        FileTransferState.Queued => "停止",
+        FileTransferState.Running => "停止",
+        FileTransferState.Paused => "继续",
+        FileTransferState.Failed => "重试",
+        _ => string.Empty
+    };
+
+    public bool HasPrimaryAction => State != FileTransferState.Completed;
+
+    public string ProgressText => $"{Progress:F1}%";
+
+    public string TransferredText => TotalBytes > 0
+        ? $"{FormatBytes(TransferredBytes)} / {FormatBytes(TotalBytes)}"
+        : FormatBytes(TransferredBytes);
+
+    public string SourceName => Path.GetFileName(SourcePath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+
+    public bool CanRemove => State != FileTransferState.Running;
+
+    public void MarkQueued(string? detail = null)
+    {
+        State = FileTransferState.Queued;
+        CompletedAt = null;
+        if (!string.IsNullOrWhiteSpace(detail))
+        {
+            Detail = detail;
+        }
+    }
+
+    public void MarkRunning(string? detail = null)
+    {
+        State = FileTransferState.Running;
+        StartedAt ??= DateTime.Now;
+        CompletedAt = null;
+        if (!string.IsNullOrWhiteSpace(detail))
+        {
+            Detail = detail;
+        }
+    }
+
+    public void MarkPaused(string? detail = null)
+    {
+        State = FileTransferState.Paused;
+        CompletedAt = DateTime.Now;
+        if (!string.IsNullOrWhiteSpace(detail))
+        {
+            Detail = detail;
+        }
+    }
+
+    public void MarkCompleted(string? detail = null)
+    {
+        State = FileTransferState.Completed;
+        Progress = 100;
+        CompletedAt = DateTime.Now;
+        if (!string.IsNullOrWhiteSpace(detail))
+        {
+            Detail = detail;
+        }
+    }
+
+    public void MarkFailed(string? detail = null)
+    {
+        State = FileTransferState.Failed;
+        CompletedAt = DateTime.Now;
+        if (!string.IsNullOrWhiteSpace(detail))
+        {
+            Detail = detail;
+        }
+    }
+
+    private static string FormatBytes(long bytes)
+    {
+        if (bytes < 1024)
+        {
+            return $"{bytes} B";
+        }
+
+        if (bytes < 1024 * 1024)
+        {
+            return $"{bytes / 1024d:F1} KB";
+        }
+
+        if (bytes < 1024L * 1024 * 1024)
+        {
+            return $"{bytes / 1024d / 1024d:F1} MB";
+        }
+
+        return $"{bytes / 1024d / 1024d / 1024d:F1} GB";
     }
 }

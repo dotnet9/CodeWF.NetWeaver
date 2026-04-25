@@ -8,13 +8,15 @@ public class MainWindowViewModel : ReactiveObject
     public MainWindowViewModel()
     {
         ProcessMonitorViewModel = new ProcessMonitorViewModel();
-        FileTransferViewModel = new FileTransferViewModel();
-        RemoteFileManagerViewModel = new RemoteFileManagerViewModel();
+        FileTransferViewModel = new FileTransferViewModel(ProcessMonitorViewModel.TcpHelper);
+        RemoteFileManagerViewModel = new RemoteFileManagerViewModel(ProcessMonitorViewModel.TcpHelper, FileTransferViewModel);
     }
 
     public WindowNotificationManager? NotificationManager { get; set; }
 
     public ProcessMonitorViewModel ProcessMonitorViewModel { get; }
+
     public FileTransferViewModel FileTransferViewModel { get; }
+
     public RemoteFileManagerViewModel RemoteFileManagerViewModel { get; }
 }

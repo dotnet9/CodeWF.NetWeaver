@@ -4,22 +4,42 @@
         xmlns:views="using:SocketTest.Client.Views"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="850"
-        Width="1000" Height="850"
+        mc:Ignorable="d"
+        d:DesignWidth="1440"
+        d:DesignHeight="920"
+        Width="1440"
+        Height="920"
+        MinWidth="1180"
+        MinHeight="760"
         x:Class="SocketTest.Client.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Icon="/Assets/logo.ico"
         Title="SocketTest.Client">
+    <Window.Styles>
+        <Style Selector="TabControl">
+            <Setter Property="Background" Value="#F5F7FA" />
+        </Style>
+    </Window.Styles>
 
-    <TabControl>
-        <TabItem Header="进程监控">
-            <views:ProcessMonitorView DataContext="{Binding ProcessMonitorViewModel}" />
-        </TabItem>
-        <TabItem Header="远程文件管理">
-            <views:RemoteFileManagerView DataContext="{Binding RemoteFileManagerViewModel}" />
-        </TabItem>
-        <TabItem Header="文件传输">
-            <views:FileTransferView DataContext="{Binding FileTransferViewModel}" />
-        </TabItem>
-    </TabControl>
+    <Grid RowDefinitions="Auto,*" Background="#F5F7FA">
+        <Border Padding="24,20,24,18" Background="#FFFFFF" BorderBrush="#E5E7EB" BorderThickness="0,0,0,1">
+            <StackPanel Spacing="6">
+                <TextBlock FontSize="24" FontWeight="SemiBold" Text="SocketTest.Client 控制台" />
+                <TextBlock Foreground="#667085"
+                           Text="进程监控、远程文件管理与文件传输统一联动，优先保证操作清晰、状态可见、反馈及时。" />
+            </StackPanel>
+        </Border>
+
+        <TabControl Grid.Row="1" Margin="18">
+            <TabItem Header="进程监控">
+                <views:ProcessMonitorView DataContext="{Binding ProcessMonitorViewModel}" />
+            </TabItem>
+            <TabItem Header="远程文件管理">
+                <views:RemoteFileManagerView DataContext="{Binding RemoteFileManagerViewModel}" />
+            </TabItem>
+            <TabItem Header="文件传输">
+                <views:FileTransferView DataContext="{Binding FileTransferViewModel}" />
+            </TabItem>
+        </TabControl>
+    </Grid>
 </Window>

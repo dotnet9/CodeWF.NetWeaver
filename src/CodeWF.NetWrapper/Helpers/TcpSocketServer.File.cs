@@ -81,6 +81,11 @@ public partial class TcpSocketServer
                     var chunkAck = command.GetCommand<FileChunkAck>();
                     await HandleFileChunkAckAsync(command.Client!, chunkAck);
                 }
+                else if (command.IsCommand<FileTransferReject>())
+                {
+                    var reject = command.GetCommand<FileTransferReject>();
+                    await HandleClientTransferRejectAsync(command.Client!, reject);
+                }
             }
             catch (Exception ex)
             {
@@ -1008,11 +1013,32 @@ public partial class TcpSocketServer
     {
         var progress = totalBytes > 0 ? (double)transferredBytes / totalBytes * 100 : 0;
         FileTransferProgress?.Invoke(this, new FileTransferProgressEventArgs(
+            0,
             fileName,
+            string.Empty,
             transferredBytes,
             totalBytes,
             progress,
             isUpload));
+    }
+
+    private Task HandleClientTransferRejectAsync(Socket client, FileTransferReject reject)
+    {
+        var clientKey = client.RemoteEndPoint?.ToString() ?? string.Empty;
+        var uploadKey = GetTransferKey(clientKey, reject.RemoteFilePath, reject.TaskId);
+        if (_uploadContexts.TryRemove(uploadKey, out _))
+        {
+            Logger.Warn($"{ServerMark} 客户端({clientKey})取消上传：{reject.RemoteFilePath}，原因：{reject.Message}");
+            return Task.CompletedTask;
+        }
+
+        var downloadKey = GetTransferKey(clientKey, reject.RemoteFilePath, reject.TaskId);
+        if (_downloadContexts.TryRemove(downloadKey, out _))
+        {
+            Logger.Warn($"{ServerMark} 客户端({clientKey})取消下载：{reject.RemoteFilePath}，原因：{reject.Message}");
+        }
+
+        return Task.CompletedTask;
     }
 
     private static string GetTransferKey(string clientKey, string remoteFilePath, int taskId) =>

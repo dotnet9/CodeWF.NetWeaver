@@ -3,9 +3,9 @@ using System;
 namespace CodeWF.NetWrapper.Models;
 
 /// <summary>
-/// 文件传输进度事件参数。
+/// 文件传输完成、失败或被取消时的结果事件参数。
 /// </summary>
-public class FileTransferProgressEventArgs : EventArgs
+public class FileTransferOutcomeEventArgs : EventArgs
 {
     /// <summary>
     /// 当前传输任务 ID。
@@ -23,37 +23,37 @@ public class FileTransferProgressEventArgs : EventArgs
     public string RemoteFilePath { get; }
 
     /// <summary>
-    /// 已传输字节数。
-    /// </summary>
-    public long TransferredBytes { get; }
-
-    /// <summary>
-    /// 文件总字节数。
-    /// </summary>
-    public long TotalBytes { get; }
-
-    /// <summary>
-    /// 当前进度百分比。
-    /// </summary>
-    public double Progress { get; }
-
-    /// <summary>
     /// 是否为上传任务。
     /// </summary>
     public bool IsUpload { get; }
 
     /// <summary>
-    /// 初始化文件传输进度事件参数。
+    /// 当前结果是否成功。
     /// </summary>
-    public FileTransferProgressEventArgs(int taskId, string fileName, string remoteFilePath, long transferredBytes,
-        long totalBytes, double progress, bool isUpload)
+    public bool Success { get; }
+
+    /// <summary>
+    /// 当前结果是否为用户取消。
+    /// </summary>
+    public bool IsCancelled { get; }
+
+    /// <summary>
+    /// 结果说明消息。
+    /// </summary>
+    public string Message { get; }
+
+    /// <summary>
+    /// 初始化文件传输结果事件参数。
+    /// </summary>
+    public FileTransferOutcomeEventArgs(int taskId, string fileName, string remoteFilePath, bool isUpload,
+        bool success, bool isCancelled, string message)
     {
         TaskId = taskId;
         FileName = fileName;
         RemoteFilePath = remoteFilePath;
-        TransferredBytes = transferredBytes;
-        TotalBytes = totalBytes;
-        Progress = progress;
         IsUpload = isUpload;
+        Success = success;
+        IsCancelled = isCancelled;
+        Message = message;
     }
 }
