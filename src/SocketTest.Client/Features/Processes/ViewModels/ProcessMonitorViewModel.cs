@@ -12,6 +12,7 @@ using SocketDto.Response;
 using SocketDto.Udp;
 using SocketTest.Client.Features.Processes.Models;
 using SocketTest.Client.Infrastructure.Collections;
+using SocketTest.Client.Shell.Messages;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -39,8 +40,6 @@ public class ProcessMonitorViewModel : ReactiveObject
 
         EventBus.Default.Subscribe(this);
     }
-
-    public event Action<bool>? ConnectionStateChanged;
 
     public RangeObservableCollection<ProcessItemModel> DisplayProcesses { get; }
 
@@ -100,7 +99,7 @@ public class ProcessMonitorViewModel : ReactiveObject
             TcpHelper.Stop();
             ClearProcesses();
             RaiseConnectionProperties();
-            ConnectionStateChanged?.Invoke(false);
+            await EventBus.Default.PublishAsync(new ClientConnectionStateChangedMessage(false));
             return;
         }
 
@@ -113,7 +112,7 @@ public class ProcessMonitorViewModel : ReactiveObject
         }
 
         RaiseConnectionProperties();
-        ConnectionStateChanged?.Invoke(true);
+        await EventBus.Default.PublishAsync(new ClientConnectionStateChangedMessage(true));
         await RequestInitialDataAsync();
     }
 

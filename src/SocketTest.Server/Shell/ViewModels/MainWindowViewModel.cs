@@ -6,7 +6,6 @@ using CodeWF.NetWeaver;
 using CodeWF.NetWrapper.Commands;
 using CodeWF.NetWrapper.Helpers;
 using CodeWF.NetWrapper.Models;
-using CodeWF.NetWrapper.Response;
 using CodeWF.Tools.Helpers;
 using ReactiveUI;
 using SocketDto;
@@ -14,14 +13,13 @@ using SocketDto.AutoCommand;
 using SocketDto.Enums;
 using SocketDto.Requests;
 using SocketDto.Response;
-using SocketDto.Udp;
 using SocketTest.Server.Configuration;
 using SocketTest.Server.Features.Processes.Services;
+using SocketTest.Server.Shell.Messages;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
-using System.Diagnostics;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
@@ -64,11 +62,13 @@ public class MainWindowViewModel : ReactiveObject
         TcpHelper = new TcpSocketServer();
         UdpHelper = new UdpSocketServer();
         ConnectedClients.CollectionChanged += ConnectedClientsOnCollectionChanged;
+        StatusBarViewModel = new ServerStatusBarViewModel();
 
         EventBus.Default.Subscribe(this);
 
         Logger.Info($"服务端配置文件：{_settingsFilePath}");
         Logger.Info("首次启动时会自动生成 TCP/UDP 配置并写入配置文件。");
+        PublishServerStatusChanged();
     }
 
     public WindowNotificationManager? NotificationManager { get; set; }
@@ -76,6 +76,8 @@ public class MainWindowViewModel : ReactiveObject
     public TcpSocketServer TcpHelper { get; }
 
     public UdpSocketServer UdpHelper { get; }
+
+    public ServerStatusBarViewModel StatusBarViewModel { get; }
 
     public ObservableCollection<KeyValuePair<string, Socket>> ConnectedClients { get; } = [];
 
@@ -103,6 +105,7 @@ public class MainWindowViewModel : ReactiveObject
             StartBackgroundTimers();
             IsRunning = true;
             RaiseServerStateProperties();
+            PublishServerStatusChanged();
 
             await Log("服务端已启动，正在实时采集真实进程并向客户端广播。");
             Logger.Info(
@@ -115,6 +118,7 @@ public class MainWindowViewModel : ReactiveObject
         UdpHelper.Stop();
         IsRunning = false;
         RaiseServerStateProperties();
+        PublishServerStatusChanged();
         await Log("服务端已停止。");
     }
 
@@ -204,8 +208,6 @@ public class MainWindowViewModel : ReactiveObject
 
     private async Task<bool> TryStartServerCoreAsync()
     {
-        TcpHelper.FileSaveDirectory = null;
-
         var tcpResult = await TcpHelper.StartAsync("TCP服务端", _runtimeSettings.TcpIp, _runtimeSettings.TcpPort);
         if (!tcpResult.IsSuccess)
         {
@@ -376,6 +378,7 @@ public class MainWindowViewModel : ReactiveObject
     {
         var result = _processSnapshotProvider.RefreshSnapshot();
         CurrentProcessCount = result.ProcessCount;
+        PublishServerStatusChanged();
         return result.StructureChanged;
     }
 
@@ -404,7 +407,6 @@ public class MainWindowViewModel : ReactiveObject
         await PushUdpSnapshotAsync(
             _processSnapshotProvider.CalculateRealtimeUdpPage,
             _processSnapshotProvider.BuildRealtimeUpdatePage,
-            "已推送实时进程 UDP 数据，共 {0} 条，分页 {1}，耗时 {2}ms。",
             "推送实时进程 UDP 数据失败。");
     }
 
@@ -413,7 +415,6 @@ public class MainWindowViewModel : ReactiveObject
         await PushUdpSnapshotAsync(
             _processSnapshotProvider.CalculateGeneralUdpPage,
             _processSnapshotProvider.BuildGeneralUpdatePage,
-            "已推送通用进程 UDP 数据，共 {0} 条，分页 {1}，耗时 {2}ms。",
             "推送通用进程 UDP 数据失败。");
     }
 
@@ -431,6 +432,7 @@ public class MainWindowViewModel : ReactiveObject
     private void ConnectedClientsOnCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
         this.RaisePropertyChanged(nameof(ClientCount));
+        PublishServerStatusChanged();
     }
 
     private void Invoke(Action action)
@@ -520,7 +522,6 @@ public class MainWindowViewModel : ReactiveObject
     private async Task PushUdpSnapshotAsync(
         UdpPageCalculator calculatePage,
         Func<int, int, CodeWF.NetWeaver.Base.INetObject> buildPage,
-        string successMessageFormat,
         string errorMessage)
     {
         if (!UdpHelper.IsRunning)
@@ -533,7 +534,6 @@ public class MainWindowViewModel : ReactiveObject
             EnsureProcessSnapshot();
             calculatePage(SerializeHelper.MaxUdpPacketSize, out var pageSize, out var pageCount);
 
-            var stopwatch = Stopwatch.StartNew();
             for (var pageIndex = 0; pageIndex < pageCount; pageIndex++)
             {
                 if (!UdpHelper.IsRunning)
@@ -543,8 +543,6 @@ public class MainWindowViewModel : ReactiveObject
 
                 await UdpHelper.SendCommandAsync(buildPage(pageSize, pageIndex), DateTimeOffset.UtcNow);
             }
-
-            Logger.Info(string.Format(successMessageFormat, CurrentProcessCount, pageCount, stopwatch.ElapsedMilliseconds));
         }
         catch (Exception ex)
         {
@@ -553,5 +551,11 @@ public class MainWindowViewModel : ReactiveObject
     }
 
     private delegate void UdpPageCalculator(int maxPacketSize, out int pageSize, out int pageCount);
+
+    private void PublishServerStatusChanged() =>
+        _ = EventBus.Default.PublishAsync(new ServerShellStatusChangedMessage(
+            ServiceStatusText,
+            CurrentProcessCount,
+            ClientCount));
 
 }

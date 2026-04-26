@@ -1,0 +1,48 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:SocketTest.Client.Shell.ViewModels"
+             mc:Ignorable="d"
+             x:Class="SocketTest.Client.Shell.Views.Controls.ClientConnectionPanelView"
+             x:DataType="vm:ClientConnectionPanelViewModel">
+    <Border Padding="20,16"
+            Background="#FFFFFF"
+            BorderBrush="#E5E7EB"
+            BorderThickness="0,0,0,1">
+        <Grid ColumnDefinitions="*,Auto,140,Auto,110,Auto,Auto" ColumnSpacing="10">
+            <StackPanel Spacing="4">
+                <TextBlock FontSize="22" FontWeight="SemiBold" Text="SocketTest.Client" />
+                <TextBlock Foreground="#667085"
+                           Text="统一连接、日志与状态信息，协同完成进程监控、远程文件浏览和文件传输。" />
+            </StackPanel>
+
+            <TextBlock Grid.Column="1" VerticalAlignment="Center" Text="服务端地址" />
+            <TextBox Grid.Column="2"
+                     Height="36"
+                     Text="{Binding ProcessMonitorViewModel.TcpIp, Mode=TwoWay}"
+                     Watermark="127.0.0.1" />
+
+            <TextBlock Grid.Column="3" VerticalAlignment="Center" Text="端口" />
+            <TextBox Grid.Column="4"
+                     Height="36"
+                     Text="{Binding ProcessMonitorViewModel.TcpPort, Mode=TwoWay}" />
+
+            <Button Grid.Column="5"
+                    MinWidth="120"
+                    Height="36"
+                    Command="{Binding ProcessMonitorViewModel.HandleConnectTcpAsync}"
+                    Content="{Binding ProcessMonitorViewModel.ConnectButtonText}" />
+
+            <Border Grid.Column="6"
+                    Padding="12,8"
+                    Background="#F8FAFC"
+                    BorderBrush="#E2E8F0"
+                    BorderThickness="1"
+                    CornerRadius="10">
+                <TextBlock Foreground="#475467"
+                           Text="{Binding ProcessMonitorViewModel.ConnectionSummary}" />
+            </Border>
+        </Grid>
+    </Border>
+</UserControl>

@@ -1,0 +1,23 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:SocketTest.Client.Shell.ViewModels"
+             mc:Ignorable="d"
+             x:Class="SocketTest.Client.Shell.Views.Controls.ProcessMonitorStatusView"
+             x:DataType="vm:ProcessMonitorStatusViewModel">
+    <Grid ColumnDefinitions="Auto,Auto,Auto,*" ColumnSpacing="18">
+        <StackPanel Orientation="Horizontal" Spacing="6">
+            <TextBlock Foreground="#9CA3AF" Text="TCP" />
+            <TextBlock Foreground="White" Text="{Binding ProcessMonitorViewModel.ConnectionSummary}" />
+        </StackPanel>
+        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
+            <TextBlock Foreground="#9CA3AF" Text="UDP" />
+            <TextBlock Foreground="White" Text="{Binding ProcessMonitorViewModel.UdpSummary}" />
+        </StackPanel>
+        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6">
+            <TextBlock Foreground="#9CA3AF" Text="进程概览" />
+            <TextBlock Foreground="White" Text="{Binding ProcessMonitorViewModel.ProcessSummary}" />
+        </StackPanel>
+    </Grid>
+</UserControl>

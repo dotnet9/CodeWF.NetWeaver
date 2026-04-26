@@ -1,6 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:SocketTest.Server.Shell.ViewModels"
+        xmlns:controls="using:SocketTest.Server.Shell.Views.Controls"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:codewf="https://codewf.com"
@@ -55,25 +56,8 @@
             </Grid>
         </Border>
 
-        <Border Grid.Row="2"
-                Margin="18,0,18,18"
-                Padding="14,10"
-                Background="#111827"
-                CornerRadius="12">
-            <Grid ColumnDefinitions="Auto,Auto,Auto,*" ColumnSpacing="18">
-                <StackPanel Orientation="Horizontal" Spacing="6">
-                    <TextBlock Foreground="#9CA3AF" Text="状态" />
-                    <TextBlock Foreground="White" Text="{Binding ServiceStatusText}" />
-                </StackPanel>
-                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
-                    <TextBlock Foreground="#9CA3AF" Text="进程数" />
-                    <TextBlock Foreground="White" Text="{Binding CurrentProcessCount}" />
-                </StackPanel>
-                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6">
-                    <TextBlock Foreground="#9CA3AF" Text="客户端" />
-                    <TextBlock Foreground="White" Text="{Binding ClientCount}" />
-                </StackPanel>
-            </Grid>
-        </Border>
+        <controls:ServerStatusBarView Grid.Row="2"
+                                      DataContext="{Binding StatusBarViewModel}"
+                                      Margin="18,0,18,18" />
     </Grid>
 </Window>

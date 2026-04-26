@@ -1,48 +1,34 @@
 using Avalonia.Controls.Notifications;
-using ReactiveUI;
 using SocketTest.Client.Features.Processes.ViewModels;
 using SocketTest.Client.Features.RemoteFiles.ViewModels;
 using SocketTest.Client.Features.Transfers.ViewModels;
 
 namespace SocketTest.Client.Shell.ViewModels;
 
-public class MainWindowViewModel : ReactiveObject
+public class MainWindowViewModel
 {
     public MainWindowViewModel()
     {
-        ProcessMonitorViewModel = new ProcessMonitorViewModel();
-        FileTransferViewModel = new FileTransferViewModel(ProcessMonitorViewModel.TcpHelper);
-        RemoteFileExplorerViewModel = new RemoteFileExplorerViewModel(ProcessMonitorViewModel.TcpHelper, FileTransferViewModel);
+        var processMonitorViewModel = new ProcessMonitorViewModel();
+        var fileTransferViewModel = new FileTransferViewModel(processMonitorViewModel.TcpHelper);
+        var remoteFileExplorerViewModel = new RemoteFileExplorerViewModel(processMonitorViewModel.TcpHelper, fileTransferViewModel);
 
-        ProcessMonitorViewModel.ConnectionStateChanged += isConnected =>
-        {
-            _ = RemoteFileExplorerViewModel.HandleConnectionStateChangedAsync(isConnected);
-        };
+        ConnectionPanelViewModel = new ClientConnectionPanelViewModel(processMonitorViewModel);
+        ModuleTabsViewModel = new ClientModuleTabsViewModel(
+            processMonitorViewModel,
+            remoteFileExplorerViewModel,
+            fileTransferViewModel);
+        StatusBarViewModel = new ClientStatusBarViewModel(
+            new ProcessMonitorStatusViewModel(processMonitorViewModel),
+            new RemoteFileExplorerStatusViewModel(remoteFileExplorerViewModel),
+            new FileTransferStatusViewModel(fileTransferViewModel));
     }
 
     public WindowNotificationManager? NotificationManager { get; set; }
 
-    public ProcessMonitorViewModel ProcessMonitorViewModel { get; }
+    public ClientConnectionPanelViewModel ConnectionPanelViewModel { get; }
 
-    public FileTransferViewModel FileTransferViewModel { get; }
+    public ClientModuleTabsViewModel ModuleTabsViewModel { get; }
 
-    public RemoteFileExplorerViewModel RemoteFileExplorerViewModel { get; }
-
-    public int SelectedTabIndex
-    {
-        get;
-        set
-        {
-            this.RaiseAndSetIfChanged(ref field, value);
-            this.RaisePropertyChanged(nameof(IsProcessMonitorTabSelected));
-            this.RaisePropertyChanged(nameof(IsRemoteFileExplorerTabSelected));
-            this.RaisePropertyChanged(nameof(IsFileTransferTabSelected));
-        }
-    }
-
-    public bool IsProcessMonitorTabSelected => SelectedTabIndex == 0;
-
-    public bool IsRemoteFileExplorerTabSelected => SelectedTabIndex == 1;
-
-    public bool IsFileTransferTabSelected => SelectedTabIndex == 2;
+    public ClientStatusBarViewModel StatusBarViewModel { get; }
 }

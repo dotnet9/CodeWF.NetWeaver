@@ -8,6 +8,7 @@ using CodeWF.NetWrapper.Response;
 using ReactiveUI;
 using SocketTest.Client.Features.RemoteFiles.Models;
 using SocketTest.Client.Features.Transfers.ViewModels;
+using SocketTest.Client.Shell.Messages;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -589,6 +590,12 @@ public class RemoteFileExplorerViewModel : ReactiveObject
         {
             HandleRemoteReject(message.GetCommand<FileTransferReject>());
         }
+    }
+
+    [EventHandler]
+    private async Task ReceiveClientConnectionStateChangedAsync(ClientConnectionStateChangedMessage message)
+    {
+        await HandleConnectionStateChangedAsync(message.IsConnected);
     }
 
     private async Task OpenEntryAsync(RemoteFileEntry entry)

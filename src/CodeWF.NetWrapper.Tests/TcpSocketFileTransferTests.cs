@@ -27,18 +27,18 @@ public sealed class TcpSocketFileTransferTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task UploadFileAsync_UploadsFileIntoServerRoot()
+    public async Task UploadFileAsync_UploadsFileIntoRequestedServerPath()
     {
         var serverRoot = CreateDirectory("server-upload-root");
         var localRoot = CreateDirectory("client-upload-root");
         var localFile = Path.Combine(localRoot, "upload.bin");
+        var serverFile = Path.Combine(serverRoot, "uploads", "upload.bin");
         await File.WriteAllBytesAsync(localFile, CreateTestBytes(180_000));
 
-        await using var harness = await CreateHarnessAsync(serverRoot);
+        await using var harness = await CreateHarnessAsync();
 
-        await harness.Client.UploadFileAsync(localFile, "uploads/upload.bin");
+        await harness.Client.UploadFileAsync(localFile, serverFile);
 
-        var serverFile = Path.Combine(serverRoot, "uploads", "upload.bin");
         await WaitForConditionAsync(() => File.Exists(serverFile) &&
                                          new FileInfo(serverFile).Length == new FileInfo(localFile).Length);
 
@@ -54,9 +54,9 @@ public sealed class TcpSocketFileTransferTests : IAsyncLifetime
         Directory.CreateDirectory(Path.GetDirectoryName(serverFile)!);
         await File.WriteAllBytesAsync(serverFile, CreateTestBytes(220_000));
 
-        await using var harness = await CreateHarnessAsync(serverRoot);
+        await using var harness = await CreateHarnessAsync();
 
-        await harness.Client.DownloadFileAsync("downloads/server.bin", localRoot);
+        await harness.Client.DownloadFileAsync(serverFile, localRoot);
 
         var localFile = Path.Combine(localRoot, "server.bin");
         await WaitForConditionAsync(() => File.Exists(localFile) &&
@@ -66,25 +66,24 @@ public sealed class TcpSocketFileTransferTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task FileSaveDirectory_RestrictsOperationsToManagedRoot()
+    public async Task FileOperations_UseClientProvidedAbsolutePaths()
     {
         var serverRoot = CreateDirectory("server-managed-root");
-        var outsideRoot = CreateDirectory("outside-root");
-        var outsideFile = Path.Combine(outsideRoot, "outside.txt");
-        await File.WriteAllTextAsync(outsideFile, "do-not-delete");
+        var managedDirectory = Path.Combine(serverRoot, "managed");
+        var managedFile = Path.Combine(managedDirectory, "managed.txt");
+        Directory.CreateDirectory(managedDirectory);
+        await File.WriteAllTextAsync(managedFile, "delete-me");
 
-        await using var harness = await CreateHarnessAsync(serverRoot);
+        await using var harness = await CreateHarnessAsync();
 
-        await harness.Client.CreateDirectoryAsync("managed");
-        await WaitForConditionAsync(() => Directory.Exists(Path.Combine(serverRoot, "managed")));
+        await harness.Client.CreateDirectoryAsync(managedDirectory);
+        await WaitForConditionAsync(() => Directory.Exists(managedDirectory));
 
-        await harness.Client.DeletePathAsync("managed", true);
-        await WaitForConditionAsync(() => !Directory.Exists(Path.Combine(serverRoot, "managed")));
+        await harness.Client.DeletePathAsync(managedFile, false);
+        await WaitForConditionAsync(() => !File.Exists(managedFile));
 
-        await harness.Client.DeletePathAsync(@"..\outside-root\outside.txt", false);
-        await Task.Delay(500);
-
-        Assert.True(File.Exists(outsideFile));
+        await harness.Client.DeletePathAsync(managedDirectory, true);
+        await WaitForConditionAsync(() => !Directory.Exists(managedDirectory));
     }
 
     private string CreateDirectory(string name)
@@ -94,13 +93,10 @@ public sealed class TcpSocketFileTransferTests : IAsyncLifetime
         return path;
     }
 
-    private async Task<TestHarness> CreateHarnessAsync(string serverRoot)
+    private async Task<TestHarness> CreateHarnessAsync()
     {
         var port = GetFreePort();
-        var server = new TcpSocketServer
-        {
-            FileSaveDirectory = serverRoot
-        };
+        var server = new TcpSocketServer();
         var client = new TcpSocketClient();
 
         var serverResult = await server.StartAsync("TestServer", IPAddress.Loopback.ToString(), port);

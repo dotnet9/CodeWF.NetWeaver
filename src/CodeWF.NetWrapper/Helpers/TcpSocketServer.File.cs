@@ -23,11 +23,6 @@ public partial class TcpSocketServer
     private readonly ConcurrentDictionary<string, ServerDownloadContext> _downloadContexts = new();
 
     /// <summary>
-    /// 服务端文件管理根目录。设置后，查询/创建/删除/上传/下载都会限制在该目录内。
-    /// </summary>
-    public string? FileSaveDirectory { get; set; }
-
-    /// <summary>
     /// 服务端文件系统抽象。默认使用物理文件系统，后续可替换为移动端容器或沙箱实现。
     /// </summary>
     public IManagedFileSystem ManagedFileSystem { get; set; } = ManagedFileSystemFactory.CreateDefault();
@@ -111,7 +106,7 @@ public partial class TcpSocketServer
         var taskId = queryInfo.TaskId;
         var requestedDirectoryPath = queryInfo.DirectoryPath;
 
-        if (string.IsNullOrWhiteSpace(FileSaveDirectory) && string.IsNullOrWhiteSpace(requestedDirectoryPath))
+        if (string.IsNullOrWhiteSpace(requestedDirectoryPath))
         {
             await SendDiskInfoListAsync(client, taskId, clientKey);
             return;
@@ -1040,30 +1035,9 @@ public partial class TcpSocketServer
         resolvedPath = string.Empty;
         errorMessage = string.Empty;
 
-        if (string.IsNullOrWhiteSpace(FileSaveDirectory))
+        if (treatEmptyAsRoot && string.IsNullOrWhiteSpace(requestedPath))
         {
-            if (treatEmptyAsRoot && string.IsNullOrWhiteSpace(requestedPath))
-            {
-                resolvedPath = string.Empty;
-                return true;
-            }
-
-            if (string.IsNullOrWhiteSpace(requestedPath))
-            {
-                errorMessage = "路径不能为空";
-                return false;
-            }
-
-            resolvedPath = ManagedFileSystem.GetFullPath(requestedPath);
-            return true;
-        }
-
-        var rootPath = ManagedFileSystem.GetFullPath(FileSaveDirectory);
-        ManagedFileSystem.CreateDirectory(rootPath);
-
-        if (treatEmptyAsRoot && (string.IsNullOrWhiteSpace(requestedPath) || requestedPath is "/" or "\\"))
-        {
-            resolvedPath = rootPath;
+            resolvedPath = string.Empty;
             return true;
         }
 
@@ -1073,35 +1047,14 @@ public partial class TcpSocketServer
             return false;
         }
 
-        // Path.IsPathRooted 用来判断是否是绝对路径；若是相对路径，就把它拼到 FileSaveDirectory 下面。
-        var candidatePath = ManagedFileSystem.PathIsRooted(requestedPath)
-            ? ManagedFileSystem.GetFullPath(requestedPath)
-            : ManagedFileSystem.GetFullPath(ManagedFileSystem.Combine(
-                rootPath,
-                requestedPath.TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)));
-
-        // 这里要同时判断完整前缀和目录边界，避免 /data/root2 这种路径误判为在 /data/root 下。
-        if (!IsPathWithinRoot(rootPath, candidatePath))
+        if (!ManagedFileSystem.PathIsRooted(requestedPath))
         {
-            errorMessage = "路径超出服务端允许访问的根目录";
+            errorMessage = "服务端路径必须是绝对路径";
             return false;
         }
 
-        resolvedPath = candidatePath;
+        resolvedPath = ManagedFileSystem.GetFullPath(requestedPath);
         return true;
-    }
-
-    private static bool IsPathWithinRoot(string rootPath, string candidatePath)
-    {
-        var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
-        if (string.Equals(rootPath, candidatePath, comparison))
-        {
-            return true;
-        }
-
-        var normalizedRoot = rootPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-        var rootWithSeparator = normalizedRoot + Path.DirectorySeparatorChar;
-        return candidatePath.StartsWith(rootWithSeparator, comparison);
     }
 }
 
