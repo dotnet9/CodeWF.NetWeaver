@@ -227,6 +227,9 @@ public class RemoteFileExplorerViewModel : ReactiveObject
 
     public void CancelDeleteCommand() => CancelDeleteDialog();
 
+    /// <summary>
+    /// 连接建立后自动初始化浏览器，连接断开时则统一清理待完成请求和当前界面状态。
+    /// </summary>
     public async Task HandleConnectionStateChangedAsync(bool isConnected)
     {
         if (isConnected)
@@ -238,6 +241,9 @@ public class RemoteFileExplorerViewModel : ReactiveObject
         ResetExplorer("连接已断开，请重新连接服务端。");
     }
 
+    /// <summary>
+    /// 初始化远程文件浏览器，并确保首次展示的根目录和目录树来源一致。
+    /// </summary>
     public async Task InitializeExplorerAsync()
     {
         if (!EnsureConnected())
@@ -568,27 +574,40 @@ public class RemoteFileExplorerViewModel : ReactiveObject
         }
     }
 
+    /// <summary>
+    /// 统一分发文件浏览相关响应，保证分页目录查询与创建/删除确认都走同一条日志链路。
+    /// </summary>
     public void ReceivedSocketCommand(SocketCommand message)
     {
         if (message.IsCommand<BrowseFileSystemResponse>())
         {
-            HandleBrowseResponse(message.GetCommand<BrowseFileSystemResponse>());
+            var response = message.GetCommand<BrowseFileSystemResponse>();
+            LogIncomingResponse(response);
+            HandleBrowseResponse(response);
         }
         else if (message.IsCommand<DriveListResponse>())
         {
-            HandleDriveListResponse(message.GetCommand<DriveListResponse>());
+            var response = message.GetCommand<DriveListResponse>();
+            LogIncomingResponse(response);
+            HandleDriveListResponse(response);
         }
         else if (message.IsCommand<CreateDirectoryResponse>())
         {
-            HandleCreateDirectoryResponse(message.GetCommand<CreateDirectoryResponse>());
+            var response = message.GetCommand<CreateDirectoryResponse>();
+            LogIncomingResponse(response);
+            HandleCreateDirectoryResponse(response);
         }
         else if (message.IsCommand<DeletePathResponse>())
         {
-            HandleDeletePathResponse(message.GetCommand<DeletePathResponse>());
+            var response = message.GetCommand<DeletePathResponse>();
+            LogIncomingResponse(response);
+            HandleDeletePathResponse(response);
         }
         else if (message.IsCommand<FileTransferReject>())
         {
-            HandleRemoteReject(message.GetCommand<FileTransferReject>());
+            var response = message.GetCommand<FileTransferReject>();
+            LogIncomingResponse(response);
+            HandleRemoteReject(response);
         }
     }
 
@@ -751,6 +770,9 @@ public class RemoteFileExplorerViewModel : ReactiveObject
         IsDeleteDialogOpen = false;
     }
 
+    /// <summary>
+    /// 发送目录浏览请求，并在分页响应全部到齐后再返回聚合后的目录项。
+    /// </summary>
     private async Task<List<RemoteFileEntry>> BrowseDirectoryAsync(string directoryPath, CancellationToken cancellationToken = default)
     {
         var normalizedRequestPath = PathsEqual(directoryPath, "/") ? string.Empty : directoryPath;
@@ -767,7 +789,7 @@ public class RemoteFileExplorerViewModel : ReactiveObject
             }
         });
 
-        await _tcpHelper.SendCommandAsync(new BrowseFileSystemRequest
+        await SendTcpRequestAsync(new BrowseFileSystemRequest
         {
             TaskId = taskId,
             DirectoryPath = normalizedRequestPath
@@ -776,11 +798,14 @@ public class RemoteFileExplorerViewModel : ReactiveObject
         return await completionSource.Task;
     }
 
+    /// <summary>
+    /// 发送创建目录请求，并把返回结果统一转换为成功值或异常。
+    /// </summary>
     private async Task CreateDirectoryRequestAsync(string directoryPath)
     {
         var response = await SendRequestAsync(
             _pendingCreateRequests,
-            taskId => _tcpHelper.SendCommandAsync(new CreateDirectoryRequest
+            taskId => SendTcpRequestAsync(new CreateDirectoryRequest
             {
                 TaskId = taskId,
                 DirectoryPath = directoryPath
@@ -792,11 +817,14 @@ public class RemoteFileExplorerViewModel : ReactiveObject
         }
     }
 
+    /// <summary>
+    /// 发送删除路径请求，并复用统一的请求-应答桥接逻辑处理最终确认对象。
+    /// </summary>
     private async Task DeletePathRequestAsync(string filePath, bool isDirectory)
     {
         var response = await SendRequestAsync(
             _pendingDeleteRequests,
-            taskId => _tcpHelper.SendCommandAsync(new DeletePathRequest
+            taskId => SendTcpRequestAsync(new DeletePathRequest
             {
                 TaskId = taskId,
                 FilePath = filePath,
@@ -1243,6 +1271,9 @@ public class RemoteFileExplorerViewModel : ReactiveObject
         }
     }
 
+    /// <summary>
+    /// 为一次 TCP 请求建立 TaskCompletionSource，把“异步发送 + 后续响应”桥接成可 await 的任务。
+    /// </summary>
     private async Task<TResponse> SendRequestAsync<TResponse>(
         ConcurrentDictionary<int, TaskCompletionSource<TResponse>> pendingRequests,
         Func<int, Task> sendRequestAsync)
@@ -1254,6 +1285,36 @@ public class RemoteFileExplorerViewModel : ReactiveObject
         await sendRequestAsync(taskId);
         return await completionSource.Task;
     }
+
+    private async Task SendTcpRequestAsync(CodeWF.NetWeaver.Base.INetObject request)
+    {
+        Logger.Info($"Client -> Server File TCP: {DescribeMessage(request)}");
+        await _tcpHelper.SendCommandAsync(request);
+    }
+
+    private static void LogIncomingResponse(object response)
+    {
+        if (response is BrowseFileSystemResponse browse && browse.PageIndex > 0)
+        {
+            return;
+        }
+
+        Logger.Info($"Server -> Client File TCP: {DescribeMessage(response)}");
+    }
+
+    private static string DescribeMessage(object message) =>
+        message switch
+        {
+            BrowseFileSystemRequest request => $"{nameof(BrowseFileSystemRequest)}(TaskId={request.TaskId},Path={request.DirectoryPath})",
+            CreateDirectoryRequest request => $"{nameof(CreateDirectoryRequest)}(TaskId={request.TaskId},Path={request.DirectoryPath})",
+            DeletePathRequest request => $"{nameof(DeletePathRequest)}(TaskId={request.TaskId},Path={request.FilePath},IsDirectory={request.IsDirectory})",
+            BrowseFileSystemResponse response => $"{nameof(BrowseFileSystemResponse)}(TaskId={response.TaskId},Page={response.PageIndex + 1}/{response.PageCount},Entries={response.Entries?.Count ?? 0})",
+            DriveListResponse response => $"{nameof(DriveListResponse)}(TaskId={response.TaskId},Disks={response.Disks?.Count ?? 0})",
+            CreateDirectoryResponse response => $"{nameof(CreateDirectoryResponse)}(TaskId={response.TaskId},Success={response.Success},Path={response.DirectoryPath})",
+            DeletePathResponse response => $"{nameof(DeletePathResponse)}(TaskId={response.TaskId},Success={response.Success},Path={response.FilePath})",
+            FileTransferReject response => $"{nameof(FileTransferReject)}(TaskId={response.TaskId},Code={response.ErrorCode},Path={response.RemoteFilePath})",
+            _ => message.GetType().Name
+        };
 
     private static void ActivateNode(RemoteDirectoryNode? node)
     {

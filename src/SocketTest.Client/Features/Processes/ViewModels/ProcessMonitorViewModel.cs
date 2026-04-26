@@ -93,10 +93,14 @@ public class ProcessMonitorViewModel : ReactiveObject
 
     public UdpSocketClient UdpHelper { get; }
 
+    /// <summary>
+    /// 管理客户端与服务端的连接生命周期，并在连通后立即发起首轮基础数据同步。
+    /// </summary>
     public async Task HandleConnectTcpAsync()
     {
         if (TcpHelper.IsRunning)
         {
+            Logger.Info($"Client TCP disconnect requested: {TcpIp}:{TcpPort}");
             UdpHelper.Stop();
             TcpHelper.Stop();
             ClearProcesses();
@@ -105,6 +109,7 @@ public class ProcessMonitorViewModel : ReactiveObject
             return;
         }
 
+        Logger.Info($"Client TCP connect requested: {TcpIp}:{TcpPort}");
         var result = await TcpHelper.ConnectAsync("SocketTest.Client", TcpIp, TcpPort);
         if (!result.IsSuccess)
         {
@@ -113,11 +118,15 @@ public class ProcessMonitorViewModel : ReactiveObject
             return;
         }
 
+        Logger.Info($"Client TCP connected: {TcpIp}:{TcpPort}");
         RaiseConnectionProperties();
         await EventBus.Default.PublishAsync(new ClientConnectionStateChangedMessage(true));
         await RequestInitialDataAsync();
     }
 
+    /// <summary>
+    /// 在连接建立后按固定顺序请求目标类型、服务信息、UDP 地址和完整进程树。
+    /// </summary>
     public async Task RequestInitialDataAsync()
     {
         if (!TcpHelper.IsRunning)
@@ -125,10 +134,10 @@ public class ProcessMonitorViewModel : ReactiveObject
             return;
         }
 
-        await TcpHelper.SendCommandAsync(new RequestTargetType { TaskId = NetHelper.GetTaskId() });
-        await TcpHelper.SendCommandAsync(new RequestServiceInfo { TaskId = NetHelper.GetTaskId() });
-        await TcpHelper.SendCommandAsync(new RequestUdpAddress { TaskId = NetHelper.GetTaskId() });
-        await TcpHelper.SendCommandAsync(new RequestProcessIDList { TaskId = NetHelper.GetTaskId() });
+        await SendTcpCommandAsync(new RequestTargetType { TaskId = NetHelper.GetTaskId() });
+        await SendTcpCommandAsync(new RequestServiceInfo { TaskId = NetHelper.GetTaskId() });
+        await SendTcpCommandAsync(new RequestUdpAddress { TaskId = NetHelper.GetTaskId() });
+        await SendTcpCommandAsync(new RequestProcessIDList { TaskId = NetHelper.GetTaskId() });
         await RefreshProcessesAsync();
     }
 
@@ -136,7 +145,7 @@ public class ProcessMonitorViewModel : ReactiveObject
     {
         if (TcpHelper.IsRunning)
         {
-            await TcpHelper.SendCommandAsync(new RequestProcessList { TaskId = NetHelper.GetTaskId() });
+            await SendTcpCommandAsync(new RequestProcessList { TaskId = NetHelper.GetTaskId() });
         }
     }
 
@@ -175,7 +184,7 @@ public class ProcessMonitorViewModel : ReactiveObject
         var completionSource = new TaskCompletionSource<ResponseTerminateProcess>(TaskCreationOptions.RunContinuationsAsynchronously);
         _pendingTerminateRequests[taskId] = completionSource;
 
-        await TcpHelper.SendCommandAsync(new RequestTerminateProcess
+        await SendTcpCommandAsync(new RequestTerminateProcess
         {
             TaskId = taskId,
             ProcessId = targetProcess.PID,
@@ -210,39 +219,58 @@ public class ProcessMonitorViewModel : ReactiveObject
         IsTerminateDialogOpen = false;
     }
 
+    /// <summary>
+    /// 统一分发服务端返回的 TCP 控制对象，让各类响应都经过同一条日志与状态更新链路。
+    /// </summary>
     public void ReceivedSocketCommand(SocketCommand message)
     {
         if (message.IsCommand<ResponseTargetType>())
         {
-            ReceivedSocketMessage(message.GetCommand<ResponseTargetType>());
+            var response = message.GetCommand<ResponseTargetType>();
+            LogIncomingTcpCommand(response);
+            ReceivedSocketMessage(response);
         }
         else if (message.IsCommand<ResponseUdpAddress>())
         {
-            ReceivedSocketMessage(message.GetCommand<ResponseUdpAddress>());
+            var response = message.GetCommand<ResponseUdpAddress>();
+            LogIncomingTcpCommand(response);
+            ReceivedSocketMessage(response);
         }
         else if (message.IsCommand<ResponseServiceInfo>())
         {
-            ReceivedSocketMessage(message.GetCommand<ResponseServiceInfo>());
+            var response = message.GetCommand<ResponseServiceInfo>();
+            LogIncomingTcpCommand(response);
+            ReceivedSocketMessage(response);
         }
         else if (message.IsCommand<ResponseProcessIDList>())
         {
-            ReceivedSocketMessage(message.GetCommand<ResponseProcessIDList>());
+            var response = message.GetCommand<ResponseProcessIDList>();
+            LogIncomingTcpCommand(response);
+            ReceivedSocketMessage(response);
         }
         else if (message.IsCommand<ResponseProcessList>())
         {
-            ReceivedSocketMessage(message.GetCommand<ResponseProcessList>());
+            var response = message.GetCommand<ResponseProcessList>();
+            LogIncomingTcpCommand(response);
+            ReceivedSocketMessage(response);
         }
         else if (message.IsCommand<ResponseTerminateProcess>())
         {
-            ReceivedSocketMessage(message.GetCommand<ResponseTerminateProcess>());
+            var response = message.GetCommand<ResponseTerminateProcess>();
+            LogIncomingTcpCommand(response);
+            ReceivedSocketMessage(response);
         }
         else if (message.IsCommand<UpdateProcessList>())
         {
-            ReceivedSocketMessage(message.GetCommand<UpdateProcessList>());
+            var response = message.GetCommand<UpdateProcessList>();
+            LogIncomingUdpCommand(response);
+            ReceivedSocketMessage(response);
         }
         else if (message.IsCommand<ChangeProcessList>())
         {
-            ReceivedSocketMessage(message.GetCommand<ChangeProcessList>());
+            var response = message.GetCommand<ChangeProcessList>();
+            LogIncomingTcpCommand(response);
+            ReceivedSocketMessage(response);
         }
     }
 
@@ -349,11 +377,15 @@ public class ProcessMonitorViewModel : ReactiveObject
         {
             if (message.IsCommand<UpdateRealtimeProcessList>())
             {
-                ApplyRealtimeUdpUpdate(message.GetCommand<UpdateRealtimeProcessList>());
+                var response = message.GetCommand<UpdateRealtimeProcessList>();
+                LogIncomingUdpCommand(response);
+                ApplyRealtimeUdpUpdate(response);
             }
             else if (message.IsCommand<UpdateGeneralProcessList>())
             {
-                ApplyGeneralUdpUpdate(message.GetCommand<UpdateGeneralProcessList>());
+                var response = message.GetCommand<UpdateGeneralProcessList>();
+                LogIncomingUdpCommand(response);
+                ApplyGeneralUdpUpdate(response);
             }
         }
         catch (Exception ex)
@@ -470,4 +502,50 @@ public class ProcessMonitorViewModel : ReactiveObject
         this.RaisePropertyChanged(nameof(ConnectionSummary));
         this.RaisePropertyChanged(nameof(ConnectButtonText));
     }
+
+    private async Task SendTcpCommandAsync(CodeWF.NetWeaver.Base.INetObject command)
+    {
+        Logger.Info($"Client -> Server TCP: {DescribeCommand(command)}");
+        await TcpHelper.SendCommandAsync(command);
+    }
+
+    private static void LogIncomingTcpCommand(object command) =>
+        Logger.Info($"Server -> Client TCP: {DescribeCommand(command)}");
+
+    private static void LogIncomingUdpCommand(object command)
+    {
+        if (command is UpdateRealtimeProcessList realtime && realtime.PageIndex > 0)
+        {
+            return;
+        }
+
+        if (command is UpdateGeneralProcessList general && general.PageIndex > 0)
+        {
+            return;
+        }
+
+        Logger.Info($"Server -> Client UDP: {DescribeCommand(command)}");
+    }
+
+    private static string DescribeCommand(object command) =>
+        command switch
+        {
+            RequestTargetType request => $"{nameof(RequestTargetType)}(TaskId={request.TaskId})",
+            RequestServiceInfo request => $"{nameof(RequestServiceInfo)}(TaskId={request.TaskId})",
+            RequestUdpAddress request => $"{nameof(RequestUdpAddress)}(TaskId={request.TaskId})",
+            RequestProcessIDList request => $"{nameof(RequestProcessIDList)}(TaskId={request.TaskId})",
+            RequestProcessList request => $"{nameof(RequestProcessList)}(TaskId={request.TaskId})",
+            RequestTerminateProcess request => $"{nameof(RequestTerminateProcess)}(TaskId={request.TaskId},Pid={request.ProcessId},KillTree={request.KillEntireProcessTree})",
+            ResponseTargetType response => $"{nameof(ResponseTargetType)}(TaskId={response.TaskId},Type={response.Type})",
+            ResponseServiceInfo response => $"{nameof(ResponseServiceInfo)}(TaskId={response.TaskId},OS={response.OS},TimestampStartYear={response.TimestampStartYear})",
+            ResponseUdpAddress response => $"{nameof(ResponseUdpAddress)}(TaskId={response.TaskId},Ip={response.Ip},Port={response.Port})",
+            ResponseProcessIDList response => $"{nameof(ResponseProcessIDList)}(TaskId={response.TaskId},Count={response.IDList?.Length ?? 0})",
+            ResponseProcessList response => $"{nameof(ResponseProcessList)}(TaskId={response.TaskId},Page={response.PageIndex + 1}/{response.PageCount},Processes={response.Processes?.Count ?? 0})",
+            ResponseTerminateProcess response => $"{nameof(ResponseTerminateProcess)}(TaskId={response.TaskId},Pid={response.ProcessId},Success={response.Success})",
+            ChangeProcessList => nameof(ChangeProcessList),
+            UpdateProcessList response => $"{nameof(UpdateProcessList)}(Processes={response.Processes?.Count ?? 0})",
+            UpdateRealtimeProcessList response => $"{nameof(UpdateRealtimeProcessList)}(Page={response.PageIndex + 1}/{response.PageCount},PageSize={response.PageSize})",
+            UpdateGeneralProcessList response => $"{nameof(UpdateGeneralProcessList)}(Page={response.PageIndex + 1}/{response.PageCount},PageSize={response.PageSize})",
+            _ => command.GetType().Name
+        };
 }

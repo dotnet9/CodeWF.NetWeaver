@@ -13,6 +13,7 @@ using SocketDto.AutoCommand;
 using SocketDto.Enums;
 using SocketDto.Requests;
 using SocketDto.Response;
+using SocketDto.Udp;
 using SocketTest.Server.Configuration;
 using SocketTest.Server.Features.Processes.Services;
 using SocketTest.Server.Shell.Messages;
@@ -84,10 +85,14 @@ public class MainWindowViewModel : ReactiveObject
 
     public string ServiceStatusText => IsRunning ? "服务运行中" : "服务未启动";
 
+    /// <summary>
+    /// 统一处理服务端启动与停止流程，并在启动后完成首轮真实进程快照采集。
+    /// </summary>
     public async Task ToggleServerAsync()
     {
         if (!TcpHelper.IsRunning)
         {
+            Logger.Info("Server start requested.");
             var started = await StartServerAsync();
             if (!started)
             {
@@ -112,6 +117,7 @@ public class MainWindowViewModel : ReactiveObject
         IsRunning = false;
         RaiseServerStateProperties();
         PublishServerStatusChanged();
+        Logger.Info("Server stop requested.");
         await Log("服务端已停止。");
     }
 
@@ -135,6 +141,9 @@ public class MainWindowViewModel : ReactiveObject
         });
     }
 
+    /// <summary>
+    /// 统一分发客户端发来的 TCP 控制对象，并把每个请求纳入可追踪的日志链路。
+    /// </summary>
     [EventHandler]
     private async Task ReceiveSocketMessageAsync(SocketCommand request)
     {
@@ -293,7 +302,7 @@ public class MainWindowViewModel : ReactiveObject
             request.KillEntireProcessTree,
             out var message);
 
-        await TcpHelper.SendCommandAsync(client, new ResponseTerminateProcess
+        await SendResponseAsync(client, new ResponseTerminateProcess
         {
             TaskId = request.TaskId,
             ProcessId = request.ProcessId,
@@ -375,6 +384,9 @@ public class MainWindowViewModel : ReactiveObject
         return result.StructureChanged;
     }
 
+    /// <summary>
+    /// 在后台线程刷新一次完整进程快照，避免首次启动采集阻塞 UI。
+    /// </summary>
     private async Task<bool> RefreshProcessSnapshotAsync(CancellationToken cancellationToken = default)
     {
         var result = await Task.Run(_processSnapshotProvider.RefreshSnapshot, cancellationToken);
@@ -421,6 +433,7 @@ public class MainWindowViewModel : ReactiveObject
 
     private async Task BroadcastProcessStructureChangedAsync()
     {
+        Logger.Info($"Server -> Client TCP: {DescribeCommand(new ChangeProcessList())}");
         await TcpHelper.SendCommandAsync(new ChangeProcessList());
     }
 
@@ -495,13 +508,21 @@ public class MainWindowViewModel : ReactiveObject
             return false;
         }
 
-        await handler(request.Client!, request.GetCommand<TCommand>());
+        var command = request.GetCommand<TCommand>();
+        Logger.Info($"Client -> Server TCP: {DescribeCommand(command)}");
+        await handler(request.Client!, command);
         return true;
     }
 
-    private Task SendResponseAsync(Socket client, CodeWF.NetWeaver.Base.INetObject response) =>
-        TcpHelper.SendCommandAsync(client, response);
+    private Task SendResponseAsync(Socket client, CodeWF.NetWeaver.Base.INetObject response)
+    {
+        Logger.Info($"Server -> Client TCP: {DescribeCommand(response)}");
+        return TcpHelper.SendCommandAsync(client, response);
+    }
 
+    /// <summary>
+    /// 将完整进程树按页返回给客户端，避免单次响应包过大。
+    /// </summary>
     private async Task SendProcessPagesAsync(Socket client, int taskId)
     {
         var totalSize = _processSnapshotProvider.ProcessCount;
@@ -520,6 +541,9 @@ public class MainWindowViewModel : ReactiveObject
         }
     }
 
+    /// <summary>
+    /// 周期性将快照压缩为 UDP 增量页发送给客户端，用于高频更新实时指标。
+    /// </summary>
     private async Task PushUdpSnapshotAsync(
         UdpPageCalculator calculatePage,
         Func<int, int, CodeWF.NetWeaver.Base.INetObject> buildPage,
@@ -542,7 +566,13 @@ public class MainWindowViewModel : ReactiveObject
                     break;
                 }
 
-                await UdpHelper.SendCommandAsync(buildPage(pageSize, pageIndex), DateTimeOffset.UtcNow);
+                var command = buildPage(pageSize, pageIndex);
+                if (pageIndex == 0)
+                {
+                    Logger.Info($"Server -> Client UDP: {DescribeCommand(command)}");
+                }
+
+                await UdpHelper.SendCommandAsync(command, DateTimeOffset.UtcNow);
             }
         }
         catch (Exception ex)
@@ -558,5 +588,28 @@ public class MainWindowViewModel : ReactiveObject
             ServiceStatusText,
             CurrentProcessCount,
             ClientCount));
+
+    private static string DescribeCommand(object? command) =>
+        command switch
+        {
+            RequestTargetType request => $"{nameof(RequestTargetType)}(TaskId={request.TaskId})",
+            RequestUdpAddress request => $"{nameof(RequestUdpAddress)}(TaskId={request.TaskId})",
+            RequestServiceInfo request => $"{nameof(RequestServiceInfo)}(TaskId={request.TaskId})",
+            RequestProcessIDList request => $"{nameof(RequestProcessIDList)}(TaskId={request.TaskId})",
+            RequestProcessList request => $"{nameof(RequestProcessList)}(TaskId={request.TaskId})",
+            RequestTerminateProcess request => $"{nameof(RequestTerminateProcess)}(TaskId={request.TaskId},Pid={request.ProcessId},KillTree={request.KillEntireProcessTree})",
+            ChangeProcessList => nameof(ChangeProcessList),
+            Heartbeat => nameof(Heartbeat),
+            ResponseTargetType response => $"{nameof(ResponseTargetType)}(TaskId={response.TaskId},Type={response.Type})",
+            ResponseUdpAddress response => $"{nameof(ResponseUdpAddress)}(TaskId={response.TaskId},Ip={response.Ip},Port={response.Port})",
+            ResponseServiceInfo response => $"{nameof(ResponseServiceInfo)}(TaskId={response.TaskId},OS={response.OS},TimestampStartYear={response.TimestampStartYear})",
+            ResponseProcessIDList response => $"{nameof(ResponseProcessIDList)}(TaskId={response.TaskId},Count={response.IDList?.Length ?? 0})",
+            ResponseProcessList response => $"{nameof(ResponseProcessList)}(TaskId={response.TaskId},Page={response.PageIndex + 1}/{response.PageCount},Processes={response.Processes?.Count ?? 0})",
+            ResponseTerminateProcess response => $"{nameof(ResponseTerminateProcess)}(TaskId={response.TaskId},Pid={response.ProcessId},Success={response.Success})",
+            UpdateRealtimeProcessList response => $"{nameof(UpdateRealtimeProcessList)}(Page={response.PageIndex + 1}/{response.PageCount},PageSize={response.PageSize})",
+            UpdateGeneralProcessList response => $"{nameof(UpdateGeneralProcessList)}(Page={response.PageIndex + 1}/{response.PageCount},PageSize={response.PageSize})",
+            null => "null",
+            _ => command.GetType().Name
+        };
 
 }

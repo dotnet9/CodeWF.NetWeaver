@@ -208,6 +208,9 @@ public class FileTransferViewModel : ReactiveObject
         }
     }
 
+    /// <summary>
+    /// 串行消费传输队列，保证同一时刻只有一个文件占用底层 TCP 文件传输会话。
+    /// </summary>
     private async Task ProcessQueueAsync()
     {
         if (_isProcessingQueue)
@@ -232,6 +235,7 @@ public class FileTransferViewModel : ReactiveObject
                 nextTransfer.CancellationSource?.Dispose();
                 nextTransfer.CancellationSource = new CancellationTokenSource();
                 nextTransfer.MarkRunning(nextTransfer.Direction == FileTransferDirection.Upload ? "正在上传" : "正在下载");
+                Logger.Info($"Transfer queue start: {nextTransfer.Direction} {nextTransfer.SourcePath} -> {nextTransfer.DestinationPath}");
                 UpdateDashboard();
 
                 try
@@ -257,6 +261,7 @@ public class FileTransferViewModel : ReactiveObject
                 }
                 catch (OperationCanceledException)
                 {
+                    Logger.Warn($"Transfer queue cancelled: {nextTransfer.Direction} {nextTransfer.SourcePath} -> {nextTransfer.DestinationPath}");
                     nextTransfer.MarkPaused("已停止，可继续传输");
                 }
                 catch (Exception ex)
@@ -280,6 +285,9 @@ public class FileTransferViewModel : ReactiveObject
         }
     }
 
+    /// <summary>
+    /// 把底层文件传输库上报的进度事件映射回当前队列项，统一刷新界面摘要。
+    /// </summary>
     private void HandleFileTransferProgress(object? sender, FileTransferProgressEventArgs e)
     {
         Dispatcher.UIThread.Post(() =>
@@ -307,6 +315,9 @@ public class FileTransferViewModel : ReactiveObject
         });
     }
 
+    /// <summary>
+    /// 把底层文件传输结果事件映射回队列项，并唤醒当前等待完成态的传输任务。
+    /// </summary>
     private void HandleFileTransferOutcome(object? sender, FileTransferOutcomeEventArgs e)
     {
         Dispatcher.UIThread.Post(() =>
@@ -334,6 +345,8 @@ public class FileTransferViewModel : ReactiveObject
 
     private void ApplyTransferOutcome(FileTransferItem item, FileTransferOutcomeEventArgs outcome)
     {
+        Logger.Info($"Transfer outcome: {item.Direction} {item.SourcePath} -> {item.DestinationPath}, Success={outcome.Success}, Cancelled={outcome.IsCancelled}, Message={outcome.Message}");
+
         if (outcome.IsCancelled)
         {
             item.MarkPaused(string.IsNullOrWhiteSpace(outcome.Message) ? "已停止，可继续传输" : outcome.Message);
