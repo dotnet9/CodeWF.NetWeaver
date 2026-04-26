@@ -6,35 +6,15 @@
              xmlns:controls="using:SocketTest.Client.Shell.Views.Controls"
              mc:Ignorable="d"
              x:Class="SocketTest.Client.Shell.Views.Controls.ClientStatusBarView"
+             x:Name="Root"
              x:DataType="vm:ClientStatusBarViewModel">
     <Border Padding="14,10"
             Background="#111827"
             CornerRadius="12">
         <Grid>
-            <ContentControl Content="{Binding ProcessMonitorStatusViewModel}"
-                            IsVisible="{Binding IsProcessMonitorTabSelected}">
-                <ContentControl.ContentTemplate>
-                    <DataTemplate>
-                        <controls:ProcessMonitorStatusView />
-                    </DataTemplate>
-                </ContentControl.ContentTemplate>
-            </ContentControl>
-            <ContentControl Content="{Binding RemoteFileExplorerStatusViewModel}"
-                            IsVisible="{Binding IsRemoteFileExplorerTabSelected}">
-                <ContentControl.ContentTemplate>
-                    <DataTemplate>
-                        <controls:RemoteFileExplorerStatusView />
-                    </DataTemplate>
-                </ContentControl.ContentTemplate>
-            </ContentControl>
-            <ContentControl Content="{Binding FileTransferStatusViewModel}"
-                            IsVisible="{Binding IsFileTransferTabSelected}">
-                <ContentControl.ContentTemplate>
-                    <DataTemplate>
-                        <controls:FileTransferStatusView />
-                    </DataTemplate>
-                </ContentControl.ContentTemplate>
-            </ContentControl>
+            <controls:ProcessMonitorStatusView IsVisible="{Binding #Root.DataContext.IsProcessMonitorTabSelected}" />
+            <controls:RemoteFileExplorerStatusView IsVisible="{Binding #Root.DataContext.IsRemoteFileExplorerTabSelected}" />
+            <controls:FileTransferStatusView IsVisible="{Binding #Root.DataContext.IsFileTransferTabSelected}" />
         </Grid>
     </Border>
 </UserControl>

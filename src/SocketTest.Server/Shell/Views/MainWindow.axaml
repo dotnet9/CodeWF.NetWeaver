@@ -57,7 +57,6 @@
         </Border>
 
         <controls:ServerStatusBarView Grid.Row="2"
-                                      DataContext="{Binding StatusBarViewModel}"
                                       Margin="18,0,18,18" />
     </Grid>
 </Window>

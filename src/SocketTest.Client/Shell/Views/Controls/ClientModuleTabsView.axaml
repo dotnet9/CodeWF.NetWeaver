@@ -11,13 +11,13 @@
              x:DataType="vm:ClientModuleTabsViewModel">
     <TabControl SelectedIndex="{Binding SelectedTabIndex, Mode=TwoWay}">
         <TabItem Header="进程监控">
-            <processViews:ProcessMonitorView DataContext="{Binding ProcessMonitorViewModel}" />
+            <processViews:ProcessMonitorView />
         </TabItem>
         <TabItem Header="远程文件">
-            <remoteFileViews:RemoteFileExplorerView DataContext="{Binding RemoteFileExplorerViewModel}" />
+            <remoteFileViews:RemoteFileExplorerView />
         </TabItem>
         <TabItem Header="文件传输">
-            <transferViews:FileTransferView DataContext="{Binding FileTransferViewModel}" />
+            <transferViews:FileTransferView />
         </TabItem>
     </TabControl>
 </UserControl>

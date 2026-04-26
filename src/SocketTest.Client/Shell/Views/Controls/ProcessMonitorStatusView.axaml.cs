@@ -1,8 +1,13 @@
 using Avalonia.Controls;
+using SocketTest.Client.Shell.ViewModels;
 
 namespace SocketTest.Client.Shell.Views.Controls;
 
 public partial class ProcessMonitorStatusView : UserControl
 {
-    public ProcessMonitorStatusView() => InitializeComponent();
+    public ProcessMonitorStatusView()
+    {
+        InitializeComponent();
+        DataContext = new ProcessMonitorStatusViewModel();
+    }
 }

@@ -9,15 +9,15 @@
     <Grid ColumnDefinitions="Auto,Auto,Auto,*" ColumnSpacing="18">
         <StackPanel Orientation="Horizontal" Spacing="6">
             <TextBlock Foreground="#9CA3AF" Text="当前目录" />
-            <TextBlock Foreground="White" Text="{Binding RemoteFileExplorerViewModel.CurrentDirectoryPath}" />
+            <TextBlock Foreground="White" Text="{Binding CurrentDirectoryPath}" />
         </StackPanel>
         <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
             <TextBlock Foreground="#9CA3AF" Text="浏览概览" />
-            <TextBlock Foreground="White" Text="{Binding RemoteFileExplorerViewModel.ExplorerSummary}" />
+            <TextBlock Foreground="White" Text="{Binding ExplorerSummary}" />
         </StackPanel>
         <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6">
             <TextBlock Foreground="#9CA3AF" Text="当前状态" />
-            <TextBlock Foreground="White" Text="{Binding RemoteFileExplorerViewModel.StatusMessage}" />
+            <TextBlock Foreground="White" Text="{Binding StatusMessage}" />
         </StackPanel>
     </Grid>
 </UserControl>

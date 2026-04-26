@@ -20,19 +20,19 @@
             <TextBlock Grid.Column="1" VerticalAlignment="Center" Text="服务端地址" />
             <TextBox Grid.Column="2"
                      Height="36"
-                     Text="{Binding ProcessMonitorViewModel.TcpIp, Mode=TwoWay}"
+                     Text="{Binding TcpIp, Mode=TwoWay}"
                      Watermark="127.0.0.1" />
 
             <TextBlock Grid.Column="3" VerticalAlignment="Center" Text="端口" />
             <TextBox Grid.Column="4"
                      Height="36"
-                     Text="{Binding ProcessMonitorViewModel.TcpPort, Mode=TwoWay}" />
+                     Text="{Binding TcpPort, Mode=TwoWay}" />
 
             <Button Grid.Column="5"
                     MinWidth="120"
                     Height="36"
-                    Command="{Binding ProcessMonitorViewModel.HandleConnectTcpAsync}"
-                    Content="{Binding ProcessMonitorViewModel.ConnectButtonText}" />
+                    Command="{Binding HandleConnectTcpAsync}"
+                    Content="{Binding ConnectButtonText}" />
 
             <Border Grid.Column="6"
                     Padding="12,8"
@@ -41,7 +41,7 @@
                     BorderThickness="1"
                     CornerRadius="10">
                 <TextBlock Foreground="#475467"
-                           Text="{Binding ProcessMonitorViewModel.ConnectionSummary}" />
+                           Text="{Binding ConnectionSummary}" />
             </Border>
         </Grid>
     </Border>

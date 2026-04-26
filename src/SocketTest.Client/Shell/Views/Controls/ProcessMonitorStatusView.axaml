@@ -9,15 +9,15 @@
     <Grid ColumnDefinitions="Auto,Auto,Auto,*" ColumnSpacing="18">
         <StackPanel Orientation="Horizontal" Spacing="6">
             <TextBlock Foreground="#9CA3AF" Text="TCP" />
-            <TextBlock Foreground="White" Text="{Binding ProcessMonitorViewModel.ConnectionSummary}" />
+            <TextBlock Foreground="White" Text="{Binding ConnectionSummary}" />
         </StackPanel>
         <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
             <TextBlock Foreground="#9CA3AF" Text="UDP" />
-            <TextBlock Foreground="White" Text="{Binding ProcessMonitorViewModel.UdpSummary}" />
+            <TextBlock Foreground="White" Text="{Binding UdpSummary}" />
         </StackPanel>
         <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6">
             <TextBlock Foreground="#9CA3AF" Text="进程概览" />
-            <TextBlock Foreground="White" Text="{Binding ProcessMonitorViewModel.ProcessSummary}" />
+            <TextBlock Foreground="White" Text="{Binding ProcessSummary}" />
         </StackPanel>
     </Grid>
 </UserControl>

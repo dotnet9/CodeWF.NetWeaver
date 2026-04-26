@@ -9,15 +9,15 @@
     <Grid ColumnDefinitions="Auto,Auto,Auto,*" ColumnSpacing="18">
         <StackPanel Orientation="Horizontal" Spacing="6">
             <TextBlock Foreground="#9CA3AF" Text="队列概览" />
-            <TextBlock Foreground="White" Text="{Binding FileTransferViewModel.QueueSummary}" />
+            <TextBlock Foreground="White" Text="{Binding QueueSummary}" />
         </StackPanel>
         <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
             <TextBlock Foreground="#9CA3AF" Text="实时速度" />
-            <TextBlock Foreground="White" Text="{Binding FileTransferViewModel.TransferSpeed}" />
+            <TextBlock Foreground="White" Text="{Binding TransferSpeed}" />
         </StackPanel>
         <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6">
             <TextBlock Foreground="#9CA3AF" Text="总进度" />
-            <TextBlock Foreground="White" Text="{Binding FileTransferViewModel.TotalProgress, StringFormat={}{0:F1}%}" />
+            <TextBlock Foreground="White" Text="{Binding TotalProgress, StringFormat={}{0:F1}%}" />
         </StackPanel>
     </Grid>
 </UserControl>

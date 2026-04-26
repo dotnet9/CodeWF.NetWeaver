@@ -6,24 +6,11 @@ namespace SocketTest.Client.Shell.ViewModels;
 
 public sealed class ClientStatusBarViewModel : ReactiveObject
 {
-    public ClientStatusBarViewModel(
-        ProcessMonitorStatusViewModel processMonitorStatusViewModel,
-        RemoteFileExplorerStatusViewModel remoteFileExplorerStatusViewModel,
-        FileTransferStatusViewModel fileTransferStatusViewModel)
+    public ClientStatusBarViewModel()
     {
-        ProcessMonitorStatusViewModel = processMonitorStatusViewModel;
-        RemoteFileExplorerStatusViewModel = remoteFileExplorerStatusViewModel;
-        FileTransferStatusViewModel = fileTransferStatusViewModel;
-
         EventBus.Default.Subscribe(this);
         ApplySelectedTab(0);
     }
-
-    public ProcessMonitorStatusViewModel ProcessMonitorStatusViewModel { get; }
-
-    public RemoteFileExplorerStatusViewModel RemoteFileExplorerStatusViewModel { get; }
-
-    public FileTransferStatusViewModel FileTransferStatusViewModel { get; }
 
     public bool IsProcessMonitorTabSelected { get; private set => this.RaiseAndSetIfChanged(ref field, value); }
 
