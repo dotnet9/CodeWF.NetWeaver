@@ -83,8 +83,6 @@ public class MainWindowViewModel : ReactiveObject
 
     public int CurrentProcessCount { get; private set => this.RaiseAndSetIfChanged(ref field, value); }
 
-    public DateTime HeartbeatTime { get; private set => this.RaiseAndSetIfChanged(ref field, value); }
-
     public int ClientCount => ConnectedClients.Count;
 
     public string StartButtonText => IsRunning ? "停止服务" : "启动服务";
@@ -328,7 +326,6 @@ public class MainWindowViewModel : ReactiveObject
     private async Task ReceiveSocketCommandAsync(Socket client, Heartbeat heartbeat)
     {
         await SendResponseAsync(client, new Heartbeat());
-        HeartbeatTime = DateTime.Now;
     }
 
     private void StartBackgroundTimers()
