@@ -50,4 +50,6 @@ public class ResponseServiceInfo : INetObject
     ///     最后更新时间
     /// </summary>
     public uint LastUpdateTime { get; set; }
+    public override string ToString() =>
+        $"返回服务信息(TaskId={TaskId},系统={OS},时间基准年份={TimestampStartYear})";
 }

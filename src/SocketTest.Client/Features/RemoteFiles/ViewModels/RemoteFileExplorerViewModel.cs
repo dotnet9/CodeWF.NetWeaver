@@ -7,8 +7,9 @@ using CodeWF.NetWrapper.Requests;
 using CodeWF.NetWrapper.Response;
 using ReactiveUI;
 using SocketTest.Client.Features.RemoteFiles.Models;
-using SocketTest.Client.Features.Transfers.ViewModels;
+using SocketTest.Client.Features.Transfers.Messages;
 using SocketTest.Client.Shell.Messages;
+using SocketTest.Client.Shell.Services;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -22,8 +23,8 @@ namespace SocketTest.Client.Features.RemoteFiles.ViewModels;
 
 public class RemoteFileExplorerViewModel : ReactiveObject
 {
+    private readonly ClientApplicationStateService _appState;
     private readonly TcpSocketClient _tcpHelper;
-    private readonly FileTransferViewModel _fileTransferViewModel;
     private readonly ConcurrentDictionary<int, PendingBrowseRequest> _pendingBrowseRequests = new();
     private readonly ConcurrentDictionary<int, TaskCompletionSource<CreateDirectoryResponse>> _pendingCreateRequests = new();
     private readonly ConcurrentDictionary<int, TaskCompletionSource<DeletePathResponse>> _pendingDeleteRequests = new();
@@ -50,15 +51,16 @@ public class RemoteFileExplorerViewModel : ReactiveObject
     private CancellationTokenSource? _searchCancellationTokenSource;
     private bool _rootDisplaysDriveList = true;
 
-    public RemoteFileExplorerViewModel(TcpSocketClient tcpHelper, FileTransferViewModel fileTransferViewModel)
+    public RemoteFileExplorerViewModel(TcpSocketClient tcpHelper, ClientApplicationStateService appState)
     {
+        _appState = appState;
         _tcpHelper = tcpHelper;
-        _fileTransferViewModel = fileTransferViewModel;
 
         RootNodes = [];
         VisibleEntries = [];
 
         EventBus.Default.Subscribe(this);
+        UpdateExplorerState();
     }
 
     public ObservableCollection<RemoteDirectoryNode> RootNodes { get; }
@@ -80,7 +82,12 @@ public class RemoteFileExplorerViewModel : ReactiveObject
     public string CurrentDirectoryPath
     {
         get => _currentDirectoryPath;
-        set => this.RaiseAndSetIfChanged(ref _currentDirectoryPath, NormalizeDirectoryInput(value));
+        set
+        {
+            var normalizedPath = NormalizeDirectoryInput(value);
+            this.RaiseAndSetIfChanged(ref _currentDirectoryPath, normalizedPath);
+            _appState.CurrentDirectoryPath = normalizedPath;
+        }
     }
 
     public string SearchKeyword
@@ -129,7 +136,11 @@ public class RemoteFileExplorerViewModel : ReactiveObject
     public string StatusMessage
     {
         get => _statusMessage;
-        private set => this.RaiseAndSetIfChanged(ref _statusMessage, value);
+        private set
+        {
+            this.RaiseAndSetIfChanged(ref _statusMessage, value);
+            _appState.ExplorerStatusMessage = value;
+        }
     }
 
     public int CurrentSearchPage
@@ -228,17 +239,14 @@ public class RemoteFileExplorerViewModel : ReactiveObject
     public void CancelDeleteCommand() => CancelDeleteDialog();
 
     /// <summary>
-    /// 连接建立后自动初始化浏览器，连接断开时则统一清理待完成请求和当前界面状态。
+    /// 连接断开时统一清理待完成请求和当前界面状态，连接建立后的初始化由启动完成事件触发。
     /// </summary>
     public async Task HandleConnectionStateChangedAsync(bool isConnected)
     {
-        if (isConnected)
+        if (!isConnected)
         {
-            await InitializeExplorerAsync();
-            return;
+            ResetExplorer("连接已断开，请重新连接服务端。");
         }
-
-        ResetExplorer("连接已断开，请重新连接服务端。");
     }
 
     /// <summary>
@@ -335,7 +343,7 @@ public class RemoteFileExplorerViewModel : ReactiveObject
         }
 
         var transfers = files.Select(file => (file, CombineRemotePath(remoteDirectory, Path.GetFileName(file)))).ToList();
-        _fileTransferViewModel.EnqueueUploads(transfers);
+        await PublishUploadTasksAsync(transfers);
         StatusMessage = $"已加入 {transfers.Count} 个上传任务。";
     }
 
@@ -389,7 +397,7 @@ public class RemoteFileExplorerViewModel : ReactiveObject
             })
             .ToList();
 
-        _fileTransferViewModel.EnqueueUploads(uploads);
+        await PublishUploadTasksAsync(uploads);
         StatusMessage = $"已加入文件夹上传任务，共 {uploads.Count} 个文件。";
     }
 
@@ -416,7 +424,7 @@ public class RemoteFileExplorerViewModel : ReactiveObject
 
         if (!entry.IsDirectory)
         {
-            _fileTransferViewModel.EnqueueDownloads((entry.FullPath, Path.Combine(localRootDirectory, entry.Name)));
+            await PublishDownloadTasksAsync([(entry.FullPath, Path.Combine(localRootDirectory, entry.Name))]);
             StatusMessage = $"已加入下载任务：{entry.Name}";
             return;
         }
@@ -448,7 +456,7 @@ public class RemoteFileExplorerViewModel : ReactiveObject
             }
         }
 
-        _fileTransferViewModel.EnqueueDownloads(downloads);
+        await PublishDownloadTasksAsync(downloads);
         StatusMessage = $"已加入文件夹下载任务，共 {downloads.Count} 个文件。";
     }
 
@@ -577,6 +585,7 @@ public class RemoteFileExplorerViewModel : ReactiveObject
     /// <summary>
     /// 统一分发文件浏览相关响应，保证分页目录查询与创建/删除确认都走同一条日志链路。
     /// </summary>
+    [EventHandler]
     public void ReceivedSocketCommand(SocketCommand message)
     {
         if (message.IsCommand<BrowseFileSystemResponse>())
@@ -612,9 +621,39 @@ public class RemoteFileExplorerViewModel : ReactiveObject
     }
 
     [EventHandler]
-    private async Task ReceiveClientConnectionStateChangedAsync(ClientConnectionStateChangedMessage message)
+    private void ReceiveClientConnectionStateChanged(ClientConnectionStateChangedMessage message)
     {
-        await HandleConnectionStateChangedAsync(message.IsConnected);
+        _ = HandleClientConnectionStateChangedSafelyAsync(message.IsConnected);
+    }
+
+    [EventHandler]
+    private void ReceiveClientConnectionBootstrapCompleted(ClientConnectionBootstrapCompletedMessage message)
+    {
+        _ = InitializeExplorerSafelyAsync();
+    }
+
+    private async Task HandleClientConnectionStateChangedSafelyAsync(bool isConnected)
+    {
+        try
+        {
+            await HandleConnectionStateChangedAsync(isConnected);
+        }
+        catch (Exception ex)
+        {
+            Logger.Error("处理客户端连接状态变更失败", ex);
+        }
+    }
+
+    private async Task InitializeExplorerSafelyAsync()
+    {
+        try
+        {
+            await InitializeExplorerAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.Error("处理远程文件浏览器初始化失败", ex);
+        }
     }
 
     private async Task OpenEntryAsync(RemoteFileEntry entry)
@@ -984,6 +1023,7 @@ public class RemoteFileExplorerViewModel : ReactiveObject
         this.RaisePropertyChanged(nameof(ExplorerSummary));
         this.RaisePropertyChanged(nameof(CanGoPreviousSearchPage));
         this.RaisePropertyChanged(nameof(CanGoNextSearchPage));
+        UpdateExplorerState();
     }
 
     private void SelectVisibleEntry(string fullPath)
@@ -1046,6 +1086,7 @@ public class RemoteFileExplorerViewModel : ReactiveObject
         IsCreateDialogOpen = false;
         IsDeleteDialogOpen = false;
         StatusMessage = statusText;
+        UpdateExplorerState();
     }
 
     private void FailPendingRequests(string message)
@@ -1257,6 +1298,29 @@ public class RemoteFileExplorerViewModel : ReactiveObject
         };
     }
 
+    private async Task PublishUploadTasksAsync(IEnumerable<(string LocalPath, string RemotePath)> uploads)
+    {
+        var items = uploads
+            .Select(upload => new FileTransferPathPair(upload.LocalPath, upload.RemotePath))
+            .ToList();
+        await EventBus.Default.PublishAsync(new FileTransferEnqueueUploadsMessage(items));
+    }
+
+    private async Task PublishDownloadTasksAsync(IEnumerable<(string RemotePath, string LocalPath)> downloads)
+    {
+        var items = downloads
+            .Select(download => new FileTransferPathPair(download.RemotePath, download.LocalPath))
+            .ToList();
+        await EventBus.Default.PublishAsync(new FileTransferEnqueueDownloadsMessage(items));
+    }
+
+    private void UpdateExplorerState()
+    {
+        _appState.CurrentDirectoryPath = CurrentDirectoryPath;
+        _appState.ExplorerSummary = ExplorerSummary;
+        _appState.ExplorerStatusMessage = StatusMessage;
+    }
+
     private async Task RunBusyAsync(Func<Task> action, Action? finallyAction = null)
     {
         IsBusy = true;
@@ -1288,7 +1352,7 @@ public class RemoteFileExplorerViewModel : ReactiveObject
 
     private async Task SendTcpRequestAsync(CodeWF.NetWeaver.Base.INetObject request)
     {
-        Logger.Info($"客户端 -> 服务端 文件 TCP：{DescribeMessage(request)}");
+        Logger.Info($"客户端 -> 服务端 文件 TCP：{request}");
         await _tcpHelper.SendCommandAsync(request);
     }
 
@@ -1299,22 +1363,8 @@ public class RemoteFileExplorerViewModel : ReactiveObject
             return;
         }
 
-        Logger.Info($"服务端 -> 客户端 文件 TCP：{DescribeMessage(response)}");
+        Logger.Info($"服务端 -> 客户端 文件 TCP：{response}");
     }
-
-    private static string DescribeMessage(object message) =>
-        message switch
-        {
-            BrowseFileSystemRequest request => $"请求浏览文件系统(TaskId={request.TaskId},路径={request.DirectoryPath})",
-            CreateDirectoryRequest request => $"请求创建目录(TaskId={request.TaskId},路径={request.DirectoryPath})",
-            DeletePathRequest request => $"请求删除路径(TaskId={request.TaskId},路径={request.FilePath},目录={request.IsDirectory})",
-            BrowseFileSystemResponse response => $"返回浏览文件系统(TaskId={response.TaskId},页={response.PageIndex + 1}/{response.PageCount},条目数={response.Entries?.Count ?? 0})",
-            DriveListResponse response => $"返回磁盘列表(TaskId={response.TaskId},磁盘数={response.Disks?.Count ?? 0})",
-            CreateDirectoryResponse response => $"返回创建目录结果(TaskId={response.TaskId},成功={response.Success},路径={response.DirectoryPath})",
-            DeletePathResponse response => $"返回删除路径结果(TaskId={response.TaskId},成功={response.Success},路径={response.FilePath})",
-            FileTransferReject response => $"文件传输拒绝(TaskId={response.TaskId},错误码={response.ErrorCode},路径={response.RemoteFilePath})",
-            _ => message.GetType().Name
-        };
 
     private static void ActivateNode(RemoteDirectoryNode? node)
     {

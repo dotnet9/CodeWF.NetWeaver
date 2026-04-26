@@ -60,4 +60,5 @@ public class UpdateGeneralProcessList : INetObject
     ///     一个进程占4字节(byte)
     /// </summary>
     public byte[] UpdateTimes { get; set; } = null!;
+    public override string ToString() => $"常规进程增量页(页={PageIndex + 1}/{PageCount},页大小={PageSize})";
 }

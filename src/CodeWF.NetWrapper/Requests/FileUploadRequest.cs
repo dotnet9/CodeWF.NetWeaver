@@ -37,4 +37,6 @@ public class FileUploadRequest : INetObject
     /// 服务端保存的目标路径。
     /// </summary>
     public string RemoteFilePath { get; set; } = string.Empty;
+    public override string ToString() =>
+        $"请求上传文件(TaskId={TaskId},文件名={FileName},大小={FileSize},远程路径={RemoteFilePath},已传输={AlreadyTransferredBytes})";
 }

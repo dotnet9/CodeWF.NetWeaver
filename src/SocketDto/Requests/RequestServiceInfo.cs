@@ -10,4 +10,5 @@ public class RequestServiceInfo : INetObject
     ///     任务Id
     /// </summary>
     public int TaskId { get; set; }
+    public override string ToString() => $"请求服务信息(TaskId={TaskId})";
 }

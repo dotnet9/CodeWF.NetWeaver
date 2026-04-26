@@ -1,9 +1,12 @@
 using Avalonia.Threading;
+using CodeWF.EventBus;
 using CodeWF.Log.Core;
 using CodeWF.NetWrapper.Helpers;
 using CodeWF.NetWrapper.Models;
 using ReactiveUI;
+using SocketTest.Client.Features.Transfers.Messages;
 using SocketTest.Client.Features.Transfers.Models;
+using SocketTest.Client.Shell.Services;
 using System;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
@@ -18,6 +21,7 @@ namespace SocketTest.Client.Features.Transfers.ViewModels;
 
 public class FileTransferViewModel : ReactiveObject
 {
+    private readonly ClientApplicationStateService _appState;
     private readonly Timer _updateTimer;
     private DateTime _lastUpdateTime = DateTime.Now;
     private long _lastTotalBytesTransferred;
@@ -25,8 +29,9 @@ public class FileTransferViewModel : ReactiveObject
     private FileTransferItem? _activeTransfer;
     private TaskCompletionSource<FileTransferOutcomeEventArgs>? _activeCompletionSource;
 
-    public FileTransferViewModel(TcpSocketClient tcpHelper)
+    public FileTransferViewModel(TcpSocketClient tcpHelper, ClientApplicationStateService appState)
     {
+        _appState = appState;
         TcpHelper = tcpHelper;
         FileTransferList = new ObservableCollection<FileTransferItem>();
         FileTransferList.CollectionChanged += HandleTransferCollectionChanged;
@@ -37,15 +42,34 @@ public class FileTransferViewModel : ReactiveObject
         _updateTimer = new Timer(500);
         _updateTimer.Elapsed += (_, _) => Dispatcher.UIThread.Post(UpdateDashboard);
         _updateTimer.Start();
+
+        EventBus.Default.Subscribe(this);
+        UpdateTransferDashboardState();
     }
 
     public ObservableCollection<FileTransferItem> FileTransferList { get; }
 
     public TcpSocketClient TcpHelper { get; }
 
-    public double TotalProgress { get; private set => this.RaiseAndSetIfChanged(ref field, value); }
+    public double TotalProgress
+    {
+        get;
+        private set
+        {
+            this.RaiseAndSetIfChanged(ref field, value);
+            _appState.TransferTotalProgress = value;
+        }
+    }
 
-    public string TransferSpeed { get; private set => this.RaiseAndSetIfChanged(ref field, value); } = "0 B/s";
+    public string TransferSpeed
+    {
+        get;
+        private set
+        {
+            this.RaiseAndSetIfChanged(ref field, value);
+            _appState.TransferSpeed = value;
+        }
+    } = "0 B/s";
 
     public string QueueSummary { get; private set => this.RaiseAndSetIfChanged(ref field, value); } = "暂无传输任务";
 
@@ -167,6 +191,18 @@ public class FileTransferViewModel : ReactiveObject
     }
 
     public void RemoveTransferItem(FileTransferItem item) => RemoveTransfer(item);
+
+    [EventHandler]
+    private void ReceiveFileTransferEnqueueUploads(FileTransferEnqueueUploadsMessage message)
+    {
+        EnqueueUploads(message.Items.Select(item => (item.SourcePath, item.DestinationPath)));
+    }
+
+    [EventHandler]
+    private void ReceiveFileTransferEnqueueDownloads(FileTransferEnqueueDownloadsMessage message)
+    {
+        EnqueueDownloads(message.Items.Select(item => (item.SourcePath, item.DestinationPath)));
+    }
 
     private void PauseTransfer(FileTransferItem item)
     {
@@ -434,6 +470,7 @@ public class FileTransferViewModel : ReactiveObject
         {
             TotalProgress = 0;
             TransferSpeed = "0 B/s";
+            UpdateTransferDashboardState();
             QueueSummary = "暂无传输任务";
             return;
         }
@@ -458,6 +495,14 @@ public class FileTransferViewModel : ReactiveObject
         var failed = FileTransferList.Count(item => item.State == FileTransferState.Failed);
 
         QueueSummary = $"运行中 {running}，排队 {queued}，暂停 {paused}，完成 {completed}，失败 {failed}";
+        UpdateTransferDashboardState();
+    }
+
+    private void UpdateTransferDashboardState()
+    {
+        _appState.TransferQueueSummary = QueueSummary;
+        _appState.TransferSpeed = TransferSpeed;
+        _appState.TransferTotalProgress = TotalProgress;
     }
 
     private static string FormatBytesPerSecond(long bytes)

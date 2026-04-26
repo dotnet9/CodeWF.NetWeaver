@@ -48,4 +48,5 @@ public class UpdateRealtimeProcessList : INetObject
     /// </summary>
     [NetFieldOffset(30, 10)]
     public byte[] Networks { get; set; } = null!;
+    public override string ToString() => $"实时进程增量页(页={PageIndex + 1}/{PageCount},页大小={PageSize})";
 }

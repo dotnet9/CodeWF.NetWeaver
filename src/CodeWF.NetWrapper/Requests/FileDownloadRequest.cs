@@ -37,4 +37,6 @@ public class FileDownloadRequest : INetObject
     /// 服务端文件路径。
     /// </summary>
     public string RemoteFilePath { get; set; } = string.Empty;
+    public override string ToString() =>
+        $"请求下载文件(TaskId={TaskId},文件名={FileName},大小={FileSize},远程路径={RemoteFilePath},已传输={AlreadyTransferredBytes})";
 }

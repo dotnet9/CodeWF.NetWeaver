@@ -17,4 +17,5 @@ public class CreateDirectoryRequest : INetObject
     /// 要创建的目录路径。
     /// </summary>
     public string DirectoryPath { get; set; } = string.Empty;
+    public override string ToString() => $"请求创建目录(TaskId={TaskId},路径={DirectoryPath})";
 }

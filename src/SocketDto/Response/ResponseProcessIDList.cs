@@ -15,4 +15,5 @@ public class ResponseProcessIDList : INetObject
     ///     进程ID数组，有顺序，更新进程实时数据包需要根据该数组查找进程、更新数据
     /// </summary>
     public int[]? IDList { get; set; }
+    public override string ToString() => $"返回进程ID列表(TaskId={TaskId},数量={IDList?.Length ?? 0})";
 }

@@ -35,6 +35,8 @@ public class ResponseProcessList : INetObject
     ///     进程列表
     /// </summary>
     public List<ProcessItem>? Processes { get; set; }
+    public override string ToString() =>
+        $"返回进程列表(TaskId={TaskId},页={PageIndex + 1}/{PageCount},进程数={Processes?.Count ?? 0})";
 }
 
 /// <summary>

@@ -1,5 +1,6 @@
 using System;
 using System.Globalization;
+using Avalonia.Data;
 using Avalonia.Data.Converters;
 using Avalonia.Media;
 
@@ -31,6 +32,18 @@ public class UsageToFormatConverter : IValueConverter
     /// </summary>
     public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
     {
-        throw new NotImplementedException();
+        if (value is not string text || string.IsNullOrWhiteSpace(text))
+        {
+            return BindingOperations.DoNothing;
+        }
+
+        text = text.Trim().TrimEnd('%');
+        if (!double.TryParse(text, NumberStyles.Float, culture, out var percentage) &&
+            !double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out percentage))
+        {
+            return BindingOperations.DoNothing;
+        }
+
+        return (short)Math.Round(percentage * 10, MidpointRounding.AwayFromZero);
     }
 }

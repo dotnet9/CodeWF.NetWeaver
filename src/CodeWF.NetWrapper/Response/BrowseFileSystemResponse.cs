@@ -38,4 +38,6 @@ public class BrowseFileSystemResponse : INetObject
     /// 当前页的文件系统条目集合。
     /// </summary>
     public List<FileSystemEntry>? Entries { get; set; }
+    public override string ToString() =>
+        $"返回浏览文件系统(TaskId={TaskId},页={PageIndex + 1}/{PageCount},条目数={Entries?.Count ?? 0})";
 }

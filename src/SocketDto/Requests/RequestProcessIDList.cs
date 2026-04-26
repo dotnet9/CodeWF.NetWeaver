@@ -10,4 +10,5 @@ public class RequestProcessIDList : INetObject
     ///     任务Id
     /// </summary>
     public int TaskId { get; set; }
+    public override string ToString() => $"请求进程ID列表(TaskId={TaskId})";
 }

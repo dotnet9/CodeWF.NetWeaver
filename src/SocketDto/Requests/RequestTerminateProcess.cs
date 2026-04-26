@@ -20,4 +20,6 @@ public class RequestTerminateProcess : INetObject
     /// 是否同时结束该进程的所有子进程。
     /// </summary>
     public bool KillEntireProcessTree { get; set; } = true;
+    public override string ToString() =>
+        $"请求结束进程(TaskId={TaskId},Pid={ProcessId},结束进程树={KillEntireProcessTree})";
 }

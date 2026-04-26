@@ -1,40 +1,40 @@
 using ReactiveUI;
-using SocketTest.Client.Features.RemoteFiles.ViewModels;
+using SocketTest.Client.Shell.Services;
 using System.ComponentModel;
 
 namespace SocketTest.Client.Shell.ViewModels;
 
 public sealed class RemoteFileExplorerStatusViewModel : ReactiveObject
 {
-    private readonly RemoteFileExplorerViewModel _remoteFileExplorerViewModel;
+    private readonly ClientApplicationStateService _appState;
 
-    public RemoteFileExplorerStatusViewModel(RemoteFileExplorerViewModel remoteFileExplorerViewModel)
+    public RemoteFileExplorerStatusViewModel(ClientApplicationStateService appState)
     {
-        _remoteFileExplorerViewModel = remoteFileExplorerViewModel;
-        _remoteFileExplorerViewModel.PropertyChanged += HandleRemoteFileExplorerPropertyChanged;
+        _appState = appState;
+        _appState.PropertyChanged += HandleAppStatePropertyChanged;
     }
 
-    public string CurrentDirectoryPath => _remoteFileExplorerViewModel.CurrentDirectoryPath;
+    public string CurrentDirectoryPath => _appState.CurrentDirectoryPath;
 
-    public string ExplorerSummary => _remoteFileExplorerViewModel.ExplorerSummary;
+    public string ExplorerSummary => _appState.ExplorerSummary;
 
-    public string StatusMessage => _remoteFileExplorerViewModel.StatusMessage;
+    public string StatusMessage => _appState.ExplorerStatusMessage;
 
-    private void HandleRemoteFileExplorerPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    private void HandleAppStatePropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName is nameof(RemoteFileExplorerViewModel.CurrentDirectoryPath))
+        if (e.PropertyName is nameof(ClientApplicationStateService.CurrentDirectoryPath))
         {
             this.RaisePropertyChanged(nameof(CurrentDirectoryPath));
             return;
         }
 
-        if (e.PropertyName is nameof(RemoteFileExplorerViewModel.ExplorerSummary))
+        if (e.PropertyName is nameof(ClientApplicationStateService.ExplorerSummary))
         {
             this.RaisePropertyChanged(nameof(ExplorerSummary));
             return;
         }
 
-        if (e.PropertyName is nameof(RemoteFileExplorerViewModel.StatusMessage))
+        if (e.PropertyName is nameof(ClientApplicationStateService.ExplorerStatusMessage))
         {
             this.RaisePropertyChanged(nameof(StatusMessage));
         }

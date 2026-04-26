@@ -25,4 +25,6 @@ public class ResponseTerminateProcess : INetObject
     /// 服务端返回的说明消息。
     /// </summary>
     public string? Message { get; set; }
+    public override string ToString() =>
+        $"返回结束进程结果(TaskId={TaskId},Pid={ProcessId},成功={Success},消息={Message})";
 }

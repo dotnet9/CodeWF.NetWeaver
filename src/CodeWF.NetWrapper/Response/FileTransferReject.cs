@@ -33,4 +33,6 @@ public class FileTransferReject : INetObject
     /// 文件名。
     /// </summary>
     public string FileName { get; set; } = string.Empty;
+    public override string ToString() =>
+        $"文件传输拒绝(TaskId={TaskId},错误码={ErrorCode},路径={RemoteFilePath},消息={Message})";
 }

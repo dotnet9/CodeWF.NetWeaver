@@ -1,40 +1,40 @@
 using ReactiveUI;
-using SocketTest.Client.Features.Processes.ViewModels;
+using SocketTest.Client.Shell.Services;
 using System.ComponentModel;
 
 namespace SocketTest.Client.Shell.ViewModels;
 
 public sealed class ProcessMonitorStatusViewModel : ReactiveObject
 {
-    private readonly ProcessMonitorViewModel _processMonitorViewModel;
+    private readonly ClientApplicationStateService _appState;
 
-    public ProcessMonitorStatusViewModel(ProcessMonitorViewModel processMonitorViewModel)
+    public ProcessMonitorStatusViewModel(ClientApplicationStateService appState)
     {
-        _processMonitorViewModel = processMonitorViewModel;
-        _processMonitorViewModel.PropertyChanged += HandleProcessMonitorPropertyChanged;
+        _appState = appState;
+        _appState.PropertyChanged += HandleAppStatePropertyChanged;
     }
 
-    public string ConnectionSummary => _processMonitorViewModel.ConnectionSummary;
+    public string ConnectionSummary => _appState.ConnectionSummary;
 
-    public string UdpSummary => _processMonitorViewModel.UdpSummary;
+    public string UdpSummary => _appState.UdpSummary;
 
-    public string ProcessSummary => _processMonitorViewModel.ProcessSummary;
+    public string ProcessSummary => _appState.ProcessSummary;
 
-    private void HandleProcessMonitorPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    private void HandleAppStatePropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName is nameof(ProcessMonitorViewModel.ConnectionSummary))
+        if (e.PropertyName is nameof(ClientApplicationStateService.ConnectionSummary))
         {
             this.RaisePropertyChanged(nameof(ConnectionSummary));
             return;
         }
 
-        if (e.PropertyName is nameof(ProcessMonitorViewModel.UdpSummary))
+        if (e.PropertyName is nameof(ClientApplicationStateService.UdpSummary))
         {
             this.RaisePropertyChanged(nameof(UdpSummary));
             return;
         }
 
-        if (e.PropertyName is nameof(ProcessMonitorViewModel.ProcessSummary))
+        if (e.PropertyName is nameof(ClientApplicationStateService.ProcessSummary))
         {
             this.RaisePropertyChanged(nameof(ProcessSummary));
         }

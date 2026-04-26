@@ -17,4 +17,5 @@ public class BrowseFileSystemRequest : INetObject
     /// 要浏览的目录路径。
     /// </summary>
     public string DirectoryPath { get; set; } = string.Empty;
+    public override string ToString() => $"请求浏览文件系统(TaskId={TaskId},路径={DirectoryPath})";
 }

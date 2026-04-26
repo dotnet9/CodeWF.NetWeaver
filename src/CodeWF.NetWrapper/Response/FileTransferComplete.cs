@@ -27,4 +27,5 @@ public class FileTransferComplete : INetObject
     /// 响应消息。
     /// </summary>
     public string Message { get; set; } = string.Empty;
+    public override string ToString() => $"文件传输完成(TaskId={TaskId},成功={Success},消息={Message})";
 }

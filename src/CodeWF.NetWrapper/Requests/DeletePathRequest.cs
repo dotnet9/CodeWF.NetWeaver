@@ -22,4 +22,5 @@ public class DeletePathRequest : INetObject
     /// 标记当前路径是否为目录。
     /// </summary>
     public bool IsDirectory { get; set; }
+    public override string ToString() => $"请求删除路径(TaskId={TaskId},路径={FilePath},目录={IsDirectory})";
 }

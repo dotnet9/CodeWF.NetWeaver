@@ -12,4 +12,5 @@ public class Heartbeat : INetObject
     /// 请求任务 ID，用于把响应与原请求对应起来。
     /// </summary>
     public int TaskId { get; set; }
+    public override string ToString() => $"心跳包(TaskId={TaskId})";
 }

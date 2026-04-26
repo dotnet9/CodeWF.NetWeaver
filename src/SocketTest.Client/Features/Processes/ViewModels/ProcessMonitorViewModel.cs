@@ -13,6 +13,7 @@ using SocketDto.Udp;
 using SocketTest.Client.Features.Processes.Models;
 using SocketTest.Client.Infrastructure.Collections;
 using SocketTest.Client.Shell.Messages;
+using SocketTest.Client.Shell.Services;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -26,6 +27,7 @@ public class ProcessMonitorViewModel : ReactiveObject
     private readonly List<ProcessItemModel> _receivedProcesses = [];
     private readonly Dictionary<int, ProcessItemModel> _processLookup = [];
     private readonly ConcurrentDictionary<int, TaskCompletionSource<ResponseTerminateProcess>> _pendingTerminateRequests = new();
+    private readonly ClientApplicationStateService _appState;
     private int[]? _processIds;
     private int _timestampStartYear = 2020;
     private int _activeProcessTaskId = -1;
@@ -33,55 +35,24 @@ public class ProcessMonitorViewModel : ReactiveObject
     private int _receivedProcessPages;
     private ProcessItemModel? _pendingTerminateProcess;
 
-    public ProcessMonitorViewModel(TcpSocketClient tcpHelper, UdpSocketClient udpHelper)
+    public ProcessMonitorViewModel(
+        TcpSocketClient tcpHelper,
+        UdpSocketClient udpHelper,
+        ClientApplicationStateService appState)
     {
+        _appState = appState;
         TcpHelper = tcpHelper;
         UdpHelper = udpHelper;
         DisplayProcesses = new RangeObservableCollection<ProcessItemModel>();
         UdpHelper.Received += HandleUdpMessageReceived;
 
         EventBus.Default.Subscribe(this);
+        UpdateProcessSummaryState();
     }
 
     public RangeObservableCollection<ProcessItemModel> DisplayProcesses { get; }
 
-    public string TcpIp { get; set => this.RaiseAndSetIfChanged(ref field, value); } = "127.0.0.1";
-
-    public int TcpPort { get; set => this.RaiseAndSetIfChanged(ref field, value); } = 5000;
-
-    public string UdpIp
-    {
-        get;
-        set
-        {
-            this.RaiseAndSetIfChanged(ref field, value);
-            this.RaisePropertyChanged(nameof(UdpSummary));
-        }
-    } = "239.255.255.250";
-
-    public int UdpPort
-    {
-        get;
-        set
-        {
-            this.RaiseAndSetIfChanged(ref field, value);
-            this.RaisePropertyChanged(nameof(UdpSummary));
-        }
-    } = 11012;
-
-    public long SystemId { get; set => this.RaiseAndSetIfChanged(ref field, value); } = 1000;
-
-    public bool IsRunning => TcpHelper.IsRunning;
-
-    public string ConnectionSummary => TcpHelper.IsRunning
-        ? $"已连接到 {TcpIp}:{TcpPort}"
-        : "尚未连接到 TCP 服务端";
-
-    public string ConnectButtonText => TcpHelper.IsRunning ? "断开连接" : "连接服务端";
-
     public string ProcessSummary => $"当前显示 {DisplayProcesses.Count:N0} 个进程";
-
-    public string UdpSummary => $"{UdpIp}:{UdpPort}";
 
     public ProcessItemModel? SelectedProcess { get; set => this.RaiseAndSetIfChanged(ref field, value); }
 
@@ -94,59 +65,16 @@ public class ProcessMonitorViewModel : ReactiveObject
     public UdpSocketClient UdpHelper { get; }
 
     /// <summary>
-    /// 管理客户端与服务端的连接生命周期，并在连通后立即发起首轮基础数据同步。
-    /// </summary>
-    public async Task HandleConnectTcpAsync()
-    {
-        if (TcpHelper.IsRunning)
-        {
-            Logger.Info($"客户端请求断开 TCP 连接：{TcpIp}:{TcpPort}");
-            UdpHelper.Stop();
-            TcpHelper.Stop();
-            ClearProcesses();
-            RaiseConnectionProperties();
-            await EventBus.Default.PublishAsync(new ClientConnectionStateChangedMessage(false));
-            return;
-        }
-
-        Logger.Info($"客户端请求建立 TCP 连接：{TcpIp}:{TcpPort}");
-        var result = await TcpHelper.ConnectAsync("SocketTest.Client", TcpIp, TcpPort);
-        if (!result.IsSuccess)
-        {
-            Logger.Warn(result.ErrorMessage ?? "TCP 连接失败。");
-            RaiseConnectionProperties();
-            return;
-        }
-
-        Logger.Info($"客户端已建立 TCP 连接：{TcpIp}:{TcpPort}");
-        RaiseConnectionProperties();
-        await EventBus.Default.PublishAsync(new ClientConnectionStateChangedMessage(true));
-        await RequestInitialDataAsync();
-    }
-
-    /// <summary>
-    /// 在连接建立后按固定顺序请求目标类型、服务信息、UDP 地址和完整进程树。
+    /// 兼容现有界面绑定，当前仅触发进程域刷新，不再负责连接初始化握手。
     /// </summary>
     public async Task RequestInitialDataAsync()
     {
-        if (!TcpHelper.IsRunning)
-        {
-            return;
-        }
-
-        await SendTcpCommandAsync(new RequestTargetType { TaskId = NetHelper.GetTaskId() });
-        await SendTcpCommandAsync(new RequestServiceInfo { TaskId = NetHelper.GetTaskId() });
-        await SendTcpCommandAsync(new RequestUdpAddress { TaskId = NetHelper.GetTaskId() });
-        await SendTcpCommandAsync(new RequestProcessIDList { TaskId = NetHelper.GetTaskId() });
         await RefreshProcessesAsync();
     }
 
     public async Task RefreshProcessesAsync()
     {
-        if (TcpHelper.IsRunning)
-        {
-            await SendTcpCommandAsync(new RequestProcessList { TaskId = NetHelper.GetTaskId() });
-        }
+        await RequestProcessIdListAsync();
     }
 
     public void ShowTerminateProcessDialog(ProcessItemModel? process)
@@ -201,7 +129,7 @@ public class ProcessMonitorViewModel : ReactiveObject
             }
 
             Logger.Info(response.Message ?? $"已结束进程：PID={targetProcess.PID}");
-            await RequestInitialDataAsync();
+            await RequestProcessIdListAsync();
         }
         catch (Exception ex)
         {
@@ -219,30 +147,29 @@ public class ProcessMonitorViewModel : ReactiveObject
         IsTerminateDialogOpen = false;
     }
 
+    [EventHandler]
+    private void ReceiveClientConnectionStateChanged(ClientConnectionStateChangedMessage message)
+    {
+        if (!message.IsConnected)
+        {
+            ClearProcesses();
+        }
+    }
+
+    [EventHandler]
+    private void ReceiveClientConnectionBootstrapCompleted(ClientConnectionBootstrapCompletedMessage message)
+    {
+        _timestampStartYear = message.TimestampStartYear;
+        _ = RequestProcessIdListSafelyAsync();
+    }
+
     /// <summary>
-    /// 统一分发服务端返回的 TCP 控制对象，让各类响应都经过同一条日志与状态更新链路。
+    /// 统一分发进程模块关心的 TCP 控制对象，让进程列表、结构变化与结束进程响应走同一条链路。
     /// </summary>
+    [EventHandler]
     public void ReceivedSocketCommand(SocketCommand message)
     {
-        if (message.IsCommand<ResponseTargetType>())
-        {
-            var response = message.GetCommand<ResponseTargetType>();
-            LogIncomingTcpCommand(response);
-            ReceivedSocketMessage(response);
-        }
-        else if (message.IsCommand<ResponseUdpAddress>())
-        {
-            var response = message.GetCommand<ResponseUdpAddress>();
-            LogIncomingTcpCommand(response);
-            ReceivedSocketMessage(response);
-        }
-        else if (message.IsCommand<ResponseServiceInfo>())
-        {
-            var response = message.GetCommand<ResponseServiceInfo>();
-            LogIncomingTcpCommand(response);
-            ReceivedSocketMessage(response);
-        }
-        else if (message.IsCommand<ResponseProcessIDList>())
+        if (message.IsCommand<ResponseProcessIDList>())
         {
             var response = message.GetCommand<ResponseProcessIDList>();
             LogIncomingTcpCommand(response);
@@ -274,36 +201,11 @@ public class ProcessMonitorViewModel : ReactiveObject
         }
     }
 
-    private void ReceivedSocketMessage(ResponseTargetType response)
-    {
-        if (response.Type == (byte)TerminalType.Server)
-        {
-            Logger.Info("已确认连接目标为服务端。");
-        }
-    }
-
-    private void ReceivedSocketMessage(ResponseUdpAddress response)
-    {
-        UdpIp = response.Ip ?? UdpIp;
-        UdpPort = response.Port;
-        Logger.Info($"已收到 UDP 组播地址：{UdpIp}:{UdpPort}");
-
-        if (!UdpHelper.IsRunning)
-        {
-            _ = UdpHelper.ConnectAsync("Server", UdpIp, UdpPort, string.Empty, SystemId);
-        }
-    }
-
-    private void ReceivedSocketMessage(ResponseServiceInfo response)
-    {
-        _timestampStartYear = response.TimestampStartYear;
-        Logger.Info($"服务端信息：{response.OS}，时间基准年份：{response.TimestampStartYear}");
-    }
-
     private void ReceivedSocketMessage(ResponseProcessIDList response)
     {
         _processIds = response.IDList;
         RebuildProcessLookup();
+        _ = RequestProcessListSafelyAsync();
     }
 
     private void ReceivedSocketMessage(ResponseProcessList response)
@@ -368,7 +270,7 @@ public class ProcessMonitorViewModel : ReactiveObject
     private void ReceivedSocketMessage(ChangeProcessList response)
     {
         Logger.Info("服务端通知进程结构已变化，准备重新拉取进程列表。");
-        _ = RequestInitialDataAsync();
+        _ = RequestProcessIdListSafelyAsync();
     }
 
     private void HandleUdpMessageReceived(object? sender, SocketCommand message)
@@ -483,6 +385,7 @@ public class ProcessMonitorViewModel : ReactiveObject
             }
 
             this.RaisePropertyChanged(nameof(ProcessSummary));
+            UpdateProcessSummaryState();
         });
     }
 
@@ -490,27 +393,70 @@ public class ProcessMonitorViewModel : ReactiveObject
     {
         _receivedProcesses.Clear();
         _processLookup.Clear();
+        _pendingTerminateRequests.Clear();
         _processIds = null;
+        _activeProcessTaskId = -1;
+        _expectedProcessPages = 0;
+        _receivedProcessPages = 0;
+        _pendingTerminateProcess = null;
         DisplayProcesses.Clear();
         SelectedProcess = null;
         this.RaisePropertyChanged(nameof(ProcessSummary));
+        UpdateProcessSummaryState();
     }
 
-    private void RaiseConnectionProperties()
+    private async Task RequestProcessIdListAsync()
     {
-        this.RaisePropertyChanged(nameof(IsRunning));
-        this.RaisePropertyChanged(nameof(ConnectionSummary));
-        this.RaisePropertyChanged(nameof(ConnectButtonText));
+        if (!TcpHelper.IsRunning)
+        {
+            return;
+        }
+
+        await SendTcpCommandAsync(new RequestProcessIDList { TaskId = NetHelper.GetTaskId() });
+    }
+
+    private async Task RequestProcessListAsync()
+    {
+        if (!TcpHelper.IsRunning)
+        {
+            return;
+        }
+
+        await SendTcpCommandAsync(new RequestProcessList { TaskId = NetHelper.GetTaskId() });
     }
 
     private async Task SendTcpCommandAsync(CodeWF.NetWeaver.Base.INetObject command)
     {
-        Logger.Info($"客户端 -> 服务端 TCP：{DescribeCommand(command)}");
+        Logger.Info($"客户端 -> 服务端 TCP：{command}");
         await TcpHelper.SendCommandAsync(command);
     }
 
+    private async Task RequestProcessIdListSafelyAsync()
+    {
+        try
+        {
+            await RequestProcessIdListAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.Error("请求进程 ID 列表失败。", ex);
+        }
+    }
+
+    private async Task RequestProcessListSafelyAsync()
+    {
+        try
+        {
+            await RequestProcessListAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.Error("请求进程详细列表失败。", ex);
+        }
+    }
+
     private static void LogIncomingTcpCommand(object command) =>
-        Logger.Info($"服务端 -> 客户端 TCP：{DescribeCommand(command)}");
+        Logger.Info($"服务端 -> 客户端 TCP：{command}");
 
     private static void LogIncomingUdpCommand(object command)
     {
@@ -524,28 +470,11 @@ public class ProcessMonitorViewModel : ReactiveObject
             return;
         }
 
-        Logger.Info($"服务端 -> 客户端 UDP：{DescribeCommand(command)}");
+        // Logger.Info($"服务端 -> 客户端 UDP：{command}");
     }
 
-    private static string DescribeCommand(object command) =>
-        command switch
-        {
-            RequestTargetType request => $"请求目标类型(TaskId={request.TaskId})",
-            RequestServiceInfo request => $"请求服务信息(TaskId={request.TaskId})",
-            RequestUdpAddress request => $"请求 UDP 地址(TaskId={request.TaskId})",
-            RequestProcessIDList request => $"请求进程 ID 列表(TaskId={request.TaskId})",
-            RequestProcessList request => $"请求进程列表(TaskId={request.TaskId})",
-            RequestTerminateProcess request => $"请求结束进程(TaskId={request.TaskId},Pid={request.ProcessId},结束进程树={request.KillEntireProcessTree})",
-            ResponseTargetType response => $"返回目标类型(TaskId={response.TaskId},类型={response.Type})",
-            ResponseServiceInfo response => $"返回服务信息(TaskId={response.TaskId},系统={response.OS},时间基准年份={response.TimestampStartYear})",
-            ResponseUdpAddress response => $"返回 UDP 地址(TaskId={response.TaskId},Ip={response.Ip},端口={response.Port})",
-            ResponseProcessIDList response => $"返回进程 ID 列表(TaskId={response.TaskId},数量={response.IDList?.Length ?? 0})",
-            ResponseProcessList response => $"返回进程列表(TaskId={response.TaskId},页={response.PageIndex + 1}/{response.PageCount},进程数={response.Processes?.Count ?? 0})",
-            ResponseTerminateProcess response => $"返回结束进程结果(TaskId={response.TaskId},Pid={response.ProcessId},成功={response.Success})",
-            ChangeProcessList => "进程结构变更通知",
-            UpdateProcessList response => $"进程列表增量更新(进程数={response.Processes?.Count ?? 0})",
-            UpdateRealtimeProcessList response => $"实时进程增量页(页={response.PageIndex + 1}/{response.PageCount},页大小={response.PageSize})",
-            UpdateGeneralProcessList response => $"常规进程增量页(页={response.PageIndex + 1}/{response.PageCount},页大小={response.PageSize})",
-            _ => command.GetType().Name
-        };
+    private void UpdateProcessSummaryState()
+    {
+        _appState.ProcessSummary = ProcessSummary;
+    }
 }

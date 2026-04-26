@@ -12,6 +12,7 @@ using SocketTest.Client.Features.RemoteFiles.ViewModels;
 using SocketTest.Client.Features.RemoteFiles.Views;
 using SocketTest.Client.Features.Transfers.ViewModels;
 using SocketTest.Client.Features.Transfers.Views;
+using SocketTest.Client.Shell.Services;
 using SocketTest.Client.Shell.ViewModels;
 
 namespace SocketTest.Client;
@@ -28,6 +29,7 @@ public class App : PrismApplication
     {
         containerRegistry.RegisterSingleton<TcpSocketClient>();
         containerRegistry.RegisterSingleton<UdpSocketClient>();
+        containerRegistry.RegisterSingleton<ClientApplicationStateService>();
 
         containerRegistry.RegisterSingleton<ProcessMonitorViewModel>();
         containerRegistry.RegisterSingleton<FileTransferViewModel>();

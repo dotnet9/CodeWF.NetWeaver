@@ -18,4 +18,5 @@ public class DriveListResponse : INetObject
     /// 当前可用磁盘信息集合。
     /// </summary>
     public List<DiskInfo>? Disks { get; set; }
+    public override string ToString() => $"返回磁盘列表(TaskId={TaskId},磁盘数={Disks?.Count ?? 0})";
 }

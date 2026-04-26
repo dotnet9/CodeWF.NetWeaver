@@ -6,4 +6,5 @@ namespace SocketDto.AutoCommand;
 [NetHead(NetConsts.ChangeProcessListObjectId, 1)]
 public class ChangeProcessList : INetObject
 {
+    public override string ToString() => "进程结构变更通知";
 }

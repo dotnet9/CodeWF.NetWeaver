@@ -27,4 +27,5 @@ public class DeletePathResponse : INetObject
     /// 响应消息。
     /// </summary>
     public string Message { get; set; } = string.Empty;
+    public override string ToString() => $"返回删除路径结果(TaskId={TaskId},成功={Success},路径={FilePath},消息={Message})";
 }

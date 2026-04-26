@@ -1,3 +1,4 @@
+using Avalonia.Data;
 using Avalonia.Data.Converters;
 using Avalonia.Media;
 using SocketDto.Enums;
@@ -38,6 +39,6 @@ public class ProcessPowerUsageToForegroundConverter : IValueConverter
     /// </summary>
     public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
     {
-        throw new NotImplementedException();
+        return BindingOperations.DoNothing;
     }
 }

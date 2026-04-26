@@ -27,4 +27,5 @@ public class CreateDirectoryResponse : INetObject
     /// 响应消息。
     /// </summary>
     public string Message { get; set; } = string.Empty;
+    public override string ToString() => $"返回创建目录结果(TaskId={TaskId},成功={Success},路径={DirectoryPath},消息={Message})";
 }

@@ -72,7 +72,13 @@ internal sealed class ProcessSnapshotProvider : IProcessSnapshotProvider
                 .ToList();
 
             var newProcessIds = processItems.Select(item => item.Pid).ToArray();
-            var structureChanged = !_currentProcessIds.SequenceEqual(newProcessIds);
+            var previousProcessIds = _currentProcessIds;
+            var previousProcessIdSet = previousProcessIds.ToHashSet();
+            var currentProcessIdSet = newProcessIds.ToHashSet();
+            var addedProcessCount = currentProcessIdSet.Except(previousProcessIdSet).Count();
+            var removedProcessCount = previousProcessIdSet.Except(currentProcessIdSet).Count();
+            var countChanged = previousProcessIds.Length != newProcessIds.Length;
+            var structureChanged = countChanged || addedProcessCount > 0 || removedProcessCount > 0;
 
             _currentProcesses = processItems;
             _currentProcessIds = newProcessIds;
@@ -85,7 +91,11 @@ internal sealed class ProcessSnapshotProvider : IProcessSnapshotProvider
             _serviceInfo = BuildServiceInfo(currentTimestamp);
             _lastCaptureUtc = nowUtc;
 
-            return new ProcessSnapshotRefreshResult(structureChanged, _currentProcesses.Count);
+            return new ProcessSnapshotRefreshResult(
+                structureChanged,
+                _currentProcesses.Count,
+                addedProcessCount,
+                removedProcessCount);
         }
     }
 
@@ -685,4 +695,8 @@ internal sealed class ProcessSnapshotProvider : IProcessSnapshotProvider
     }
 }
 
-internal readonly record struct ProcessSnapshotRefreshResult(bool StructureChanged, int ProcessCount);
+internal readonly record struct ProcessSnapshotRefreshResult(
+    bool StructureChanged,
+    int ProcessCount,
+    int AddedProcessCount,
+    int RemovedProcessCount);

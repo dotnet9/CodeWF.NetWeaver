@@ -16,4 +16,5 @@ public class ResponseTargetType : INetObject
     ///     终端类型，0：Server，1：Client
     /// </summary>
     public byte Type { get; set; }
+    public override string ToString() => $"返回目标类型(TaskId={TaskId},类型={Type})";
 }
