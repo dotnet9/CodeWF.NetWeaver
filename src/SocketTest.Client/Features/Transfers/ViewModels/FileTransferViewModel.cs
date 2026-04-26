@@ -18,7 +18,6 @@ namespace SocketTest.Client.Features.Transfers.ViewModels;
 
 public class FileTransferViewModel : ReactiveObject
 {
-    private readonly TcpSocketClient _tcpHelper;
     private readonly Timer _updateTimer;
     private DateTime _lastUpdateTime = DateTime.Now;
     private long _lastTotalBytesTransferred;
@@ -28,12 +27,12 @@ public class FileTransferViewModel : ReactiveObject
 
     public FileTransferViewModel(TcpSocketClient tcpHelper)
     {
-        _tcpHelper = tcpHelper;
+        TcpHelper = tcpHelper;
         FileTransferList = new ObservableCollection<FileTransferItem>();
         FileTransferList.CollectionChanged += HandleTransferCollectionChanged;
 
-        _tcpHelper.FileTransferProgress += HandleFileTransferProgress;
-        _tcpHelper.FileTransferOutcome += HandleFileTransferOutcome;
+        TcpHelper.FileTransferProgress += HandleFileTransferProgress;
+        TcpHelper.FileTransferOutcome += HandleFileTransferOutcome;
 
         _updateTimer = new Timer(500);
         _updateTimer.Elapsed += (_, _) => Dispatcher.UIThread.Post(UpdateDashboard);
@@ -41,6 +40,8 @@ public class FileTransferViewModel : ReactiveObject
     }
 
     public ObservableCollection<FileTransferItem> FileTransferList { get; }
+
+    public TcpSocketClient TcpHelper { get; }
 
     public double TotalProgress { get; private set => this.RaiseAndSetIfChanged(ref field, value); }
 
@@ -237,7 +238,7 @@ public class FileTransferViewModel : ReactiveObject
                 {
                     if (nextTransfer.Direction == FileTransferDirection.Upload)
                     {
-                        await _tcpHelper.UploadFileAsync(nextTransfer.SourcePath, nextTransfer.DestinationPath, nextTransfer.CancellationSource.Token);
+                        await TcpHelper.UploadFileAsync(nextTransfer.SourcePath, nextTransfer.DestinationPath, nextTransfer.CancellationSource.Token);
                     }
                     else
                     {
@@ -248,7 +249,7 @@ public class FileTransferViewModel : ReactiveObject
                         }
 
                         Directory.CreateDirectory(localDirectory);
-                        await _tcpHelper.DownloadFileAsync(nextTransfer.SourcePath, localDirectory, nextTransfer.CancellationSource.Token);
+                        await TcpHelper.DownloadFileAsync(nextTransfer.SourcePath, localDirectory, nextTransfer.CancellationSource.Token);
                     }
 
                     var outcome = await _activeCompletionSource.Task.WaitAsync(nextTransfer.CancellationSource.Token);

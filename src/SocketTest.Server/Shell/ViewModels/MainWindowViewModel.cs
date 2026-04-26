@@ -23,6 +23,7 @@ using System.Collections.Specialized;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
+using System.Threading;
 using System.Threading.Tasks;
 using Notification = Avalonia.Controls.Notifications.Notification;
 using Timer = System.Timers.Timer;
@@ -48,11 +49,6 @@ public class MainWindowViewModel : ReactiveObject
     private Timer? _sendRealtimeDataTimer;
     private Timer? _sendGeneralDataTimer;
 
-    public MainWindowViewModel()
-        : this(ProcessSnapshotProviderFactory.CreateDefault())
-    {
-    }
-
     internal MainWindowViewModel(IProcessSnapshotProvider processSnapshotProvider)
     {
         _processSnapshotProvider = processSnapshotProvider;
@@ -62,7 +58,6 @@ public class MainWindowViewModel : ReactiveObject
         TcpHelper = new TcpSocketServer();
         UdpHelper = new UdpSocketServer();
         ConnectedClients.CollectionChanged += ConnectedClientsOnCollectionChanged;
-        StatusBarViewModel = new ServerStatusBarViewModel();
 
         EventBus.Default.Subscribe(this);
 
@@ -76,8 +71,6 @@ public class MainWindowViewModel : ReactiveObject
     public TcpSocketServer TcpHelper { get; }
 
     public UdpSocketServer UdpHelper { get; }
-
-    public ServerStatusBarViewModel StatusBarViewModel { get; }
 
     public ObservableCollection<KeyValuePair<string, Socket>> ConnectedClients { get; } = [];
 
@@ -101,7 +94,7 @@ public class MainWindowViewModel : ReactiveObject
                 return;
             }
 
-            RefreshProcessSnapshot();
+            await RefreshProcessSnapshotAsync();
             StartBackgroundTimers();
             IsRunning = true;
             RaiseServerStateProperties();
@@ -377,6 +370,14 @@ public class MainWindowViewModel : ReactiveObject
     private bool RefreshProcessSnapshot()
     {
         var result = _processSnapshotProvider.RefreshSnapshot();
+        CurrentProcessCount = result.ProcessCount;
+        PublishServerStatusChanged();
+        return result.StructureChanged;
+    }
+
+    private async Task<bool> RefreshProcessSnapshotAsync(CancellationToken cancellationToken = default)
+    {
+        var result = await Task.Run(_processSnapshotProvider.RefreshSnapshot, cancellationToken);
         CurrentProcessCount = result.ProcessCount;
         PublishServerStatusChanged();
         return result.StructureChanged;

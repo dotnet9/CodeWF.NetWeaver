@@ -1,5 +1,6 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:prism="using:Prism.Mvvm"
         xmlns:vm="using:SocketTest.Server.Shell.ViewModels"
         xmlns:controls="using:SocketTest.Server.Shell.Views.Controls"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -13,6 +14,7 @@
         MinWidth="760"
         MinHeight="520"
         x:Class="SocketTest.Server.Shell.Views.MainWindow"
+        prism:ViewModelLocator.AutoWireViewModel="True"
         x:DataType="vm:MainWindowViewModel"
         Icon="/Assets/logo.ico"
         Title="SocketTest.Server">
@@ -24,10 +26,6 @@
             <Setter Property="BorderThickness" Value="1" />
         </Style>
     </Window.Styles>
-
-    <Design.DataContext>
-        <vm:MainWindowViewModel />
-    </Design.DataContext>
 
     <Grid Background="#F5F7FA" RowDefinitions="Auto,*,Auto">
         <Border Padding="20,16"

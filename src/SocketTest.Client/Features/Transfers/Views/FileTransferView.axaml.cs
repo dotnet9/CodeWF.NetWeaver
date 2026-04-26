@@ -2,7 +2,6 @@ using Avalonia.Controls;
 using Avalonia.Interactivity;
 using SocketTest.Client.Features.Transfers.Models;
 using SocketTest.Client.Features.Transfers.ViewModels;
-using SocketTest.Client.Shell.ViewModels;
 
 namespace SocketTest.Client.Features.Transfers.Views;
 
@@ -11,7 +10,6 @@ public partial class FileTransferView : UserControl
     public FileTransferView()
     {
         InitializeComponent();
-        DataContext = ClientShellViewModelRegistry.FileTransferViewModel;
     }
 
     private void ToggleTransferMenuItem_OnClick(object? sender, RoutedEventArgs e)

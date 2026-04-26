@@ -2,9 +2,11 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:prism="using:Prism.Mvvm"
              xmlns:vm="using:SocketTest.Server.Shell.ViewModels"
              mc:Ignorable="d"
              x:Class="SocketTest.Server.Shell.Views.Controls.ServerStatusBarView"
+             prism:ViewModelLocator.AutoWireViewModel="True"
              x:DataType="vm:ServerStatusBarViewModel">
     <Border Padding="14,10"
             Background="#111827"

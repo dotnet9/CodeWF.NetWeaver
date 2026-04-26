@@ -33,8 +33,10 @@ public class ProcessMonitorViewModel : ReactiveObject
     private int _receivedProcessPages;
     private ProcessItemModel? _pendingTerminateProcess;
 
-    public ProcessMonitorViewModel()
+    public ProcessMonitorViewModel(TcpSocketClient tcpHelper, UdpSocketClient udpHelper)
     {
+        TcpHelper = tcpHelper;
+        UdpHelper = udpHelper;
         DisplayProcesses = new RangeObservableCollection<ProcessItemModel>();
         UdpHelper.Received += HandleUdpMessageReceived;
 
@@ -87,9 +89,9 @@ public class ProcessMonitorViewModel : ReactiveObject
 
     public string TerminateDialogMessage { get; private set => this.RaiseAndSetIfChanged(ref field, value); } = string.Empty;
 
-    public TcpSocketClient TcpHelper { get; } = new();
+    public TcpSocketClient TcpHelper { get; }
 
-    public UdpSocketClient UdpHelper { get; } = new();
+    public UdpSocketClient UdpHelper { get; }
 
     public async Task HandleConnectTcpAsync()
     {

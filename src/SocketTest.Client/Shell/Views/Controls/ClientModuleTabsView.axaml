@@ -2,12 +2,14 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:prism="using:Prism.Mvvm"
              xmlns:vm="using:SocketTest.Client.Shell.ViewModels"
              xmlns:processViews="using:SocketTest.Client.Features.Processes.Views"
              xmlns:remoteFileViews="using:SocketTest.Client.Features.RemoteFiles.Views"
              xmlns:transferViews="using:SocketTest.Client.Features.Transfers.Views"
              mc:Ignorable="d"
              x:Class="SocketTest.Client.Shell.Views.Controls.ClientModuleTabsView"
+             prism:ViewModelLocator.AutoWireViewModel="True"
              x:DataType="vm:ClientModuleTabsViewModel">
     <TabControl SelectedIndex="{Binding SelectedTabIndex, Mode=TwoWay}">
         <TabItem Header="进程监控">

@@ -2,6 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:prism="using:Prism.Mvvm"
              xmlns:vm="using:SocketTest.Client.Features.Processes.ViewModels"
              xmlns:models="using:SocketTest.Client.Features.Processes.Models"
              xmlns:converters="using:SocketTest.Client.Converters"
@@ -9,6 +10,7 @@
              d:DesignWidth="1280"
              d:DesignHeight="780"
              x:Class="SocketTest.Client.Features.Processes.Views.ProcessMonitorView"
+             prism:ViewModelLocator.AutoWireViewModel="True"
              x:DataType="vm:ProcessMonitorViewModel">
     <UserControl.Styles>
         <Style Selector="TextBlock">

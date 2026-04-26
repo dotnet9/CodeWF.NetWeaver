@@ -7,10 +7,11 @@ namespace SocketTest.Client.Shell.ViewModels;
 
 public sealed class ClientConnectionPanelViewModel : ReactiveObject
 {
-    private readonly ProcessMonitorViewModel _processMonitorViewModel = ClientShellViewModelRegistry.ProcessMonitorViewModel;
+    private readonly ProcessMonitorViewModel _processMonitorViewModel;
 
-    public ClientConnectionPanelViewModel()
+    public ClientConnectionPanelViewModel(ProcessMonitorViewModel processMonitorViewModel)
     {
+        _processMonitorViewModel = processMonitorViewModel;
         _processMonitorViewModel.PropertyChanged += HandleProcessMonitorPropertyChanged;
     }
 

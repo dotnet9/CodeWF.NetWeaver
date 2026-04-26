@@ -2,9 +2,11 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:prism="using:Prism.Mvvm"
              xmlns:vm="using:SocketTest.Client.Shell.ViewModels"
              mc:Ignorable="d"
              x:Class="SocketTest.Client.Shell.Views.Controls.ClientConnectionPanelView"
+             prism:ViewModelLocator.AutoWireViewModel="True"
              x:DataType="vm:ClientConnectionPanelViewModel">
     <Border Padding="20,16"
             Background="#FFFFFF"

@@ -6,10 +6,11 @@ namespace SocketTest.Client.Shell.ViewModels;
 
 public sealed class FileTransferStatusViewModel : ReactiveObject
 {
-    private readonly FileTransferViewModel _fileTransferViewModel = ClientShellViewModelRegistry.FileTransferViewModel;
+    private readonly FileTransferViewModel _fileTransferViewModel;
 
-    public FileTransferStatusViewModel()
+    public FileTransferStatusViewModel(FileTransferViewModel fileTransferViewModel)
     {
+        _fileTransferViewModel = fileTransferViewModel;
         _fileTransferViewModel.PropertyChanged += HandleFileTransferPropertyChanged;
     }
 

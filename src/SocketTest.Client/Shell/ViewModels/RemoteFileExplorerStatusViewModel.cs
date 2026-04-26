@@ -6,10 +6,11 @@ namespace SocketTest.Client.Shell.ViewModels;
 
 public sealed class RemoteFileExplorerStatusViewModel : ReactiveObject
 {
-    private readonly RemoteFileExplorerViewModel _remoteFileExplorerViewModel = ClientShellViewModelRegistry.RemoteFileExplorerViewModel;
+    private readonly RemoteFileExplorerViewModel _remoteFileExplorerViewModel;
 
-    public RemoteFileExplorerStatusViewModel()
+    public RemoteFileExplorerStatusViewModel(RemoteFileExplorerViewModel remoteFileExplorerViewModel)
     {
+        _remoteFileExplorerViewModel = remoteFileExplorerViewModel;
         _remoteFileExplorerViewModel.PropertyChanged += HandleRemoteFileExplorerPropertyChanged;
     }
 

@@ -4,7 +4,6 @@ using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
 using SocketTest.Client.Features.RemoteFiles.Models;
 using SocketTest.Client.Features.RemoteFiles.ViewModels;
-using SocketTest.Client.Shell.ViewModels;
 using System;
 using System.Linq;
 using System.Threading.Tasks;
@@ -16,7 +15,6 @@ public partial class RemoteFileExplorerView : UserControl
     public RemoteFileExplorerView()
     {
         InitializeComponent();
-        DataContext = ClientShellViewModelRegistry.RemoteFileExplorerViewModel;
     }
 
     private async void NavigationTree_OnSelectionChanged(object? sender, SelectionChangedEventArgs e)

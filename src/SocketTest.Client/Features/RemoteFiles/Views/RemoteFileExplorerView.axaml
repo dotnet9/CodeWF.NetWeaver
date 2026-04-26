@@ -2,12 +2,14 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:prism="using:Prism.Mvvm"
              xmlns:vm="using:SocketTest.Client.Features.RemoteFiles.ViewModels"
              xmlns:models="using:SocketTest.Client.Features.RemoteFiles.Models"
              mc:Ignorable="d"
              d:DesignWidth="1360"
              d:DesignHeight="800"
              x:Class="SocketTest.Client.Features.RemoteFiles.Views.RemoteFileExplorerView"
+             prism:ViewModelLocator.AutoWireViewModel="True"
              x:DataType="vm:RemoteFileExplorerViewModel">
     <UserControl.Styles>
         <Style Selector="Border.surface">
