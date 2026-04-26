@@ -235,7 +235,7 @@ public class FileTransferViewModel : ReactiveObject
                 nextTransfer.CancellationSource?.Dispose();
                 nextTransfer.CancellationSource = new CancellationTokenSource();
                 nextTransfer.MarkRunning(nextTransfer.Direction == FileTransferDirection.Upload ? "正在上传" : "正在下载");
-                Logger.Info($"Transfer queue start: {nextTransfer.Direction} {nextTransfer.SourcePath} -> {nextTransfer.DestinationPath}");
+                Logger.Info($"传输队列开始：{DescribeTransferDirection(nextTransfer.Direction)} {nextTransfer.SourcePath} -> {nextTransfer.DestinationPath}");
                 UpdateDashboard();
 
                 try
@@ -261,7 +261,7 @@ public class FileTransferViewModel : ReactiveObject
                 }
                 catch (OperationCanceledException)
                 {
-                    Logger.Warn($"Transfer queue cancelled: {nextTransfer.Direction} {nextTransfer.SourcePath} -> {nextTransfer.DestinationPath}");
+                    Logger.Warn($"传输队列已取消：{DescribeTransferDirection(nextTransfer.Direction)} {nextTransfer.SourcePath} -> {nextTransfer.DestinationPath}");
                     nextTransfer.MarkPaused("已停止，可继续传输");
                 }
                 catch (Exception ex)
@@ -345,7 +345,7 @@ public class FileTransferViewModel : ReactiveObject
 
     private void ApplyTransferOutcome(FileTransferItem item, FileTransferOutcomeEventArgs outcome)
     {
-        Logger.Info($"Transfer outcome: {item.Direction} {item.SourcePath} -> {item.DestinationPath}, Success={outcome.Success}, Cancelled={outcome.IsCancelled}, Message={outcome.Message}");
+        Logger.Info($"传输结果：方向={DescribeTransferDirection(item.Direction)}，源={item.SourcePath}，目标={item.DestinationPath}，成功={outcome.Success}，已取消={outcome.IsCancelled}，消息={outcome.Message}");
 
         if (outcome.IsCancelled)
         {
@@ -383,6 +383,9 @@ public class FileTransferViewModel : ReactiveObject
     }
 
     private static string NormalizePath(string path) => path.Replace('\\', '/').Trim();
+
+    private static string DescribeTransferDirection(FileTransferDirection direction) =>
+        direction == FileTransferDirection.Upload ? "上传" : "下载";
 
     private void HandleTransferCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {

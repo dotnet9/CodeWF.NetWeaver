@@ -1288,7 +1288,7 @@ public class RemoteFileExplorerViewModel : ReactiveObject
 
     private async Task SendTcpRequestAsync(CodeWF.NetWeaver.Base.INetObject request)
     {
-        Logger.Info($"Client -> Server File TCP: {DescribeMessage(request)}");
+        Logger.Info($"客户端 -> 服务端 文件 TCP：{DescribeMessage(request)}");
         await _tcpHelper.SendCommandAsync(request);
     }
 
@@ -1299,20 +1299,20 @@ public class RemoteFileExplorerViewModel : ReactiveObject
             return;
         }
 
-        Logger.Info($"Server -> Client File TCP: {DescribeMessage(response)}");
+        Logger.Info($"服务端 -> 客户端 文件 TCP：{DescribeMessage(response)}");
     }
 
     private static string DescribeMessage(object message) =>
         message switch
         {
-            BrowseFileSystemRequest request => $"{nameof(BrowseFileSystemRequest)}(TaskId={request.TaskId},Path={request.DirectoryPath})",
-            CreateDirectoryRequest request => $"{nameof(CreateDirectoryRequest)}(TaskId={request.TaskId},Path={request.DirectoryPath})",
-            DeletePathRequest request => $"{nameof(DeletePathRequest)}(TaskId={request.TaskId},Path={request.FilePath},IsDirectory={request.IsDirectory})",
-            BrowseFileSystemResponse response => $"{nameof(BrowseFileSystemResponse)}(TaskId={response.TaskId},Page={response.PageIndex + 1}/{response.PageCount},Entries={response.Entries?.Count ?? 0})",
-            DriveListResponse response => $"{nameof(DriveListResponse)}(TaskId={response.TaskId},Disks={response.Disks?.Count ?? 0})",
-            CreateDirectoryResponse response => $"{nameof(CreateDirectoryResponse)}(TaskId={response.TaskId},Success={response.Success},Path={response.DirectoryPath})",
-            DeletePathResponse response => $"{nameof(DeletePathResponse)}(TaskId={response.TaskId},Success={response.Success},Path={response.FilePath})",
-            FileTransferReject response => $"{nameof(FileTransferReject)}(TaskId={response.TaskId},Code={response.ErrorCode},Path={response.RemoteFilePath})",
+            BrowseFileSystemRequest request => $"请求浏览文件系统(TaskId={request.TaskId},路径={request.DirectoryPath})",
+            CreateDirectoryRequest request => $"请求创建目录(TaskId={request.TaskId},路径={request.DirectoryPath})",
+            DeletePathRequest request => $"请求删除路径(TaskId={request.TaskId},路径={request.FilePath},目录={request.IsDirectory})",
+            BrowseFileSystemResponse response => $"返回浏览文件系统(TaskId={response.TaskId},页={response.PageIndex + 1}/{response.PageCount},条目数={response.Entries?.Count ?? 0})",
+            DriveListResponse response => $"返回磁盘列表(TaskId={response.TaskId},磁盘数={response.Disks?.Count ?? 0})",
+            CreateDirectoryResponse response => $"返回创建目录结果(TaskId={response.TaskId},成功={response.Success},路径={response.DirectoryPath})",
+            DeletePathResponse response => $"返回删除路径结果(TaskId={response.TaskId},成功={response.Success},路径={response.FilePath})",
+            FileTransferReject response => $"文件传输拒绝(TaskId={response.TaskId},错误码={response.ErrorCode},路径={response.RemoteFilePath})",
             _ => message.GetType().Name
         };
 

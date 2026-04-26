@@ -92,7 +92,7 @@ public class MainWindowViewModel : ReactiveObject
     {
         if (!TcpHelper.IsRunning)
         {
-            Logger.Info("Server start requested.");
+            Logger.Info("服务端收到启动请求。");
             var started = await StartServerAsync();
             if (!started)
             {
@@ -117,7 +117,7 @@ public class MainWindowViewModel : ReactiveObject
         IsRunning = false;
         RaiseServerStateProperties();
         PublishServerStatusChanged();
-        Logger.Info("Server stop requested.");
+        Logger.Info("服务端收到停止请求。");
         await Log("服务端已停止。");
     }
 
@@ -433,7 +433,7 @@ public class MainWindowViewModel : ReactiveObject
 
     private async Task BroadcastProcessStructureChangedAsync()
     {
-        Logger.Info($"Server -> Client TCP: {DescribeCommand(new ChangeProcessList())}");
+        Logger.Info($"服务端 -> 客户端 TCP：{DescribeCommand(new ChangeProcessList())}");
         await TcpHelper.SendCommandAsync(new ChangeProcessList());
     }
 
@@ -509,14 +509,14 @@ public class MainWindowViewModel : ReactiveObject
         }
 
         var command = request.GetCommand<TCommand>();
-        Logger.Info($"Client -> Server TCP: {DescribeCommand(command)}");
+        Logger.Info($"客户端 -> 服务端 TCP：{DescribeCommand(command)}");
         await handler(request.Client!, command);
         return true;
     }
 
     private Task SendResponseAsync(Socket client, CodeWF.NetWeaver.Base.INetObject response)
     {
-        Logger.Info($"Server -> Client TCP: {DescribeCommand(response)}");
+        Logger.Info($"服务端 -> 客户端 TCP：{DescribeCommand(response)}");
         return TcpHelper.SendCommandAsync(client, response);
     }
 
@@ -569,7 +569,7 @@ public class MainWindowViewModel : ReactiveObject
                 var command = buildPage(pageSize, pageIndex);
                 if (pageIndex == 0)
                 {
-                    Logger.Info($"Server -> Client UDP: {DescribeCommand(command)}");
+                    Logger.Info($"服务端 -> 客户端 UDP：{DescribeCommand(command)}");
                 }
 
                 await UdpHelper.SendCommandAsync(command, DateTimeOffset.UtcNow);
@@ -592,22 +592,22 @@ public class MainWindowViewModel : ReactiveObject
     private static string DescribeCommand(object? command) =>
         command switch
         {
-            RequestTargetType request => $"{nameof(RequestTargetType)}(TaskId={request.TaskId})",
-            RequestUdpAddress request => $"{nameof(RequestUdpAddress)}(TaskId={request.TaskId})",
-            RequestServiceInfo request => $"{nameof(RequestServiceInfo)}(TaskId={request.TaskId})",
-            RequestProcessIDList request => $"{nameof(RequestProcessIDList)}(TaskId={request.TaskId})",
-            RequestProcessList request => $"{nameof(RequestProcessList)}(TaskId={request.TaskId})",
-            RequestTerminateProcess request => $"{nameof(RequestTerminateProcess)}(TaskId={request.TaskId},Pid={request.ProcessId},KillTree={request.KillEntireProcessTree})",
-            ChangeProcessList => nameof(ChangeProcessList),
-            Heartbeat => nameof(Heartbeat),
-            ResponseTargetType response => $"{nameof(ResponseTargetType)}(TaskId={response.TaskId},Type={response.Type})",
-            ResponseUdpAddress response => $"{nameof(ResponseUdpAddress)}(TaskId={response.TaskId},Ip={response.Ip},Port={response.Port})",
-            ResponseServiceInfo response => $"{nameof(ResponseServiceInfo)}(TaskId={response.TaskId},OS={response.OS},TimestampStartYear={response.TimestampStartYear})",
-            ResponseProcessIDList response => $"{nameof(ResponseProcessIDList)}(TaskId={response.TaskId},Count={response.IDList?.Length ?? 0})",
-            ResponseProcessList response => $"{nameof(ResponseProcessList)}(TaskId={response.TaskId},Page={response.PageIndex + 1}/{response.PageCount},Processes={response.Processes?.Count ?? 0})",
-            ResponseTerminateProcess response => $"{nameof(ResponseTerminateProcess)}(TaskId={response.TaskId},Pid={response.ProcessId},Success={response.Success})",
-            UpdateRealtimeProcessList response => $"{nameof(UpdateRealtimeProcessList)}(Page={response.PageIndex + 1}/{response.PageCount},PageSize={response.PageSize})",
-            UpdateGeneralProcessList response => $"{nameof(UpdateGeneralProcessList)}(Page={response.PageIndex + 1}/{response.PageCount},PageSize={response.PageSize})",
+            RequestTargetType request => $"请求目标类型(TaskId={request.TaskId})",
+            RequestUdpAddress request => $"请求 UDP 地址(TaskId={request.TaskId})",
+            RequestServiceInfo request => $"请求服务信息(TaskId={request.TaskId})",
+            RequestProcessIDList request => $"请求进程 ID 列表(TaskId={request.TaskId})",
+            RequestProcessList request => $"请求进程列表(TaskId={request.TaskId})",
+            RequestTerminateProcess request => $"请求结束进程(TaskId={request.TaskId},Pid={request.ProcessId},结束进程树={request.KillEntireProcessTree})",
+            ChangeProcessList => "进程结构变更通知",
+            Heartbeat => "心跳包",
+            ResponseTargetType response => $"返回目标类型(TaskId={response.TaskId},类型={response.Type})",
+            ResponseUdpAddress response => $"返回 UDP 地址(TaskId={response.TaskId},Ip={response.Ip},端口={response.Port})",
+            ResponseServiceInfo response => $"返回服务信息(TaskId={response.TaskId},系统={response.OS},时间基准年份={response.TimestampStartYear})",
+            ResponseProcessIDList response => $"返回进程 ID 列表(TaskId={response.TaskId},数量={response.IDList?.Length ?? 0})",
+            ResponseProcessList response => $"返回进程列表(TaskId={response.TaskId},页={response.PageIndex + 1}/{response.PageCount},进程数={response.Processes?.Count ?? 0})",
+            ResponseTerminateProcess response => $"返回结束进程结果(TaskId={response.TaskId},Pid={response.ProcessId},成功={response.Success})",
+            UpdateRealtimeProcessList response => $"实时进程增量页(页={response.PageIndex + 1}/{response.PageCount},页大小={response.PageSize})",
+            UpdateGeneralProcessList response => $"常规进程增量页(页={response.PageIndex + 1}/{response.PageCount},页大小={response.PageSize})",
             null => "null",
             _ => command.GetType().Name
         };
