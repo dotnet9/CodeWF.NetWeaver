@@ -21,6 +21,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
+using System.Diagnostics;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
@@ -37,6 +38,7 @@ public class MainWindowViewModel : ReactiveObject
     private const int SnapshotRefreshMilliseconds = 1000;
     private const int RealtimeUdpMilliseconds = 500;
     private const int GeneralUdpMilliseconds = 1000;
+    private const int ProcessStructureChangeDebounceMilliseconds = 1000;
 
     private const string TcpIpKey = "TcpIp";
     private const string TcpPortKey = "TcpPort";
@@ -44,8 +46,11 @@ public class MainWindowViewModel : ReactiveObject
     private const string UdpPortKey = "UdpPort";
 
     private readonly IProcessSnapshotProvider _processSnapshotProvider;
+    private readonly object _processStructureChangeDebounceSyncRoot = new();
     private readonly string _settingsFilePath;
     private readonly ServerRuntimeSettings _runtimeSettings = new();
+    private Task? _initialSnapshotWarmupTask;
+    private CancellationTokenSource? _processStructureChangeDebounceCts;
     private Timer? _snapshotRefreshTimer;
     private Timer? _sendRealtimeDataTimer;
     private Timer? _sendGeneralDataTimer;
@@ -99,19 +104,20 @@ public class MainWindowViewModel : ReactiveObject
                 return;
             }
 
-            await RefreshProcessSnapshotAsync();
             StartBackgroundTimers();
             IsRunning = true;
             RaiseServerStateProperties();
             PublishServerStatusChanged();
+            StartInitialSnapshotWarmup();
 
-            await Log("服务端已启动，正在实时采集真实进程并向客户端广播。");
+            await Log("服务端已启动，首轮进程快照将在后台静默预热，随后持续向客户端广播更新。");
             Logger.Info(
                 $"当前生效配置：配置文件={_settingsFilePath}，TCP={_runtimeSettings.TcpIp}:{_runtimeSettings.TcpPort}，UDP={_runtimeSettings.UdpIp}:{_runtimeSettings.UdpPort}。");
             return;
         }
 
         StopBackgroundTimers();
+        CancelProcessStructureChangedBroadcast();
         await TcpHelper.StopAsync();
         UdpHelper.Stop();
         IsRunning = false;
@@ -236,8 +242,21 @@ public class MainWindowViewModel : ReactiveObject
         AppConfigHelper.TryGet(UdpPortKey, out int udpPort);
 
         _runtimeSettings.TcpIp = string.IsNullOrWhiteSpace(tcpIp) ? IPAddress.Any.ToString() : tcpIp.Trim();
+        if (!IPAddress.TryParse(_runtimeSettings.TcpIp, out _))
+        {
+            Logger.Warn($"TCP 配置地址无效，已回退为 {IPAddress.Any}：{_runtimeSettings.TcpIp}");
+            _runtimeSettings.TcpIp = IPAddress.Any.ToString();
+        }
+
         _runtimeSettings.TcpPort = tcpPort > 0 ? tcpPort : GetRandomAvailablePort(SocketType.Stream, ProtocolType.Tcp);
         _runtimeSettings.UdpIp = string.IsNullOrWhiteSpace(udpIp) ? GenerateRandomMulticastAddress() : udpIp.Trim();
+        if (!IPAddress.TryParse(_runtimeSettings.UdpIp, out _))
+        {
+            var fallbackUdpIp = GenerateRandomMulticastAddress();
+            Logger.Warn($"UDP 配置地址无效，已回退为 {fallbackUdpIp}：{_runtimeSettings.UdpIp}");
+            _runtimeSettings.UdpIp = fallbackUdpIp;
+        }
+
         _runtimeSettings.UdpPort = udpPort > 0 ? udpPort : GetRandomAvailablePort(SocketType.Dgram, ProtocolType.Udp);
 
         AppConfigHelper.SetOrAdd(TcpIpKey, _runtimeSettings.TcpIp);
@@ -275,13 +294,20 @@ public class MainWindowViewModel : ReactiveObject
 
     private async Task ReceiveSocketCommandAsync(Socket client, RequestServiceInfo request)
     {
-        EnsureProcessSnapshot();
-        await SendResponseAsync(client, _processSnapshotProvider.GetServiceInfo(request.TaskId));
+        var readStartedAt = Stopwatch.GetTimestamp();
+        var response = _processSnapshotProvider.GetServiceInfo(request.TaskId);
+        var readElapsedMilliseconds = Stopwatch.GetElapsedTime(readStartedAt).TotalMilliseconds;
+
+        var sendStartedAt = Stopwatch.GetTimestamp();
+        await SendResponseAsync(client, response);
+        var sendElapsedMilliseconds = Stopwatch.GetElapsedTime(sendStartedAt).TotalMilliseconds;
+
+        Logger.Info(
+            $"RequestServiceInfo 已完成：缓存读取 {readElapsedMilliseconds:F1} ms，响应发送 {sendElapsedMilliseconds:F1} ms。");
     }
 
     private async Task ReceiveSocketCommandAsync(Socket client, RequestProcessIDList request)
     {
-        EnsureProcessSnapshot();
         await SendResponseAsync(client, new ResponseProcessIDList
         {
             TaskId = request.TaskId,
@@ -291,7 +317,6 @@ public class MainWindowViewModel : ReactiveObject
 
     private async Task ReceiveSocketCommandAsync(Socket client, RequestProcessList request)
     {
-        EnsureProcessSnapshot();
         await SendProcessPagesAsync(client, request.TaskId);
     }
 
@@ -317,14 +342,14 @@ public class MainWindowViewModel : ReactiveObject
         }
 
         RefreshProcessSnapshot();
-        await BroadcastProcessStructureChangedAsync();
+        ScheduleProcessStructureChangedBroadcast();
         Logger.Info($"结束进程成功，PID={request.ProcessId}。");
     }
 
     private async Task ReceiveSocketCommandAsync(Socket client, ChangeProcessList changeProcess)
     {
         RefreshProcessSnapshot();
-        await BroadcastProcessStructureChangedAsync();
+        ScheduleProcessStructureChangedBroadcast();
     }
 
     private async Task ReceiveSocketCommandAsync(Socket client, Heartbeat heartbeat)
@@ -368,20 +393,22 @@ public class MainWindowViewModel : ReactiveObject
         timer = null;
     }
 
-    private void EnsureProcessSnapshot()
-    {
-        if (!_processSnapshotProvider.IsInitialized)
-        {
-            _ = RefreshProcessSnapshot();
-        }
-    }
-
     private ProcessSnapshotRefreshResult RefreshProcessSnapshot()
     {
         var result = _processSnapshotProvider.RefreshSnapshot();
         CurrentProcessCount = result.ProcessCount;
         PublishServerStatusChanged();
         return result;
+    }
+
+    private void StartInitialSnapshotWarmup()
+    {
+        if (_initialSnapshotWarmupTask is { IsCompleted: false })
+        {
+            return;
+        }
+
+        _initialSnapshotWarmupTask = WarmupInitialSnapshotAsync();
     }
 
     /// <summary>
@@ -393,6 +420,29 @@ public class MainWindowViewModel : ReactiveObject
         CurrentProcessCount = result.ProcessCount;
         PublishServerStatusChanged();
         return result;
+    }
+
+    private async Task WarmupInitialSnapshotAsync()
+    {
+        try
+        {
+            var result = await RefreshProcessSnapshotAsync();
+            if (!TcpHelper.IsRunning)
+            {
+                return;
+            }
+
+            if (result.StructureChanged)
+            {
+                Logger.Info(
+                    $"启动后台预热完成：当前数量={result.ProcessCount}，新增={result.AddedProcessCount}，退出={result.RemovedProcessCount}。");
+                ScheduleProcessStructureChangedBroadcast();
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.Error("服务启动后的后台进程快照预热失败。", ex);
+        }
     }
 
     private async void SnapshotRefreshTimerOnElapsed(object? sender, System.Timers.ElapsedEventArgs e)
@@ -409,7 +459,7 @@ public class MainWindowViewModel : ReactiveObject
             {
                 Logger.Info(
                     $"进程结构发生变化：当前数量={result.ProcessCount}，新增={result.AddedProcessCount}，退出={result.RemovedProcessCount}。");
-                await BroadcastProcessStructureChangedAsync();
+                ScheduleProcessStructureChangedBroadcast();
             }
         }
         catch (Exception ex)
@@ -439,6 +489,65 @@ public class MainWindowViewModel : ReactiveObject
         var command = new ChangeProcessList();
         Logger.Info($"服务端 -> 客户端 TCP：{command}");
         await TcpHelper.SendCommandAsync(command);
+    }
+
+    private void ScheduleProcessStructureChangedBroadcast()
+    {
+        CancellationTokenSource currentCts;
+        CancellationTokenSource? previousCts;
+        lock (_processStructureChangeDebounceSyncRoot)
+        {
+            previousCts = _processStructureChangeDebounceCts;
+            currentCts = new CancellationTokenSource();
+            _processStructureChangeDebounceCts = currentCts;
+        }
+
+        previousCts?.Cancel();
+        previousCts?.Dispose();
+        _ = DebounceProcessStructureChangedBroadcastAsync(currentCts);
+    }
+
+    private async Task DebounceProcessStructureChangedBroadcastAsync(CancellationTokenSource cts)
+    {
+        try
+        {
+            await Task.Delay(ProcessStructureChangeDebounceMilliseconds, cts.Token);
+            if (!TcpHelper.IsRunning)
+            {
+                return;
+            }
+
+            Logger.Info($"进程结构变化通知已静默 {ProcessStructureChangeDebounceMilliseconds} ms，开始广播。");
+            await BroadcastProcessStructureChangedAsync();
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        finally
+        {
+            lock (_processStructureChangeDebounceSyncRoot)
+            {
+                if (ReferenceEquals(_processStructureChangeDebounceCts, cts))
+                {
+                    _processStructureChangeDebounceCts = null;
+                }
+            }
+
+            cts.Dispose();
+        }
+    }
+
+    private void CancelProcessStructureChangedBroadcast()
+    {
+        CancellationTokenSource? cts;
+        lock (_processStructureChangeDebounceSyncRoot)
+        {
+            cts = _processStructureChangeDebounceCts;
+            _processStructureChangeDebounceCts = null;
+        }
+
+        cts?.Cancel();
+        cts?.Dispose();
     }
 
     private void RaiseServerStateProperties()
@@ -514,7 +623,10 @@ public class MainWindowViewModel : ReactiveObject
 
         var command = request.GetCommand<TCommand>();
         Logger.Info($"客户端 -> 服务端 TCP：{command}");
+        var startedAt = Stopwatch.GetTimestamp();
         await handler(request.Client!, command);
+        var elapsedMilliseconds = Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds;
+        Logger.Info($"服务端已完成 {typeof(TCommand).Name}，总耗时 {elapsedMilliseconds:F1} ms。");
         return true;
     }
 
@@ -529,7 +641,8 @@ public class MainWindowViewModel : ReactiveObject
     /// </summary>
     private async Task SendProcessPagesAsync(Socket client, int taskId)
     {
-        var totalSize = _processSnapshotProvider.ProcessCount;
+        var processes = _processSnapshotProvider.GetAllProcesses();
+        var totalSize = processes.Count;
         var pageCount = ProcessSnapshotProvider.GetPageCount(totalSize, ProcessPageSize);
         for (var pageIndex = 0; pageIndex < pageCount; pageIndex++)
         {
@@ -540,7 +653,10 @@ public class MainWindowViewModel : ReactiveObject
                 PageSize = ProcessPageSize,
                 PageCount = pageCount,
                 PageIndex = pageIndex,
-                Processes = _processSnapshotProvider.GetProcessPage(ProcessPageSize, pageIndex)
+                Processes = processes
+                    .Skip(pageIndex * ProcessPageSize)
+                    .Take(ProcessPageSize)
+                    .ToList()
             });
         }
     }
@@ -553,14 +669,13 @@ public class MainWindowViewModel : ReactiveObject
         Func<int, int, CodeWF.NetWeaver.Base.INetObject> buildPage,
         string errorMessage)
     {
-        if (!UdpHelper.IsRunning)
+        if (!UdpHelper.IsRunning || !_processSnapshotProvider.IsInitialized)
         {
             return;
         }
 
         try
         {
-            EnsureProcessSnapshot();
             calculatePage(SerializeHelper.MaxUdpPacketSize, out var pageSize, out var pageCount);
 
             for (var pageIndex = 0; pageIndex < pageCount; pageIndex++)

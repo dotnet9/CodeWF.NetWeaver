@@ -10,6 +10,7 @@ using SocketTest.Client.Features.RemoteFiles.Models;
 using SocketTest.Client.Features.Transfers.Messages;
 using SocketTest.Client.Shell.Messages;
 using SocketTest.Client.Shell.Services;
+using Avalonia.Threading;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -245,7 +246,7 @@ public class RemoteFileExplorerViewModel : ReactiveObject
     {
         if (!isConnected)
         {
-            ResetExplorer("连接已断开，请重新连接服务端。");
+            await InvokeOnUiAsync(() => ResetExplorer("连接已断开，请重新连接服务端。"));
         }
     }
 
@@ -263,22 +264,28 @@ public class RemoteFileExplorerViewModel : ReactiveObject
         {
             await RunBusyAsync(async () =>
             {
-                ClearSearchInternal();
-
-                var rootNode = GetOrCreateRootNode();
+                RemoteDirectoryNode rootNode = null!;
+                await InvokeOnUiAsync(() =>
+                {
+                    ClearSearchInternal();
+                    rootNode = GetOrCreateRootNode();
+                });
                 var rootItems = await BrowseDirectoryAsync("/");
 
-                ApplyDirectoryItems("/", rootItems);
-                PopulateNodeChildren(rootNode, rootItems);
-                ActivateNode(rootNode);
-                SelectedNode = rootNode;
-                StatusMessage = "已连接服务端，正在浏览远程文件系统。";
+                await InvokeOnUiAsync(() =>
+                {
+                    ApplyDirectoryItems("/", rootItems);
+                    PopulateNodeChildren(rootNode, rootItems);
+                    ActivateNode(rootNode);
+                    SelectedNode = rootNode;
+                    StatusMessage = "已连接服务端，正在浏览远程文件系统。";
+                });
             });
         }
         catch (Exception ex)
         {
             Logger.Error("初始化远程文件浏览器失败", ex);
-            ResetExplorer(ex.Message);
+            await InvokeOnUiAsync(() => ResetExplorer(ex.Message));
         }
     }
 
@@ -485,27 +492,30 @@ public class RemoteFileExplorerViewModel : ReactiveObject
             await RunBusyAsync(async () =>
             {
                 var normalizedPath = NormalizeDirectoryInput(directoryPath);
-                ClearSearchInternal();
+                await InvokeOnUiAsync(ClearSearchInternal);
 
                 var items = await BrowseDirectoryAsync(normalizedPath);
-                ApplyDirectoryItems(normalizedPath, items);
+                await InvokeOnUiAsync(() => ApplyDirectoryItems(normalizedPath, items));
 
                 var matchedNode = await EnsureNodeForPathAsync(normalizedPath, items);
-                ActivateNode(matchedNode);
-                SelectedNode = matchedNode;
-
-                if (!string.IsNullOrWhiteSpace(selectItemFullPath))
+                await InvokeOnUiAsync(() =>
                 {
-                    SelectVisibleEntry(selectItemFullPath);
-                }
+                    ActivateNode(matchedNode);
+                    SelectedNode = matchedNode;
 
-                StatusMessage = $"已打开目录：{CurrentDirectoryPath}";
+                    if (!string.IsNullOrWhiteSpace(selectItemFullPath))
+                    {
+                        SelectVisibleEntry(selectItemFullPath);
+                    }
+
+                    StatusMessage = $"已打开目录：{CurrentDirectoryPath}";
+                });
             });
         }
         catch (Exception ex)
         {
             Logger.Error($"打开目录失败：{directoryPath}", ex);
-            StatusMessage = ex.Message;
+            await InvokeOnUiAsync(() => StatusMessage = ex.Message);
         }
     }
 
@@ -957,6 +967,13 @@ public class RemoteFileExplorerViewModel : ReactiveObject
 
     private void ApplyDirectoryItems(string directoryPath, IEnumerable<RemoteFileEntry> items)
     {
+        if (!Dispatcher.UIThread.CheckAccess())
+        {
+            var materializedItems = items.ToList();
+            Dispatcher.UIThread.Post(() => ApplyDirectoryItems(directoryPath, materializedItems));
+            return;
+        }
+
         CurrentDirectoryPath = NormalizeDirectoryInput(directoryPath);
         _currentDirectoryItems.Clear();
         _currentDirectoryItems.AddRange(items
@@ -1009,6 +1026,12 @@ public class RemoteFileExplorerViewModel : ReactiveObject
 
     private void RefreshVisibleEntries()
     {
+        if (!Dispatcher.UIThread.CheckAccess())
+        {
+            Dispatcher.UIThread.Post(RefreshVisibleEntries);
+            return;
+        }
+
         VisibleEntries.Clear();
 
         var source = IsSearchMode
@@ -1066,6 +1089,12 @@ public class RemoteFileExplorerViewModel : ReactiveObject
 
     private void ResetExplorer(string statusText)
     {
+        if (!Dispatcher.UIThread.CheckAccess())
+        {
+            Dispatcher.UIThread.Post(() => ResetExplorer(statusText));
+            return;
+        }
+
         _searchCancellationTokenSource?.Cancel();
         _searchCancellationTokenSource?.Dispose();
         _searchCancellationTokenSource = null;
@@ -1320,6 +1349,9 @@ public class RemoteFileExplorerViewModel : ReactiveObject
         _appState.ExplorerSummary = ExplorerSummary;
         _appState.ExplorerStatusMessage = StatusMessage;
     }
+
+    private Task InvokeOnUiAsync(Action action) =>
+        Dispatcher.UIThread.InvokeAsync(action).GetTask();
 
     private async Task RunBusyAsync(Func<Task> action, Action? finallyAction = null)
     {

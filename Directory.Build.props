@@ -4,6 +4,19 @@
 		<OutputPath>$(MSBuildThisFileDirectory)Output</OutputPath>
 		<AppendTargetFrameworkToOutputPath>True</AppendTargetFrameworkToOutputPath>
 		<Version>2.1.0</Version>
+		<TestSamplesVersion>2.1.0</TestSamplesVersion>
 		<AvaloniaVersion>11.3.14</AvaloniaVersion>
+	</PropertyGroup>
+
+	<PropertyGroup>
+		<IsTestSamplesProject>false</IsTestSamplesProject>
+		<IsTestSamplesProject Condition="$([System.String]::Copy('$(MSBuildProjectName)').EndsWith('.Tests'))">true</IsTestSamplesProject>
+		<IsTestSamplesProject Condition="$([System.String]::Copy('$(MSBuildProjectName)').EndsWith('.Test'))">true</IsTestSamplesProject>
+		<IsTestSamplesProject Condition="'$(MSBuildProjectName)' == 'CodeWF.NetWeaver.AOTTest'">true</IsTestSamplesProject>
+		<IsTestSamplesProject Condition="'$(MSBuildProjectName)' == 'SocketTest.Client'">true</IsTestSamplesProject>
+		<IsTestSamplesProject Condition="'$(MSBuildProjectName)' == 'SocketTest.Server'">true</IsTestSamplesProject>
+
+		<!-- 测试/示例版本独立维护，避免和核心库发布节奏强绑定。 -->
+		<Version Condition="'$(IsTestSamplesProject)' == 'true'">$(TestSamplesVersion)</Version>
 	</PropertyGroup>
 </Project>

@@ -17,22 +17,33 @@ using SocketTest.Client.Shell.Services;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace SocketTest.Client.Features.Processes.ViewModels;
 
 public class ProcessMonitorViewModel : ReactiveObject
 {
+    private const int ProcessStructureChangeDebounceMilliseconds = 1000;
+
     private readonly List<ProcessItemModel> _receivedProcesses = [];
     private readonly Dictionary<int, ProcessItemModel> _processLookup = [];
     private readonly ConcurrentDictionary<int, TaskCompletionSource<ResponseTerminateProcess>> _pendingTerminateRequests = new();
+    private readonly ConcurrentDictionary<int, PendingRequestInfo> _pendingRequests = new();
     private readonly ClientApplicationStateService _appState;
+    private readonly object _processStructureChangeDebounceSyncRoot = new();
+    private bool _isGridRefreshQueued;
+    private bool _isProcessIdRequestInFlight;
+    private bool _isProcessListRequestInFlight;
+    private bool _pendingProcessRefresh;
     private int[]? _processIds;
     private int _timestampStartYear = 2020;
     private int _activeProcessTaskId = -1;
     private int _expectedProcessPages;
     private int _receivedProcessPages;
+    private CancellationTokenSource? _processStructureChangeDebounceCts;
     private ProcessItemModel? _pendingTerminateProcess;
 
     public ProcessMonitorViewModel(
@@ -64,17 +75,16 @@ public class ProcessMonitorViewModel : ReactiveObject
 
     public UdpSocketClient UdpHelper { get; }
 
-    /// <summary>
-    /// 兼容现有界面绑定，当前仅触发进程域刷新，不再负责连接初始化握手。
-    /// </summary>
-    public async Task RequestInitialDataAsync()
+    public Task RequestInitialDataAsync()
     {
-        await RefreshProcessesAsync();
+        RequestProcessRefresh();
+        return Task.CompletedTask;
     }
 
-    public async Task RefreshProcessesAsync()
+    public Task RefreshProcessesAsync()
     {
-        await RequestProcessIdListAsync();
+        RequestProcessRefresh();
+        return Task.CompletedTask;
     }
 
     public void ShowTerminateProcessDialog(ProcessItemModel? process)
@@ -87,7 +97,7 @@ public class ProcessMonitorViewModel : ReactiveObject
 
         _pendingTerminateProcess = targetProcess;
         TerminateDialogMessage =
-            $"确认结束进程“{targetProcess.Name}”(PID: {targetProcess.PID})吗？\n服务端会同步结束该进程的所有子进程。";
+            $"确认结束进程 \"{targetProcess.Name}\" (PID: {targetProcess.PID}) 吗？\n服务端会同步结束该进程的所有子进程。";
         IsTerminateDialogOpen = true;
     }
 
@@ -129,7 +139,7 @@ public class ProcessMonitorViewModel : ReactiveObject
             }
 
             Logger.Info(response.Message ?? $"已结束进程：PID={targetProcess.PID}");
-            await RequestProcessIdListAsync();
+            RequestProcessRefresh();
         }
         catch (Exception ex)
         {
@@ -160,12 +170,9 @@ public class ProcessMonitorViewModel : ReactiveObject
     private void ReceiveClientConnectionBootstrapCompleted(ClientConnectionBootstrapCompletedMessage message)
     {
         _timestampStartYear = message.TimestampStartYear;
-        _ = RequestProcessIdListSafelyAsync();
+        RequestProcessRefresh();
     }
 
-    /// <summary>
-    /// 统一分发进程模块关心的 TCP 控制对象，让进程列表、结构变化与结束进程响应走同一条链路。
-    /// </summary>
     [EventHandler]
     public void ReceivedSocketCommand(SocketCommand message)
     {
@@ -203,8 +210,19 @@ public class ProcessMonitorViewModel : ReactiveObject
 
     private void ReceivedSocketMessage(ResponseProcessIDList response)
     {
+        TryLogResponseElapsed(response.TaskId, nameof(ResponseProcessIDList));
+        _isProcessIdRequestInFlight = false;
         _processIds = response.IDList;
         RebuildProcessLookup();
+
+        if (_processIds == null || _processIds.Length == 0)
+        {
+            _receivedProcesses.Clear();
+            RefreshProcessGrid();
+            StartPendingProcessRefreshIfNeeded();
+            return;
+        }
+
         _ = RequestProcessListSafelyAsync();
     }
 
@@ -229,13 +247,17 @@ public class ProcessMonitorViewModel : ReactiveObject
             return;
         }
 
+        TryLogResponseElapsed(response.TaskId, nameof(ResponseProcessList));
+        _isProcessListRequestInFlight = false;
         RebuildProcessLookup();
         RefreshProcessGrid();
-        Logger.Info($"已接收完整进程列表，共 {_receivedProcesses.Count:N0} 项。");
+        StartPendingProcessRefreshIfNeeded();
+        Logger.Info($"已接收完整进程列表，共 {_receivedProcesses.Count:N0} 条。");
     }
 
     private void ReceivedSocketMessage(ResponseTerminateProcess response)
     {
+        TryLogResponseElapsed(response.TaskId, nameof(ResponseTerminateProcess));
         if (_pendingTerminateRequests.TryRemove(response.TaskId, out var completionSource))
         {
             completionSource.TrySetResult(response);
@@ -270,7 +292,7 @@ public class ProcessMonitorViewModel : ReactiveObject
     private void ReceivedSocketMessage(ChangeProcessList response)
     {
         Logger.Info("服务端通知进程结构已变化，准备重新拉取进程列表。");
-        _ = RequestProcessIdListSafelyAsync();
+        RequestProcessRefreshDebounced();
     }
 
     private void HandleUdpMessageReceived(object? sender, SocketCommand message)
@@ -375,29 +397,47 @@ public class ProcessMonitorViewModel : ReactiveObject
 
     private void RefreshProcessGrid()
     {
+        if (_isGridRefreshQueued)
+        {
+            return;
+        }
+
+        _isGridRefreshQueued = true;
         Dispatcher.UIThread.Post(() =>
         {
-            DisplayProcesses.Clear();
-            DisplayProcesses.AddRange(_receivedProcesses);
-            if (SelectedProcess != null)
+            try
             {
-                SelectedProcess = DisplayProcesses.FirstOrDefault(item => item.PID == SelectedProcess.PID);
-            }
+                DisplayProcesses.Clear();
+                DisplayProcesses.AddRange(_receivedProcesses);
+                if (SelectedProcess != null)
+                {
+                    SelectedProcess = DisplayProcesses.FirstOrDefault(item => item.PID == SelectedProcess.PID);
+                }
 
-            this.RaisePropertyChanged(nameof(ProcessSummary));
-            UpdateProcessSummaryState();
+                this.RaisePropertyChanged(nameof(ProcessSummary));
+                UpdateProcessSummaryState();
+            }
+            finally
+            {
+                _isGridRefreshQueued = false;
+            }
         });
     }
 
     private void ClearProcesses()
     {
+        CancelProcessRefreshDebounce();
         _receivedProcesses.Clear();
         _processLookup.Clear();
         _pendingTerminateRequests.Clear();
+        _pendingRequests.Clear();
         _processIds = null;
         _activeProcessTaskId = -1;
         _expectedProcessPages = 0;
         _receivedProcessPages = 0;
+        _isProcessIdRequestInFlight = false;
+        _isProcessListRequestInFlight = false;
+        _pendingProcessRefresh = false;
         _pendingTerminateProcess = null;
         DisplayProcesses.Clear();
         SelectedProcess = null;
@@ -407,26 +447,29 @@ public class ProcessMonitorViewModel : ReactiveObject
 
     private async Task RequestProcessIdListAsync()
     {
-        if (!TcpHelper.IsRunning)
+        if (!TcpHelper.IsRunning || _isProcessIdRequestInFlight)
         {
             return;
         }
 
+        _isProcessIdRequestInFlight = true;
         await SendTcpCommandAsync(new RequestProcessIDList { TaskId = NetHelper.GetTaskId() });
     }
 
     private async Task RequestProcessListAsync()
     {
-        if (!TcpHelper.IsRunning)
+        if (!TcpHelper.IsRunning || _isProcessListRequestInFlight)
         {
             return;
         }
 
+        _isProcessListRequestInFlight = true;
         await SendTcpCommandAsync(new RequestProcessList { TaskId = NetHelper.GetTaskId() });
     }
 
     private async Task SendTcpCommandAsync(CodeWF.NetWeaver.Base.INetObject command)
     {
+        TrackPendingRequest(command);
         Logger.Info($"客户端 -> 服务端 TCP：{command}");
         await TcpHelper.SendCommandAsync(command);
     }
@@ -439,6 +482,7 @@ public class ProcessMonitorViewModel : ReactiveObject
         }
         catch (Exception ex)
         {
+            _isProcessIdRequestInFlight = false;
             Logger.Error("请求进程 ID 列表失败。", ex);
         }
     }
@@ -451,9 +495,110 @@ public class ProcessMonitorViewModel : ReactiveObject
         }
         catch (Exception ex)
         {
+            _isProcessListRequestInFlight = false;
             Logger.Error("请求进程详细列表失败。", ex);
         }
     }
+
+    private void RequestProcessRefresh()
+    {
+        _pendingProcessRefresh = true;
+        StartPendingProcessRefreshIfNeeded();
+    }
+
+    private void RequestProcessRefreshDebounced()
+    {
+        CancellationTokenSource currentCts;
+        CancellationTokenSource? previousCts;
+        lock (_processStructureChangeDebounceSyncRoot)
+        {
+            previousCts = _processStructureChangeDebounceCts;
+            currentCts = new CancellationTokenSource();
+            _processStructureChangeDebounceCts = currentCts;
+        }
+
+        previousCts?.Cancel();
+        previousCts?.Dispose();
+        _ = DebounceProcessRefreshAsync(currentCts);
+    }
+
+    private async Task DebounceProcessRefreshAsync(CancellationTokenSource cts)
+    {
+        try
+        {
+            await Task.Delay(ProcessStructureChangeDebounceMilliseconds, cts.Token);
+            Logger.Info($"客户端已静默等待 {ProcessStructureChangeDebounceMilliseconds} ms，开始重新请求进程列表。");
+            RequestProcessRefresh();
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        finally
+        {
+            lock (_processStructureChangeDebounceSyncRoot)
+            {
+                if (ReferenceEquals(_processStructureChangeDebounceCts, cts))
+                {
+                    _processStructureChangeDebounceCts = null;
+                }
+            }
+
+            cts.Dispose();
+        }
+    }
+
+    private void StartPendingProcessRefreshIfNeeded()
+    {
+        if (!_pendingProcessRefresh || _isProcessIdRequestInFlight || _isProcessListRequestInFlight || !TcpHelper.IsRunning)
+        {
+            return;
+        }
+
+        _pendingProcessRefresh = false;
+        _ = RequestProcessIdListSafelyAsync();
+    }
+
+    private void CancelProcessRefreshDebounce()
+    {
+        CancellationTokenSource? cts;
+        lock (_processStructureChangeDebounceSyncRoot)
+        {
+            cts = _processStructureChangeDebounceCts;
+            _processStructureChangeDebounceCts = null;
+        }
+
+        cts?.Cancel();
+        cts?.Dispose();
+    }
+
+    private void TrackPendingRequest(CodeWF.NetWeaver.Base.INetObject command)
+    {
+        switch (command)
+        {
+            case RequestProcessIDList request:
+                _pendingRequests[request.TaskId] = new PendingRequestInfo(nameof(RequestProcessIDList), Stopwatch.GetTimestamp());
+                break;
+            case RequestProcessList request:
+                _pendingRequests[request.TaskId] = new PendingRequestInfo(nameof(RequestProcessList), Stopwatch.GetTimestamp());
+                break;
+            case RequestTerminateProcess request:
+                _pendingRequests[request.TaskId] = new PendingRequestInfo(nameof(RequestTerminateProcess), Stopwatch.GetTimestamp());
+                break;
+        }
+    }
+
+    private void TryLogResponseElapsed(int taskId, string responseName)
+    {
+        if (!_pendingRequests.TryRemove(taskId, out var pending))
+        {
+            return;
+        }
+
+        var elapsedMilliseconds = Stopwatch.GetElapsedTime(pending.StartedAt).TotalMilliseconds;
+        Logger.Info($"客户端收到 {responseName}，对应 {pending.RequestName} 往返耗时 {elapsedMilliseconds:F1} ms。");
+    }
+
+    private readonly record struct PendingRequestInfo(string RequestName, long StartedAt);
 
     private static void LogIncomingTcpCommand(object command) =>
         Logger.Info($"服务端 -> 客户端 TCP：{command}");

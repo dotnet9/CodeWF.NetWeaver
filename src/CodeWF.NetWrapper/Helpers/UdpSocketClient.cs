@@ -2,7 +2,6 @@ using CodeWF.Log.Core;
 using CodeWF.NetWeaver;
 using CodeWF.NetWrapper.Commands;
 using System;
-using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading.Channels;
@@ -11,51 +10,49 @@ using System.Threading.Tasks;
 namespace CodeWF.NetWrapper.Helpers;
 
 /// <summary>
-/// UDP Socket 客户端类，用于与 UDP 服务器建立连接并进行通信
+/// UDP Socket 客户端类，用于与 UDP 服务端建立连接并进行通信。
 /// </summary>
 public class UdpSocketClient
 {
     /// <summary>
-    /// 接收缓冲区通道
+    /// 接收缓冲区通道。
     /// </summary>
     private readonly Channel<SocketCommand> _receivedBuffers = Channel.CreateUnbounded<SocketCommand>();
 
     /// <summary>
-    /// UDP客户端对象
+    /// UDP 客户端对象。
     /// </summary>
     private UdpClient? _client;
-
 
     #region 公开属性
 
     /// <summary>
-    /// 服务标识，用以区分多个服务
+    /// 服务标识，用于区分多个服务。
     /// </summary>
     public string? ServerMark { get; private set; }
 
     /// <summary>
-    /// 获取或设置服务器IP地址
+    /// 服务端 IP 地址。
     /// </summary>
     public string? ServerIP { get; private set; }
 
     /// <summary>
-    /// 获取或设置服务器端口号
+    /// 服务端端口号。
     /// </summary>
     public int ServerPort { get; private set; }
 
-
     /// <summary>
-    ///     是否正在运行udp组播订阅
+    /// 是否正在运行 UDP 组播订阅。
     /// </summary>
     public bool IsRunning { get; set; }
 
     /// <summary>
-    /// 新数据通知事件
+    /// 新数据通知事件。
     /// </summary>
     public EventHandler<SocketCommand>? Received;
 
     /// <summary>
-    /// 系统ID，用于标识客户端身份
+    /// 系统 ID，用于标识客户端身份。
     /// </summary>
     public long SystemId { get; private set; }
 
@@ -64,12 +61,13 @@ public class UdpSocketClient
     #region 公开接口
 
     /// <summary>
-    /// 连接到UDP服务器
+    /// 连接到 UDP 服务端。
     /// </summary>
-    /// <param name="serverMark">服务器标识</param>
-    /// <param name="serverIP">服务器IP地址</param>
-    /// <param name="serverPort">服务器端口号</param>
-    /// <param name="endpoint">本地端点</param>
+    /// <param name="serverMark">服务端标识。</param>
+    /// <param name="serverIP">服务端 IP 地址。</param>
+    /// <param name="serverPort">服务端端口号。</param>
+    /// <param name="endpoint">本地 TCP 已连接端点。</param>
+    /// <param name="systemId">客户端系统 ID。</param>
     public async Task ConnectAsync(string serverMark, string serverIP, int serverPort, string endpoint, long systemId)
     {
         ServerMark = serverMark;
@@ -79,48 +77,50 @@ public class UdpSocketClient
 
         try
         {
-            _client = new UdpClient();
-            _client.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, 1);
-            _client.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.Broadcast, 1);
-
-            // 开启组播回环
-            _client.Client.SetSocketOption(SocketOptionLevel.IP, SocketOptionName.MulticastLoopback, true);
-
-            var localIp = endpoint.Split(":").First();
-            if (localIp == "127.0.0.1")
+            if (!IPAddress.TryParse(ServerIP, out var multicastAddress))
             {
-                localIp = "0.0.0.0";
+                throw new InvalidOperationException($"无效的 UDP 组播地址：{ServerIP}");
             }
 
-            // 任意IP+广播端口，0是任意端口
-            _client.Client.Bind(new IPEndPoint(IPAddress.Parse(localIp), ServerPort));
+            var localAddress = ResolveLocalAddress(endpoint);
+            _client = new UdpClient(multicastAddress.AddressFamily)
+            {
+                EnableBroadcast = true
+            };
+            _client.ExclusiveAddressUse = false;
+            _client.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
+            _client.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.Broadcast, true);
+            _client.Client.SetSocketOption(SocketOptionLevel.IP, SocketOptionName.MulticastLoopback, true);
+            _client.Client.Bind(new IPEndPoint(localAddress, ServerPort));
 
             if (UdpSocketServer.LoopbackIP == ServerIP)
             {
-                _client.JoinMulticastGroup(IPAddress.Parse(UdpSocketServer.LoopbackSubIP), IPAddress.Parse(localIp!));
+                _client.JoinMulticastGroup(IPAddress.Parse(UdpSocketServer.LoopbackSubIP), localAddress);
             }
             else
             {
-                _client.JoinMulticastGroup(IPAddress.Parse(ServerIP), IPAddress.Parse(localIp!));
+                _client.JoinMulticastGroup(multicastAddress, localAddress);
             }
 
             IsRunning = true;
 
-            // 不再使用await，让方法在后台运行
             _ = Task.Run(ReceiveDataAsync);
             _ = Task.Run(CheckCommandMeAsync);
         }
         catch (Exception ex)
         {
             IsRunning = false;
-            Logger.Error($"{ServerMark} 连接异常", ex, uiContent: $"{ServerMark} 连接异常：{ex.Message}，详细信息请查看日志文件");
+            Logger.Error(
+                $"{ServerMark} 连接异常",
+                ex,
+                uiContent: $"{ServerMark} 连接异常：{ex.Message}，详细信息请查看日志文件");
         }
     }
 
     /// <summary>
-    /// 停止UDP客户端
+    /// 停止 UDP 客户端。
     /// </summary>
-    /// <returns>是否成功停止</returns>
+    /// <returns>是否成功停止。</returns>
     public bool Stop()
     {
         try
@@ -145,7 +145,7 @@ public class UdpSocketClient
     #region 接收处理数据
 
     /// <summary>
-    /// 接收数据
+    /// 接收数据。
     /// </summary>
     private async Task ReceiveDataAsync()
     {
@@ -170,7 +170,7 @@ public class UdpSocketClient
 
                 if (data.Length < headInfo.BufferLen)
                 {
-                    Logger.Warn($"{ServerMark} 接收到不完整UDP包，接收大小 {data.Length}，错误UDP包基本信息：{headInfo}");
+                    Logger.Warn($"{ServerMark} 接收到不完整 UDP 包，接收大小 {data.Length}，错误 UDP 包基本信息：{headInfo}");
                     continue;
                 }
 
@@ -179,18 +179,18 @@ public class UdpSocketClient
             catch (SocketException ex)
             {
                 Logger.Error(ex.SocketErrorCode == SocketError.Interrupted
-                    ? $"{ServerMark} Udp中断，停止接收数据！"
-                    : $"{ServerMark} 接收Udp数据异常：{ex.Message}");
+                    ? $"{ServerMark} Udp 中断，停止接收数据。"
+                    : $"{ServerMark} 接收 Udp 数据异常：{ex.Message}");
             }
             catch (Exception ex)
             {
-                Logger.Error($"接收Udp数据异常：{ex.Message}");
+                Logger.Error($"接收 Udp 数据异常：{ex.Message}");
             }
         }
     }
 
     /// <summary>
-    /// 检查消息通道
+    /// 检查消息通道。
     /// </summary>
     private async Task CheckCommandMeAsync()
     {
@@ -203,6 +203,40 @@ public class UdpSocketClient
         {
             Received?.Invoke(this, message);
         }
+    }
+
+    private static IPAddress ResolveLocalAddress(string? endpoint)
+    {
+        if (string.IsNullOrWhiteSpace(endpoint))
+        {
+            return IPAddress.Any;
+        }
+
+        if (IPEndPoint.TryParse(endpoint, out var ipEndPoint))
+        {
+            return NormalizeLocalAddress(ipEndPoint.Address);
+        }
+
+        var separatorIndex = endpoint.LastIndexOf(':');
+        var addressText = separatorIndex > 0
+            ? endpoint[..separatorIndex]
+            : endpoint;
+
+        return IPAddress.TryParse(addressText, out var address)
+            ? NormalizeLocalAddress(address)
+            : IPAddress.Any;
+    }
+
+    private static IPAddress NormalizeLocalAddress(IPAddress address)
+    {
+        if (address.AddressFamily == AddressFamily.InterNetworkV6 && address.IsIPv4MappedToIPv6)
+        {
+            address = address.MapToIPv4();
+        }
+
+        return IPAddress.IsLoopback(address)
+            ? IPAddress.Any
+            : address;
     }
 
     #endregion

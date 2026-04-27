@@ -3,13 +3,15 @@ using CodeWF.Log.Core;
 using CodeWF.NetWrapper.Commands;
 using CodeWF.NetWrapper.Helpers;
 using ReactiveUI;
-using SocketDto;
 using SocketDto.Enums;
 using SocketDto.Requests;
 using SocketDto.Response;
 using SocketTest.Client.Shell.Messages;
 using SocketTest.Client.Shell.Services;
 using System;
+using System.Collections.Concurrent;
+using System.Diagnostics;
+using System.Net;
 using System.Threading.Tasks;
 
 namespace SocketTest.Client.Shell.ViewModels;
@@ -19,6 +21,7 @@ public sealed class ClientConnectionPanelViewModel : ReactiveObject
     private readonly ClientApplicationStateService _appState;
     private readonly TcpSocketClient _tcpHelper;
     private readonly UdpSocketClient _udpHelper;
+    private readonly ConcurrentDictionary<int, PendingRequestInfo> _pendingRequests = new();
     private bool _hasReceivedServiceInfo;
     private bool _hasReceivedUdpAddress;
     private bool _hasPublishedBootstrapCompleted;
@@ -103,7 +106,7 @@ public sealed class ClientConnectionPanelViewModel : ReactiveObject
         }
 
         Logger.Info($"客户端请求建立 TCP 连接：{TcpIp}:{TcpPort}");
-        var result = await _tcpHelper.ConnectAsync("SocketTest.Client", TcpIp, TcpPort);
+        var result = await _tcpHelper.ConnectAsync("TCP客户端", TcpIp, TcpPort);
         if (!result.IsSuccess)
         {
             Logger.Warn(result.ErrorMessage ?? "TCP 连接失败。");
@@ -156,6 +159,7 @@ public sealed class ClientConnectionPanelViewModel : ReactiveObject
 
     private void ReceivedSocketMessage(ResponseTargetType response)
     {
+        TryLogResponseElapsed(response.TaskId, nameof(ResponseTargetType));
         if (response.Type != (byte)TerminalType.Server)
         {
             Logger.Warn($"连接目标类型异常：{response.Type}");
@@ -168,15 +172,22 @@ public sealed class ClientConnectionPanelViewModel : ReactiveObject
 
     private void ReceivedSocketMessage(ResponseServiceInfo response)
     {
+        TryLogResponseElapsed(response.TaskId, nameof(ResponseServiceInfo));
         _timestampStartYear = response.TimestampStartYear;
         _hasReceivedServiceInfo = true;
         _appState.TimestampStartYear = response.TimestampStartYear;
         Logger.Info($"服务端信息：{response.OS}，时间基准年份：{response.TimestampStartYear}");
+        if (!_hasReceivedUdpAddress)
+        {
+            _ = RequestUdpAddressSafelyAsync();
+        }
+
         _ = PublishBootstrapCompletedIfReadyAsync();
     }
 
     private void ReceivedSocketMessage(ResponseUdpAddress response)
     {
+        TryLogResponseElapsed(response.TaskId, nameof(ResponseUdpAddress));
         UdpIp = response.Ip ?? string.Empty;
         UdpPort = response.Port;
         _hasReceivedUdpAddress = true;
@@ -188,7 +199,6 @@ public sealed class ClientConnectionPanelViewModel : ReactiveObject
     private async Task RequestBootstrapDetailsAsync()
     {
         await SendTcpCommandAsync(new RequestServiceInfo { TaskId = NetHelper.GetTaskId() });
-        await SendTcpCommandAsync(new RequestUdpAddress { TaskId = NetHelper.GetTaskId() });
     }
 
     private async Task RequestBootstrapDetailsSafelyAsync()
@@ -203,6 +213,18 @@ public sealed class ClientConnectionPanelViewModel : ReactiveObject
         }
     }
 
+    private async Task RequestUdpAddressSafelyAsync()
+    {
+        try
+        {
+            await SendTcpCommandAsync(new RequestUdpAddress { TaskId = NetHelper.GetTaskId() });
+        }
+        catch (Exception ex)
+        {
+            Logger.Error("请求 UDP 组播地址失败。", ex);
+        }
+    }
+
     private async Task ConnectUdpSafelyAsync()
     {
         if (_udpHelper.IsRunning || string.IsNullOrWhiteSpace(UdpIp) || UdpPort <= 0)
@@ -210,9 +232,15 @@ public sealed class ClientConnectionPanelViewModel : ReactiveObject
             return;
         }
 
+        if (!IPAddress.TryParse(UdpIp, out _))
+        {
+            Logger.Error($"收到非法 UDP 地址：{UdpIp}");
+            return;
+        }
+
         try
         {
-            await _udpHelper.ConnectAsync("Server", UdpIp, UdpPort, string.Empty, _tcpHelper.SystemId);
+            await _udpHelper.ConnectAsync("UDP客户端", UdpIp, UdpPort, _tcpHelper.LocalEndPoint!, _tcpHelper.SystemId);
         }
         catch (Exception ex)
         {
@@ -234,6 +262,7 @@ public sealed class ClientConnectionPanelViewModel : ReactiveObject
 
     private async Task SendTcpCommandAsync(CodeWF.NetWeaver.Base.INetObject command)
     {
+        TrackPendingRequest(command);
         Logger.Info($"客户端 -> 服务端 TCP：{command}");
         await _tcpHelper.SendCommandAsync(command);
     }
@@ -243,6 +272,7 @@ public sealed class ClientConnectionPanelViewModel : ReactiveObject
 
     private void ResetBootstrapState()
     {
+        _pendingRequests.Clear();
         _hasReceivedServiceInfo = false;
         _hasReceivedUdpAddress = false;
         _hasPublishedBootstrapCompleted = false;
@@ -266,4 +296,33 @@ public sealed class ClientConnectionPanelViewModel : ReactiveObject
         _appState.ConnectionSummary = ConnectionSummary;
         _appState.UdpSummary = UdpSummary;
     }
+
+    private void TrackPendingRequest(CodeWF.NetWeaver.Base.INetObject command)
+    {
+        switch (command)
+        {
+            case RequestTargetType request:
+                _pendingRequests[request.TaskId] = new PendingRequestInfo(nameof(RequestTargetType), Stopwatch.GetTimestamp());
+                break;
+            case RequestServiceInfo request:
+                _pendingRequests[request.TaskId] = new PendingRequestInfo(nameof(RequestServiceInfo), Stopwatch.GetTimestamp());
+                break;
+            case RequestUdpAddress request:
+                _pendingRequests[request.TaskId] = new PendingRequestInfo(nameof(RequestUdpAddress), Stopwatch.GetTimestamp());
+                break;
+        }
+    }
+
+    private void TryLogResponseElapsed(int taskId, string responseName)
+    {
+        if (!_pendingRequests.TryRemove(taskId, out var pending))
+        {
+            return;
+        }
+
+        var elapsedMilliseconds = Stopwatch.GetElapsedTime(pending.StartedAt).TotalMilliseconds;
+        Logger.Info($"客户端收到 {responseName}，对应 {pending.RequestName} 往返耗时 {elapsedMilliseconds:F1} ms。");
+    }
+
+    private readonly record struct PendingRequestInfo(string RequestName, long StartedAt);
 }

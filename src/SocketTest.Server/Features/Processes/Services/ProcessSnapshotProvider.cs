@@ -12,6 +12,7 @@ using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Runtime.InteropServices;
+using System.Threading;
 
 namespace SocketTest.Server.Features.Processes.Services;
 
@@ -20,14 +21,16 @@ internal sealed class ProcessSnapshotProvider : IProcessSnapshotProvider
     private readonly object _syncRoot = new();
     private readonly Dictionary<int, ProcessHistory> _previousHistory = [];
     private readonly IProcessMetricsSampler _metricsSampler;
-    private List<ProcessItem> _currentProcesses = [];
-    private int[] _currentProcessIds = [];
-    private ResponseServiceInfo _serviceInfo = new();
+    private ProcessSnapshotState _snapshotState;
     private DateTime _lastCaptureUtc = DateTime.UtcNow.AddSeconds(-1);
 
     public ProcessSnapshotProvider(IProcessMetricsSampler metricsSampler)
     {
         _metricsSampler = metricsSampler ?? throw new ArgumentNullException(nameof(metricsSampler));
+        _snapshotState = new ProcessSnapshotState(
+            Array.Empty<ProcessItem>(),
+            Array.Empty<int>(),
+            BuildServiceInfo(DateTime.Now.GetSpecialUnixTimeSeconds(TimestampStartYear)));
     }
 
     public const int TimestampStartYear = 2023;
@@ -69,10 +72,10 @@ internal sealed class ProcessSnapshotProvider : IProcessSnapshotProvider
             var processItems = processSnapshots
                 .Select(snapshot => snapshot.Item)
                 .OrderBy(item => item.Pid)
-                .ToList();
+                .ToArray();
 
             var newProcessIds = processItems.Select(item => item.Pid).ToArray();
-            var previousProcessIds = _currentProcessIds;
+            var previousProcessIds = Volatile.Read(ref _snapshotState).ProcessIds;
             var previousProcessIdSet = previousProcessIds.ToHashSet();
             var currentProcessIdSet = newProcessIds.ToHashSet();
             var addedProcessCount = currentProcessIdSet.Except(previousProcessIdSet).Count();
@@ -80,20 +83,23 @@ internal sealed class ProcessSnapshotProvider : IProcessSnapshotProvider
             var countChanged = previousProcessIds.Length != newProcessIds.Length;
             var structureChanged = countChanged || addedProcessCount > 0 || removedProcessCount > 0;
 
-            _currentProcesses = processItems;
-            _currentProcessIds = newProcessIds;
             _previousHistory.Clear();
             foreach (var pair in nextHistory)
             {
                 _previousHistory[pair.Key] = pair.Value;
             }
 
-            _serviceInfo = BuildServiceInfo(currentTimestamp);
+            Volatile.Write(
+                ref _snapshotState,
+                new ProcessSnapshotState(
+                    processItems,
+                    newProcessIds,
+                    BuildServiceInfo(currentTimestamp)));
             _lastCaptureUtc = nowUtc;
 
             return new ProcessSnapshotRefreshResult(
                 structureChanged,
-                _currentProcesses.Count,
+                processItems.Length,
                 addedProcessCount,
                 removedProcessCount);
         }
@@ -103,10 +109,8 @@ internal sealed class ProcessSnapshotProvider : IProcessSnapshotProvider
     {
         get
         {
-            lock (_syncRoot)
-            {
-                return _currentProcessIds.Length > 0 || _currentProcesses.Count > 0;
-            }
+            var snapshotState = Volatile.Read(ref _snapshotState);
+            return snapshotState.ProcessIds.Length > 0 || snapshotState.Processes.Length > 0;
         }
     }
 
@@ -114,128 +118,107 @@ internal sealed class ProcessSnapshotProvider : IProcessSnapshotProvider
     {
         get
         {
-            lock (_syncRoot)
-            {
-                return _currentProcesses.Count;
-            }
+            return Volatile.Read(ref _snapshotState).Processes.Length;
         }
     }
 
     public ResponseServiceInfo GetServiceInfo(int taskId)
     {
-        lock (_syncRoot)
+        var serviceInfo = Volatile.Read(ref _snapshotState).ServiceInfo;
+        return new ResponseServiceInfo
         {
-            return new ResponseServiceInfo
-            {
-                TaskId = taskId,
-                OS = _serviceInfo.OS,
-                MemorySize = _serviceInfo.MemorySize,
-                ProcessorCount = _serviceInfo.ProcessorCount,
-                DiskSize = _serviceInfo.DiskSize,
-                NetworkBandwidth = _serviceInfo.NetworkBandwidth,
-                Ips = _serviceInfo.Ips,
-                TimestampStartYear = _serviceInfo.TimestampStartYear,
-                LastUpdateTime = _serviceInfo.LastUpdateTime
-            };
-        }
+            TaskId = taskId,
+            OS = serviceInfo.OS,
+            MemorySize = serviceInfo.MemorySize,
+            ProcessorCount = serviceInfo.ProcessorCount,
+            DiskSize = serviceInfo.DiskSize,
+            NetworkBandwidth = serviceInfo.NetworkBandwidth,
+            Ips = serviceInfo.Ips,
+            TimestampStartYear = serviceInfo.TimestampStartYear,
+            LastUpdateTime = serviceInfo.LastUpdateTime
+        };
     }
 
     public int[] GetProcessIds()
     {
-        lock (_syncRoot)
-        {
-            return _currentProcessIds.ToArray();
-        }
+        return Volatile.Read(ref _snapshotState).ProcessIds.ToArray();
     }
 
     public List<ProcessItem> GetProcessPage(int pageSize, int pageIndex)
     {
-        lock (_syncRoot)
-        {
-            return _currentProcesses
-                .Skip(pageIndex * pageSize)
-                .Take(pageSize)
-                .Select(CloneProcessItem)
-                .ToList();
-        }
+        var processes = Volatile.Read(ref _snapshotState).Processes;
+        return processes
+            .Skip(pageIndex * pageSize)
+            .Take(pageSize)
+            .Select(CloneProcessItem)
+            .ToList();
     }
 
     public List<ProcessItem> GetAllProcesses()
     {
-        lock (_syncRoot)
-        {
-            return _currentProcesses.Select(CloneProcessItem).ToList();
-        }
+        return Volatile.Read(ref _snapshotState).Processes.Select(CloneProcessItem).ToList();
     }
 
     public void CalculateRealtimeUdpPage(int packetSize, out int pageSize, out int pageCount)
     {
-        lock (_syncRoot)
-        {
-            pageSize = (packetSize - SerializeHelper.PacketHeadLen - sizeof(int) * 8) / (sizeof(short) * 4);
-            pageSize = Math.Max(pageSize, 1);
-            pageCount = GetPageCount(_currentProcesses.Count, pageSize);
-        }
+        var totalCount = Volatile.Read(ref _snapshotState).Processes.Length;
+        pageSize = (packetSize - SerializeHelper.PacketHeadLen - sizeof(int) * 8) / (sizeof(short) * 4);
+        pageSize = Math.Max(pageSize, 1);
+        pageCount = GetPageCount(totalCount, pageSize);
     }
 
     public void CalculateGeneralUdpPage(int packetSize, out int pageSize, out int pageCount)
     {
-        lock (_syncRoot)
-        {
-            pageSize = (packetSize - SerializeHelper.PacketHeadLen - sizeof(int) * 11) /
-                       (sizeof(byte) * 5 + sizeof(short) + sizeof(uint));
-            pageSize = Math.Max(pageSize, 1);
-            pageCount = GetPageCount(_currentProcesses.Count, pageSize);
-        }
+        var totalCount = Volatile.Read(ref _snapshotState).Processes.Length;
+        pageSize = (packetSize - SerializeHelper.PacketHeadLen - sizeof(int) * 11) /
+                   (sizeof(byte) * 5 + sizeof(short) + sizeof(uint));
+        pageSize = Math.Max(pageSize, 1);
+        pageCount = GetPageCount(totalCount, pageSize);
     }
 
     public UpdateRealtimeProcessList BuildRealtimeUpdatePage(int pageSize, int pageIndex)
     {
-        lock (_syncRoot)
-        {
-            var page = _currentProcesses
-                .Skip(pageIndex * pageSize)
-                .Take(pageSize)
-                .ToList();
+        var processes = Volatile.Read(ref _snapshotState).Processes;
+        var page = processes
+            .Skip(pageIndex * pageSize)
+            .Take(pageSize)
+            .ToArray();
 
-            return new UpdateRealtimeProcessList
-            {
-                TotalSize = _currentProcesses.Count,
-                PageSize = pageSize,
-                PageCount = GetPageCount(_currentProcesses.Count, pageSize),
-                PageIndex = pageIndex,
-                Cpus = ToByteArray(page.Select(item => item.Cpu)),
-                Memories = ToByteArray(page.Select(item => item.Memory)),
-                Disks = ToByteArray(page.Select(item => item.Disk)),
-                Networks = ToByteArray(page.Select(item => item.Network))
-            };
-        }
+        return new UpdateRealtimeProcessList
+        {
+            TotalSize = processes.Length,
+            PageSize = pageSize,
+            PageCount = GetPageCount(processes.Length, pageSize),
+            PageIndex = pageIndex,
+            Cpus = ToByteArray(page.Select(item => item.Cpu)),
+            Memories = ToByteArray(page.Select(item => item.Memory)),
+            Disks = ToByteArray(page.Select(item => item.Disk)),
+            Networks = ToByteArray(page.Select(item => item.Network))
+        };
     }
 
     public UpdateGeneralProcessList BuildGeneralUpdatePage(int pageSize, int pageIndex)
     {
-        lock (_syncRoot)
-        {
-            var page = _currentProcesses
-                .Skip(pageIndex * pageSize)
-                .Take(pageSize)
-                .ToList();
+        var processes = Volatile.Read(ref _snapshotState).Processes;
+        var page = processes
+            .Skip(pageIndex * pageSize)
+            .Take(pageSize)
+            .ToArray();
 
-            return new UpdateGeneralProcessList
-            {
-                TotalSize = _currentProcesses.Count,
-                PageSize = pageSize,
-                PageCount = GetPageCount(_currentProcesses.Count, pageSize),
-                PageIndex = pageIndex,
-                ProcessStatuses = page.Select(item => item.ProcessStatus).ToArray(),
-                AlarmStatuses = page.Select(item => item.AlarmStatus).ToArray(),
-                Gpus = ToByteArray(page.Select(item => item.Gpu)),
-                GpuEngine = page.Select(item => item.GpuEngine).ToArray(),
-                PowerUsage = page.Select(item => item.PowerUsage).ToArray(),
-                PowerUsageTrend = page.Select(item => item.PowerUsageTrend).ToArray(),
-                UpdateTimes = ToByteArray(page.Select(item => item.UpdateTime))
-            };
-        }
+        return new UpdateGeneralProcessList
+        {
+            TotalSize = processes.Length,
+            PageSize = pageSize,
+            PageCount = GetPageCount(processes.Length, pageSize),
+            PageIndex = pageIndex,
+            ProcessStatuses = page.Select(item => item.ProcessStatus).ToArray(),
+            AlarmStatuses = page.Select(item => item.AlarmStatus).ToArray(),
+            Gpus = ToByteArray(page.Select(item => item.Gpu)),
+            GpuEngine = page.Select(item => item.GpuEngine).ToArray(),
+            PowerUsage = page.Select(item => item.PowerUsage).ToArray(),
+            PowerUsageTrend = page.Select(item => item.PowerUsageTrend).ToArray(),
+            UpdateTimes = ToByteArray(page.Select(item => item.UpdateTime))
+        };
     }
 
     public bool TryTerminateProcess(int processId, bool killEntireProcessTree, out string message)
@@ -693,6 +676,11 @@ internal sealed class ProcessSnapshotProvider : IProcessSnapshotProvider
 
         public int NetworkActivityCount { get; }
     }
+
+    private sealed record ProcessSnapshotState(
+        ProcessItem[] Processes,
+        int[] ProcessIds,
+        ResponseServiceInfo ServiceInfo);
 }
 
 internal readonly record struct ProcessSnapshotRefreshResult(

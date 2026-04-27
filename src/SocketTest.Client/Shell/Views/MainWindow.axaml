@@ -23,20 +23,21 @@
         </Style>
     </Window.Styles>
 
-    <Grid Background="#F5F7FA" RowDefinitions="Auto,*,220,Auto">
+    <Grid Background="#F5F7FA" RowDefinitions="Auto,*,1, 220,Auto">
         <controls:ClientConnectionPanelView />
 
         <controls:ClientModuleTabsView Grid.Row="1"
                                        Margin="18,18,18,12" />
+        <GridSplitter Grid.Row="2" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Margin="30 0" />
 
-        <Border Grid.Row="2" Classes="panel" Margin="18,0,18,12" Padding="12">
+        <Border Grid.Row="3" Classes="panel" Margin="18,0,18,12" Padding="12">
             <Grid RowDefinitions="Auto,*">
                 <TextBlock Margin="4,0,0,10" FontSize="16" FontWeight="SemiBold" Text="运行日志" />
                 <codewf:LogView Grid.Row="1" />
             </Grid>
         </Border>
 
-        <controls:ClientStatusBarView Grid.Row="3"
+        <controls:ClientStatusBarView Grid.Row="4"
                                       Margin="18,0,18,18" />
     </Grid>
 </Window>
