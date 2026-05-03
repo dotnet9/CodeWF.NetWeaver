@@ -17,11 +17,43 @@ Chinese version: [README.zh-CN.md](README.zh-CN.md)
 | `CodeWF.NetWeaver` | Core packet serialization and deserialization library. |
 | `CodeWF.NetWrapper` | TCP/UDP socket helper library built on top of `CodeWF.NetWeaver`. |
 | `SocketTest.Client` | Demo client for wrapper features. |
+| `SocketTest.Server` | Demo server for wrapper features. |
 
 ## Install
 
 ```bash
 NuGet\Install-Package CodeWF.NetWeaver
+```
+
+## Repository Baseline
+
+- Development SDK: `.NET 11` preview, pinned through `global.json`
+- Package management: centralized with `Directory.Packages.props`
+- Core libraries: `CodeWF.NetWeaver` and `CodeWF.NetWrapper`
+- Sample UI stack: `Avalonia 12.0.2`, `Semi.Avalonia 12.0.1`, `ReactiveUI.Avalonia 12.0.1`
+- Free-only policy: `Prism.DryIoc.Avalonia` remains pinned to `8.1.97.11073`
+- Grid migration: the sample applications now use `CodeWF.AvaloniaControls.ProDataGrid` instead of the old free `Avalonia.Controls.DataGrid` line
+
+## Build And Scripts
+
+Restore, build, and test the whole solution:
+
+```bash
+dotnet restore CodeWF.NetWeaver.slnx
+dotnet build CodeWF.NetWeaver.slnx -c Debug
+dotnet test CodeWF.NetWeaver.slnx -c Debug --no-build
+```
+
+Pack the NuGet libraries:
+
+```bash
+pack.bat
+```
+
+Publish the runnable samples:
+
+```bash
+publish_all.bat
 ```
 
 ## Packet Model

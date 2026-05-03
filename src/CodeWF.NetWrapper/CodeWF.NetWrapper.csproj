@@ -1,33 +1,23 @@
 <Project Sdk="Microsoft.NET.Sdk">
 	<PropertyGroup>
 		<Title>CodeWF.NetWrapper</Title>
-		<TargetFramework>net10.0</TargetFramework>
+		<TargetFramework>net11.0</TargetFramework>
 		<Nullable>enable</Nullable>
 		<LangVersion>latest</LangVersion>
 		<OutputType>Library</OutputType>
 		<IsPackable>true</IsPackable>
-		<Authors>沙漠尽头的狼</Authors>
-		<RepositoryUrl>https://github.com/dotnet9/CodeWF.EventBus.Socket</RepositoryUrl>
-		<PackageLicenseExpression>MIT</PackageLicenseExpression>
+		<Description>CodeWF.NetWrapper builds on CodeWF.NetWeaver and provides TCP/UDP helpers, command dispatching, and file transfer or file management capabilities.</Description>
 		<PackageIcon>logo.png</PackageIcon>
+		<PackageReadmeFile>README.md</PackageReadmeFile>
 		<PackageTags>c#,eventbus,socket</PackageTags>
-		<PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
-		<RepositoryType>git</RepositoryType>
-		<PackageLicenseExpression>MIT</PackageLicenseExpression>
-		<Copyright>https://codewf.com</Copyright>
-		<PackageReadmeFile>README.MD</PackageReadmeFile>
 	</PropertyGroup>
-	<ItemGroup>
-		<!-- The nuget package icon -->
-		<None Include="..\..\README.MD" Pack="true" PackagePath="" />
-		<None Include="..\..\logo.png" Pack="true" PackagePath="" />
-	</ItemGroup>
-  <ItemGroup>
-    <PackageReference Include="CodeWF.EventBus" Version="3.4.5.1" />
-    <PackageReference Include="CodeWF.Log.Core" Version="11.3.15" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\CodeWF.NetWeaver\CodeWF.NetWeaver.csproj" />
-  </ItemGroup>
 
+	<ItemGroup>
+		<PackageReference Include="CodeWF.EventBus" />
+		<PackageReference Include="CodeWF.Log.Core" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\CodeWF.NetWeaver\CodeWF.NetWeaver.csproj" />
+	</ItemGroup>
 </Project>

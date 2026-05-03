@@ -1,11 +1,24 @@
 <Project>
 	<PropertyGroup>
 		<BaseIntermediateOutputPath>$(MSBuildThisFileDirectory).vs\$(SolutionName)\Intermediate\$(MSBuildProjectName)\</BaseIntermediateOutputPath>
-		<OutputPath>$(MSBuildThisFileDirectory)Output</OutputPath>
-		<AppendTargetFrameworkToOutputPath>True</AppendTargetFrameworkToOutputPath>
+		<OutputPath>$(MSBuildThisFileDirectory)Output\</OutputPath>
+		<AppendTargetFrameworkToOutputPath>true</AppendTargetFrameworkToOutputPath>
 		<Version>2.1.0</Version>
 		<TestSamplesVersion>2.1.0</TestSamplesVersion>
-		<AvaloniaVersion>11.3.14</AvaloniaVersion>
+		<Company>https://codewf.com</Company>
+		<Authors>CodeWF</Authors>
+		<Owners>https://codewf.com</Owners>
+		<Copyright>Copyright (c) https://codewf.com 2024</Copyright>
+		<RepositoryUrl>https://github.com/dotnet9/CodeWF.NetWeaver</RepositoryUrl>
+		<PackageProjectUrl>https://github.com/dotnet9/CodeWF.NetWeaver</PackageProjectUrl>
+		<RepositoryType>git</RepositoryType>
+		<PackageLicenseExpression>MIT</PackageLicenseExpression>
+		<PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+		<PublishRepositoryUrl>true</PublishRepositoryUrl>
+		<ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+		<CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+		<PackageIcon Condition="'$(IsPackable)' == 'true' and '$(PackageIcon)' == ''">logo.png</PackageIcon>
+		<PackageReadmeFile Condition="'$(IsPackable)' == 'true' and '$(PackageReadmeFile)' == ''">README.md</PackageReadmeFile>
 	</PropertyGroup>
 
 	<PropertyGroup>

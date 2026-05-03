@@ -4,6 +4,6 @@
              x:Class="SocketTest.Client.App">
     <Application.Styles>
         <semi:SemiTheme Locale="zh-CN" />
-        <semi:DataGridSemiTheme />
+        <semi:ProDataGridSemiTheme />
     </Application.Styles>
 </Application>

@@ -1,34 +1,16 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
-		<TargetFramework>net10.0</TargetFramework>
+		<TargetFramework>net11.0</TargetFramework>
 		<Nullable>enable</Nullable>
 		<LangVersion>latest</LangVersion>
-		<Company>https://codewf.com</Company>
-		<Authors>沙漠尽头的狼</Authors>
-		<Owners>https://codewf.com</Owners>
 		<Description>CodeWF.NetWeaver is a concise and powerful C# library that supports AOT for handling TCP and UDP packet grouping and unpacking operations. CodeWF.NetWeaver 是一个简洁而强大的C#库，支持AOT，用于处理TCP和UDP数据包的组包和解包操作。</Description>
 		<ApplicationIcon>Resources\logo.ico</ApplicationIcon>
-		<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
-		<Title>$(AssemblyName)</Title>
-		<Copyright>Copyright © https://codewf.com 2024</Copyright>
-		<AssemblyName>$(AssemblyName)</AssemblyName>
-		<RootNamespace>$(AssemblyName)</RootNamespace>
-		<PackageId>$(AssemblyName)</PackageId>
-		<PackageTags>C#;TCP;UDP;</PackageTags>
+		<Title>CodeWF.NetWeaver</Title>
 		<PackageIcon>logo.png</PackageIcon>
-		<PackageProjectUrl>https://github.com/dotnet9/$(AssemblyName)</PackageProjectUrl>
-		<RepositoryUrl>https://github.com/dotnet9/$(AssemblyName)</RepositoryUrl>
-		<PackageReadmeFile>README.MD</PackageReadmeFile>
+		<PackageReadmeFile>README.md</PackageReadmeFile>
+		<PackageTags>C#;TCP;UDP;</PackageTags>
 		<Platforms>AnyCPU;x64</Platforms>
 	</PropertyGroup>
-
-	<ItemGroup>
-		<None Include="Resources\logo.png">
-			<Pack>True</Pack>
-			<PackagePath>\</PackagePath>
-		</None>
-		<None Include="..\..\README.MD" Pack="true" PackagePath="" />
-	</ItemGroup>
 
 </Project>

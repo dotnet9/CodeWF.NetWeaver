@@ -110,12 +110,12 @@
                     <TextBox Name="CurrentDirectoryTextBox"
                              Grid.Column="0"
                              Text="{Binding CurrentDirectoryPath, Mode=TwoWay}"
-                             Watermark="输入远程目录路径后按回车"
+                             PlaceholderText="输入远程目录路径后按回车"
                              KeyDown="CurrentDirectoryTextBox_OnKeyDown" />
                     <TextBox Name="SearchTextBox"
                              Grid.Column="2"
                              Text="{Binding SearchKeyword, Mode=TwoWay}"
-                             Watermark="搜索当前目录，按回车执行"
+                             PlaceholderText="搜索当前目录，按回车执行"
                              KeyDown="SearchTextBox_OnKeyDown" />
                 </Grid>
 
@@ -346,7 +346,7 @@
                     <StackPanel Spacing="14">
                         <TextBlock FontSize="18" FontWeight="SemiBold" Text="创建目录" />
                         <TextBlock Foreground="#667085" Text="{Binding CreateDialogHint}" />
-                        <TextBox Text="{Binding PendingDirectoryName, Mode=TwoWay}" Watermark="请输入目录名称" />
+                <TextBox Text="{Binding PendingDirectoryName, Mode=TwoWay}" PlaceholderText="请输入目录名称" />
                         <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
                             <Button Command="{Binding ConfirmCreateDirectoryCommand}" Content="确认创建" />
                             <Button Grid.Column="1" Command="{Binding CancelCreateDirectoryCommand}" Content="取消" />

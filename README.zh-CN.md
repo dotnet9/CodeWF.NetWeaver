@@ -17,11 +17,43 @@
 | `CodeWF.NetWeaver` | 核心数据包序列化 / 反序列化库。 |
 | `CodeWF.NetWrapper` | 基于 `CodeWF.NetWeaver` 的 TCP/UDP Socket 帮助库。 |
 | `SocketTest.Client` | Wrapper 功能演示客户端。 |
+| `SocketTest.Server` | Wrapper 功能演示服务端。 |
 
 ## 安装
 
 ```bash
 NuGet\Install-Package CodeWF.NetWeaver
+```
+
+## 仓库基线
+
+- 开发 SDK：`.NET 11` 预览版，通过 `global.json` 锁定
+- 包管理方式：使用 `Directory.Packages.props` 统一做中央包管理
+- 核心类库：`CodeWF.NetWeaver` 与 `CodeWF.NetWrapper`
+- 示例 UI 技术栈：`Avalonia 12.0.2`、`Semi.Avalonia 12.0.1`、`ReactiveUI.Avalonia 12.0.1`
+- 免费策略：`Prism.DryIoc.Avalonia` 固定为最后一个免费可用的 `8.1.97.11073`
+- 表格迁移：示例工程已从旧版免费 `Avalonia.Controls.DataGrid` 链路切换到 `CodeWF.AvaloniaControls.ProDataGrid`
+
+## 构建与脚本
+
+还原、构建并测试整个解决方案：
+
+```bash
+dotnet restore CodeWF.NetWeaver.slnx
+dotnet build CodeWF.NetWeaver.slnx -c Debug
+dotnet test CodeWF.NetWeaver.slnx -c Debug --no-build
+```
+
+打包 NuGet 类库：
+
+```bash
+pack.bat
+```
+
+发布可运行示例：
+
+```bash
+publish_all.bat
 ```
 
 ## 数据包模型
