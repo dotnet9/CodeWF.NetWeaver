@@ -8,7 +8,7 @@ if "%~1"=="" (
 )
 
 if "%~2"=="" (
-    set "platforms=win-x64"
+    set "platforms=win-x64 linux-x64"
 ) else (
     set "platforms=%~2"
 )

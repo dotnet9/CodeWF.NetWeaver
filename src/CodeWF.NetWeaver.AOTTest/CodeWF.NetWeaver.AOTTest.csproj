@@ -17,10 +17,6 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<TrimmerRootDescriptor Include="Roots.xml" />
-	</ItemGroup>
-
-	<ItemGroup>
 		<ProjectReference Include="..\CodeWF.NetWeaver\CodeWF.NetWeaver.csproj" />
 	</ItemGroup>
 
