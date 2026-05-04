@@ -21,7 +21,21 @@
 
 ## 安装
 
+仅安装数据包序列化核心：
+
 ```bash
+dotnet add package CodeWF.NetWeaver
+```
+
+如果需要 TCP/UDP 命令分发、文件传输或文件管理能力，再安装封装层：
+
+```bash
+dotnet add package CodeWF.NetWrapper
+```
+
+也可以在 Package Manager Console 中安装：
+
+```powershell
 NuGet\Install-Package CodeWF.NetWeaver
 ```
 
@@ -54,6 +68,13 @@ pack.bat
 
 ```bash
 publish_all.bat
+```
+
+运行示例时先启动服务端，再启动客户端：
+
+```bash
+dotnet run --project src/SocketTest.Server/SocketTest.Server.csproj -f net11.0-windows
+dotnet run --project src/SocketTest.Client/SocketTest.Client.csproj -f net11.0-windows
 ```
 
 ## 数据包模型
@@ -112,6 +133,7 @@ var netObject = new ResponseProcessList
 };
 
 var buffer = netObject.Serialize(systemId: 32);
+Console.WriteLine($"Packet bytes: {buffer.Length}");
 ```
 
 反序列化：
@@ -119,7 +141,7 @@ var buffer = netObject.Serialize(systemId: 32);
 ```csharp
 var deserialized = buffer.Deserialize<ResponseProcessList>();
 
-Console.WriteLine(deserialized.TotalSize);
+Console.WriteLine($"Process count: {deserialized.Processes?.Count ?? 0}");
 ```
 
 ## CodeWF.NetWrapper
@@ -137,6 +159,7 @@ await server.StartAsync("Server", "0.0.0.0", 8888);
 EventBus.Default.Subscribe<SocketCommand>(async (sender, command) =>
 {
     // 非文件管理命令可以在这里处理。
+    await Task.CompletedTask;
 });
 ```
 

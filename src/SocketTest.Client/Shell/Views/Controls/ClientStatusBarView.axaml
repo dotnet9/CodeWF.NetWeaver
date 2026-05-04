@@ -12,7 +12,7 @@
              x:DataType="vm:ClientStatusBarViewModel">
     <Border Padding="14,10"
             Background="#111827"
-            CornerRadius="12">
+            CornerRadius="8">
         <Grid>
             <controls:ProcessMonitorStatusView IsVisible="{Binding #Root.DataContext.IsProcessMonitorTabSelected}" />
             <controls:RemoteFileExplorerStatusView IsVisible="{Binding #Root.DataContext.IsRemoteFileExplorerTabSelected}" />

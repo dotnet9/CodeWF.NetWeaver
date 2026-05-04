@@ -1,4 +1,4 @@
-﻿using CodeWF.NetWeaver.AOTTest.Dto;
+using CodeWF.NetWeaver.AOTTest.Dto;
 using System.Collections;
 using CodeWF.NetWeaver.AOTTest.Models;
 using CodeWF.Tools.Extensions;
@@ -51,7 +51,7 @@ public static class Test
         Console.WriteLine("\r\n\r\n===3、AOT Dictionary<int,int>===");
         AOTDictionary();
 
-        Console.WriteLine("\r\n\r\n===3、AOT Dictionary<stirng,double>===");
+        Console.WriteLine("\r\n\r\n===3、AOT Dictionary<string,double>===");
         AOTDictionary2();
 
         Console.WriteLine("\r\n\r\n===4、AOT Custom Object");
@@ -67,7 +67,7 @@ public static class Test
         try
         {
             int[] arr = [1, 3, 4];
-            var type = arr.GetType();
+            var type = typeof(Array);
 
             Console.WriteLine($"直接获取数组长度：{arr.Length}");
 
@@ -80,12 +80,8 @@ public static class Test
             var arrLen2 = arrObj.Length;
             Console.WriteLine($"转Array获取数组长度：{arrLen2}");
 
-            // GetElementType() 返回数组元素类型，例如 int[] -> int。
-            var elementType = type.GetElementType()
-                              ?? throw new InvalidOperationException("Array element type cannot be null.");
-            // Array.CreateInstance(...) 按“运行时元素类型 + 长度”动态创建数组，
-            // 这是 AOT/反射场景里常见但不太常手写的 API。
-            var newObj = Array.CreateInstance(elementType, arrLen2);
+            // AOT 场景下优先使用已知元素类型创建数组，避免运行时动态代码生成。
+            var newObj = new int[arrLen2];
             Console.WriteLine($"{newObj}");
 
             Console.WriteLine("=========================");
@@ -101,7 +97,7 @@ public static class Test
         try
         {
             var lst = new List<int> { 1, 2, 3, 4 };
-            var type = lst.GetType();
+            var type = typeof(List<int>);
 
             Console.WriteLine($"直接获取List长度：{lst.Count}");
 
@@ -113,12 +109,11 @@ public static class Test
             var listLen2 = listObj.Count;
             Console.WriteLine($"转IList获取List长度：{listLen2}");
 
-            var newObj1 = CreateInstance(lst);
+            var newObj1 = CreateAotFriendlyInstance(lst);
             Console.WriteLine($"ins1: {newObj1}");
 
-            // Activator.CreateInstance(type) 按运行时类型动态 new 一个对象，
-            // 等价于“已知类型时直接 new”，但适用于反射代码。
-            var newObj2 = Activator.CreateInstance(type);
+            // AOT 场景下示例代码优先使用显式类型构造，构建时不会产生 IL3050/IL2072 警告。
+            var newObj2 = new List<int>();
             Console.WriteLine($"ins2:{newObj2}");
 
             Console.WriteLine("=========================");
@@ -134,7 +129,7 @@ public static class Test
         try
         {
             var dict = new Dictionary<int, int>() { { 1, 2 }, { 3, 4 }, { 5, 6 }, { 7, 8 } };
-            var type = dict.GetType();
+            var type = typeof(Dictionary<int, int>);
 
             Console.WriteLine($"直接获取Dictionary长度：{dict.Count}");
 
@@ -146,10 +141,10 @@ public static class Test
             var dictLen2 = dictObj.Count;
             Console.WriteLine($"反射获取Dictionary长度：{dictLen2}");
 
-            var newObj1 = CreateInstance(dict);
+            var newObj1 = CreateAotFriendlyInstance(dict);
             Console.WriteLine($"ins1: {newObj1}");
 
-            var newObj = Activator.CreateInstance(type);
+            var newObj = new Dictionary<int, int>();
             Console.WriteLine($"ins2: {newObj}");
 
             Console.WriteLine("=========================");
@@ -165,7 +160,7 @@ public static class Test
         try
         {
             var dict = new Dictionary<string, double>() { { "1", 2 }, { "3", 4 }, { "5", 6 }, { "7", 8 } };
-            var type = dict.GetType();
+            var type = typeof(Dictionary<string, double>);
 
             Console.WriteLine($"直接获取Dictionary长度：{dict.Count}");
 
@@ -176,10 +171,10 @@ public static class Test
             var dictLen2 = dictObj.Count;
             Console.WriteLine($"反射获取Dictionary长度：{dictLen2}");
 
-            var newObj1 = CreateInstance(dict);
+            var newObj1 = CreateAotFriendlyInstance(dict);
             Console.WriteLine($"ins1: {newObj1}");
 
-            var newObj = Activator.CreateInstance(type);
+            var newObj = new Dictionary<string, double>();
             Console.WriteLine($"ins2: {newObj}");
 
             Console.WriteLine("=========================");
@@ -218,25 +213,15 @@ public static class Test
         }
     }
 
-    private static object CreateInstance(object val)
+    private static object CreateAotFriendlyInstance(object val)
     {
-        var type = val.GetType();
-        // GetGenericArguments() 取得当前泛型实参，
-        // 例如 List<int> -> [int]，Dictionary<string, double> -> [string, double]。
-        var itemTypes = type.GetGenericArguments();
-        if (val is IList)
+        return val switch
         {
-            var lstType = typeof(List<>);
-            // MakeGenericType(...) 会把开放泛型 List<> 补全成封闭泛型 List<int>。
-            var genericType = lstType.MakeGenericType(itemTypes.First());
-            return Activator.CreateInstance(genericType)!;
-        }
-        else
-        {
-            var dictType = typeof(Dictionary<,>);
-            var genericType = dictType.MakeGenericType(itemTypes.First(), itemTypes[1]);
-            return Activator.CreateInstance(genericType)!;
-        }
+            IList<int> => new List<int>(),
+            IDictionary<int, int> => new Dictionary<int, int>(),
+            IDictionary<string, double> => new Dictionary<string, double>(),
+            _ => throw new NotSupportedException($"Unsupported AOT sample type: {val.GetType().FullName}.")
+        };
     }
 
     private static void TestEnumAndBool()

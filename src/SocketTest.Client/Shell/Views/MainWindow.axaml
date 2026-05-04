@@ -17,18 +17,22 @@
     <Window.Styles>
         <Style Selector="Border.panel">
             <Setter Property="Background" Value="#FFFFFF" />
-            <Setter Property="CornerRadius" Value="14" />
+            <Setter Property="CornerRadius" Value="8" />
             <Setter Property="BorderBrush" Value="#D8DEE9" />
             <Setter Property="BorderThickness" Value="1" />
         </Style>
     </Window.Styles>
 
-    <Grid Background="#F5F7FA" RowDefinitions="Auto,*,1, 220,Auto">
+    <Grid Background="#F6F8FB" RowDefinitions="Auto,*,1,220,Auto">
         <controls:ClientConnectionPanelView />
 
         <controls:ClientModuleTabsView Grid.Row="1"
                                        Margin="18,18,18,12" />
-        <GridSplitter Grid.Row="2" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Margin="30 0" />
+        <GridSplitter Grid.Row="2"
+                      HorizontalAlignment="Stretch"
+                      VerticalAlignment="Stretch"
+                      Margin="30,0"
+                      Background="#D8DEE9" />
 
         <Border Grid.Row="3" Classes="panel" Margin="18,0,18,12" Padding="12">
             <Grid RowDefinitions="Auto,*">

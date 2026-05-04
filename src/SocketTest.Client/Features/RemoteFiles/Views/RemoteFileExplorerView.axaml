@@ -14,32 +14,32 @@
     <UserControl.Styles>
         <Style Selector="Border.surface">
             <Setter Property="Background" Value="#FFFFFF" />
-            <Setter Property="CornerRadius" Value="14" />
+            <Setter Property="CornerRadius" Value="8" />
             <Setter Property="BorderBrush" Value="#D7DEEA" />
             <Setter Property="BorderThickness" Value="1" />
         </Style>
         <Style Selector="Border.tree-node">
             <Setter Property="Padding" Value="8,6" />
-            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="CornerRadius" Value="6" />
         </Style>
         <Style Selector="Border.tile-card">
-            <Setter Property="Padding" Value="14" />
+            <Setter Property="Padding" Value="12" />
             <Setter Property="Margin" Value="0,0,12,12" />
-            <Setter Property="Width" Value="220" />
-            <Setter Property="Height" Value="156" />
-            <Setter Property="CornerRadius" Value="16" />
+            <Setter Property="Width" Value="208" />
+            <Setter Property="Height" Value="148" />
+            <Setter Property="CornerRadius" Value="8" />
             <Setter Property="BorderBrush" Value="#D0D5DD" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="Background" Value="#FFFFFF" />
         </Style>
     </UserControl.Styles>
 
-    <Grid Margin="10" ColumnDefinitions="300,8,*">
+    <Grid Margin="10" ColumnDefinitions="280,6,*">
         <Border Classes="surface" Padding="14">
             <Grid RowDefinitions="Auto,*">
                 <StackPanel Spacing="4">
-                    <TextBlock FontSize="18" FontWeight="SemiBold" Text="远程目录树" />
-                    <TextBlock Foreground="#667085" Text="按磁盘和目录层级快速定位远程资源。" />
+                    <TextBlock FontSize="18" FontWeight="SemiBold" Text="远程目录" />
+                    <TextBlock Foreground="#667085" Text="磁盘与目录层级" />
                 </StackPanel>
 
                 <Border Grid.Row="1"
@@ -76,7 +76,7 @@
                                     <StackPanel Orientation="Horizontal" Spacing="10">
                                         <Border Width="34"
                                                 Height="34"
-                                                CornerRadius="10"
+                                                CornerRadius="8"
                                                 Background="#E8EEF9">
                                             <TextBlock HorizontalAlignment="Center"
                                                        VerticalAlignment="Center"
@@ -88,6 +88,7 @@
                                                        Text="{Binding Name}" />
                                             <TextBlock Foreground="#667085"
                                                        FontSize="12"
+                                                       TextTrimming="CharacterEllipsis"
                                                        Text="{Binding FullPath}" />
                                         </StackPanel>
                                     </StackPanel>
@@ -100,7 +101,7 @@
         </Border>
 
         <GridSplitter Grid.Column="1"
-                      Width="8"
+                      Width="6"
                       Background="#E5E7EB"
                       HorizontalAlignment="Stretch" />
 
@@ -119,45 +120,22 @@
                              KeyDown="SearchTextBox_OnKeyDown" />
                 </Grid>
 
-                <Grid Grid.Row="1"
-                      Margin="0,14,0,14"
-                      ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,*,Auto,Auto">
-                    <Button Command="{Binding RefreshDirectoryCommand}" Content="刷新" />
-                    <Button Grid.Column="1"
-                            Margin="8,0,0,0"
-                            Command="{Binding EnterParentDirectoryCommand}"
-                            Content="上一级" />
-                    <Button Grid.Column="2"
-                            Margin="8,0,0,0"
-                            Click="CreateDirectoryButton_OnClick"
-                            Content="新建目录" />
-                    <Button Grid.Column="3"
-                            Margin="8,0,0,0"
-                            Click="UploadFilesButton_OnClick"
-                            Content="上传文件" />
-                    <Button Grid.Column="4"
-                            Margin="8,0,0,0"
-                            Click="UploadFolderButton_OnClick"
-                            Content="上传文件夹" />
-                    <Button Grid.Column="5"
-                            Margin="8,0,0,0"
-                            Click="DownloadSelectionButton_OnClick"
-                            Content="下载选中" />
-                    <Button Grid.Column="6"
-                            Margin="8,0,0,0"
-                            Click="DeleteButton_OnClick"
-                            Content="删除选中" />
-                    <CheckBox Grid.Column="8"
+                <WrapPanel Grid.Row="1"
+                           Margin="0,14,0,6">
+                    <Button Margin="0,0,8,8" Command="{Binding RefreshDirectoryCommand}" Content="刷新" />
+                    <Button Margin="0,0,8,8" Command="{Binding EnterParentDirectoryCommand}" Content="上一级" />
+                    <Button Margin="0,0,8,8" Click="CreateDirectoryButton_OnClick" Content="新建目录" />
+                    <Button Margin="0,0,8,8" Click="UploadFilesButton_OnClick" Content="上传文件" />
+                    <Button Margin="0,0,8,8" Click="UploadFolderButton_OnClick" Content="上传文件夹" />
+                    <Button Margin="0,0,8,8" Click="DownloadSelectionButton_OnClick" Content="下载选中" />
+                    <Button Margin="0,0,12,8" Click="DeleteButton_OnClick" Content="删除选中" />
+                    <CheckBox Margin="0,0,12,8"
                               VerticalAlignment="Center"
                               IsChecked="{Binding SearchRecursive, Mode=TwoWay}"
                               Content="递归搜索" />
-                    <StackPanel Grid.Column="9"
-                                Orientation="Horizontal"
-                                Spacing="8">
-                        <Button Command="{Binding SwitchToListViewCommand}" Content="列表" />
-                        <Button Command="{Binding SwitchToTileViewCommand}" Content="方块" />
-                    </StackPanel>
-                </Grid>
+                    <Button Margin="0,0,8,8" Command="{Binding SwitchToListViewCommand}" Content="列表" />
+                    <Button Margin="0,0,8,8" Command="{Binding SwitchToTileViewCommand}" Content="方块" />
+                </WrapPanel>
 
                 <StackPanel Grid.Row="2" Margin="0,0,0,12" Spacing="4">
                     <TextBlock FontSize="16" FontWeight="SemiBold" Text="{Binding ExplorerSummary}" />
@@ -192,6 +170,7 @@
                                   HeadersVisibility="Column"
                                   IsReadOnly="True"
                                   BorderThickness="0"
+                                  RowHeight="42"
                                   ItemsSource="{Binding VisibleEntries}"
                                   SelectedItem="{Binding SelectedEntry, Mode=TwoWay}">
                             <DataGrid.Columns>
@@ -226,7 +205,7 @@
                                                 <StackPanel Orientation="Horizontal" Spacing="10">
                                                     <Border Width="36"
                                                             Height="36"
-                                                            CornerRadius="10"
+                                                            CornerRadius="8"
                                                             Background="#E8EEF9">
                                                         <TextBlock HorizontalAlignment="Center"
                                                                    VerticalAlignment="Center"
@@ -237,6 +216,7 @@
                                                         <TextBlock FontWeight="SemiBold"
                                                                    Text="{Binding Name}" />
                                                         <TextBlock Foreground="#667085"
+                                                                   TextTrimming="CharacterEllipsis"
                                                                    Text="{Binding FullPath}" />
                                                     </StackPanel>
                                                 </StackPanel>
@@ -289,7 +269,7 @@
                                                 <StackPanel Spacing="10">
                                                     <Border Width="56"
                                                             Height="56"
-                                                            CornerRadius="14"
+                                                            CornerRadius="8"
                                                             Background="#E8EEF9">
                                                         <TextBlock HorizontalAlignment="Center"
                                                                    VerticalAlignment="Center"
@@ -306,6 +286,7 @@
                                                     <TextBlock Foreground="#667085"
                                                                TextWrapping="Wrap"
                                                                MaxHeight="36"
+                                                               TextTrimming="CharacterEllipsis"
                                                                Text="{Binding FullPath}" />
                                                 </StackPanel>
                                             </Button>
@@ -346,7 +327,7 @@
                     <StackPanel Spacing="14">
                         <TextBlock FontSize="18" FontWeight="SemiBold" Text="创建目录" />
                         <TextBlock Foreground="#667085" Text="{Binding CreateDialogHint}" />
-                <TextBox Text="{Binding PendingDirectoryName, Mode=TwoWay}" PlaceholderText="请输入目录名称" />
+                        <TextBox Text="{Binding PendingDirectoryName, Mode=TwoWay}" PlaceholderText="请输入目录名称" />
                         <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
                             <Button Command="{Binding ConfirmCreateDirectoryCommand}" Content="确认创建" />
                             <Button Grid.Column="1" Command="{Binding CancelCreateDirectoryCommand}" Content="取消" />

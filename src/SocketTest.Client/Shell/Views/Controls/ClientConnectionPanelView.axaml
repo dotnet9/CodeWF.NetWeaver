@@ -8,41 +8,47 @@
              x:Class="SocketTest.Client.Shell.Views.Controls.ClientConnectionPanelView"
              prism:ViewModelLocator.AutoWireViewModel="True"
              x:DataType="vm:ClientConnectionPanelViewModel">
-    <Border Padding="20,16"
+    <Border Padding="18,14"
             Background="#FFFFFF"
             BorderBrush="#E5E7EB"
             BorderThickness="0,0,0,1">
-        <Grid ColumnDefinitions="*,Auto,140,Auto,110,Auto,Auto" ColumnSpacing="10">
+        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="14">
             <StackPanel Spacing="4">
                 <TextBlock FontSize="22" FontWeight="SemiBold" Text="SocketTest.Client" />
                 <TextBlock Foreground="#667085"
-                           Text="统一连接、日志与状态信息，协同完成进程监控、远程文件浏览和文件传输。" />
+                           Text="TCP/UDP 客户端示例" />
             </StackPanel>
 
-            <TextBlock Grid.Column="1" VerticalAlignment="Center" Text="服务端地址" />
-            <TextBox Grid.Column="2"
-                     Height="36"
-                     Text="{Binding TcpIp, Mode=TwoWay}"
-                 PlaceholderText="127.0.0.1" />
+            <StackPanel Grid.Column="1"
+                        Orientation="Horizontal"
+                        VerticalAlignment="Center"
+                        Spacing="8">
+                <TextBlock VerticalAlignment="Center" Text="服务端地址" />
+                <TextBox Width="150"
+                         Height="34"
+                         Text="{Binding TcpIp, Mode=TwoWay}"
+                         PlaceholderText="127.0.0.1" />
 
-            <TextBlock Grid.Column="3" VerticalAlignment="Center" Text="端口" />
-            <TextBox Grid.Column="4"
-                     Height="36"
-                     Text="{Binding TcpPort, Mode=TwoWay}" />
+                <TextBlock VerticalAlignment="Center" Text="端口" />
+                <TextBox Width="92"
+                         Height="34"
+                         Text="{Binding TcpPort, Mode=TwoWay}" />
 
-            <Button Grid.Column="5"
-                    MinWidth="120"
-                    Height="36"
-                    Command="{Binding HandleConnectTcpAsync}"
-                    Content="{Binding ConnectButtonText}" />
+                <Button MinWidth="116"
+                        Height="34"
+                        Command="{Binding HandleConnectTcpAsync}"
+                        Content="{Binding ConnectButtonText}" />
+            </StackPanel>
 
-            <Border Grid.Column="6"
-                    Padding="12,8"
+            <Border Grid.Column="2"
+                    MinWidth="210"
+                    Padding="12,7"
                     Background="#F8FAFC"
                     BorderBrush="#E2E8F0"
                     BorderThickness="1"
-                    CornerRadius="10">
+                    CornerRadius="8">
                 <TextBlock Foreground="#475467"
+                           TextTrimming="CharacterEllipsis"
                            Text="{Binding ConnectionSummary}" />
             </Border>
         </Grid>

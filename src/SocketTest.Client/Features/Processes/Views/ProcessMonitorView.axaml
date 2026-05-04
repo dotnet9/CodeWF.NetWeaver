@@ -18,7 +18,7 @@
         </Style>
         <Style Selector="Border.surface">
             <Setter Property="Background" Value="#FFFFFF" />
-            <Setter Property="CornerRadius" Value="14" />
+            <Setter Property="CornerRadius" Value="8" />
             <Setter Property="BorderBrush" Value="#E4E7EC" />
             <Setter Property="BorderThickness" Value="1" />
         </Style>
@@ -37,12 +37,20 @@
         <Border Classes="surface" Padding="16" Margin="0,0,0,12">
             <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10">
                 <StackPanel Spacing="4">
-                    <TextBlock FontSize="18" FontWeight="SemiBold" Text="服务端进程监控" />
+                    <TextBlock FontSize="18" FontWeight="SemiBold" Text="进程监控" />
                     <TextBlock Foreground="#667085"
-                               Text="聚焦实时进程状态、资源占用和告警信息，支持在客户端直接请求服务端结束目标进程树。" />
+                               Text="实时状态、资源占用与告警" />
                 </StackPanel>
-                <Button Grid.Column="1" Command="{Binding RefreshProcessesAsync}" Content="刷新进程" />
-                <Button Grid.Column="2" Command="{Binding RequestInitialDataAsync}" Content="重新同步" />
+                <Button Grid.Column="1"
+                        MinWidth="92"
+                        Height="34"
+                        Command="{Binding RefreshProcessesAsync}"
+                        Content="刷新" />
+                <Button Grid.Column="2"
+                        MinWidth="92"
+                        Height="34"
+                        Command="{Binding RequestInitialDataAsync}"
+                        Content="同步" />
             </Grid>
         </Border>
 
@@ -57,6 +65,7 @@
                           HeadersVisibility="Column"
                           IsReadOnly="True"
                           BorderThickness="0"
+                          RowHeight="38"
                           ItemsSource="{Binding DisplayProcesses, Mode=OneWay}"
                           SelectedItem="{Binding SelectedProcess, Mode=TwoWay}">
                     <DataGrid.Columns>

@@ -8,18 +8,12 @@
              x:Class="SocketTest.Client.Shell.Views.Controls.ProcessMonitorStatusView"
              prism:ViewModelLocator.AutoWireViewModel="True"
              x:DataType="vm:ProcessMonitorStatusViewModel">
-    <Grid ColumnDefinitions="Auto,Auto,Auto,*" ColumnSpacing="18">
-        <StackPanel Orientation="Horizontal" Spacing="6">
-            <TextBlock Foreground="#9CA3AF" Text="TCP" />
-            <TextBlock Foreground="White" Text="{Binding ConnectionSummary}" />
-        </StackPanel>
-        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
-            <TextBlock Foreground="#9CA3AF" Text="UDP" />
-            <TextBlock Foreground="White" Text="{Binding UdpSummary}" />
-        </StackPanel>
-        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6">
-            <TextBlock Foreground="#9CA3AF" Text="进程概览" />
-            <TextBlock Foreground="White" Text="{Binding ProcessSummary}" />
-        </StackPanel>
+    <Grid ColumnDefinitions="Auto,*,Auto,*,Auto,*" ColumnSpacing="8">
+        <TextBlock Foreground="#9CA3AF" Text="TCP" />
+        <TextBlock Grid.Column="1" Foreground="White" TextTrimming="CharacterEllipsis" Text="{Binding ConnectionSummary}" />
+        <TextBlock Grid.Column="2" Foreground="#9CA3AF" Text="UDP" />
+        <TextBlock Grid.Column="3" Foreground="White" TextTrimming="CharacterEllipsis" Text="{Binding UdpSummary}" />
+        <TextBlock Grid.Column="4" Foreground="#9CA3AF" Text="进程概览" />
+        <TextBlock Grid.Column="5" Foreground="White" TextTrimming="CharacterEllipsis" Text="{Binding ProcessSummary}" />
     </Grid>
 </UserControl>

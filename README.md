@@ -21,7 +21,21 @@ Chinese version: [README.zh-CN.md](README.zh-CN.md)
 
 ## Install
 
+Install only the packet serializer:
+
 ```bash
+dotnet add package CodeWF.NetWeaver
+```
+
+Install the socket helper layer when you need TCP/UDP command dispatching, file transfer, or file management:
+
+```bash
+dotnet add package CodeWF.NetWrapper
+```
+
+Package Manager Console is also supported:
+
+```powershell
 NuGet\Install-Package CodeWF.NetWeaver
 ```
 
@@ -54,6 +68,13 @@ Publish the runnable samples:
 
 ```bash
 publish_all.bat
+```
+
+Run the server sample first, then the client sample:
+
+```bash
+dotnet run --project src/SocketTest.Server/SocketTest.Server.csproj -f net11.0-windows
+dotnet run --project src/SocketTest.Client/SocketTest.Client.csproj -f net11.0-windows
 ```
 
 ## Packet Model
@@ -112,6 +133,7 @@ var netObject = new ResponseProcessList
 };
 
 var buffer = netObject.Serialize(systemId: 32);
+Console.WriteLine($"Packet bytes: {buffer.Length}");
 ```
 
 Deserialize:
@@ -119,7 +141,7 @@ Deserialize:
 ```csharp
 var deserialized = buffer.Deserialize<ResponseProcessList>();
 
-Console.WriteLine(deserialized.TotalSize);
+Console.WriteLine($"Process count: {deserialized.Processes?.Count ?? 0}");
 ```
 
 ## CodeWF.NetWrapper
@@ -137,6 +159,7 @@ await server.StartAsync("Server", "0.0.0.0", 8888);
 EventBus.Default.Subscribe<SocketCommand>(async (sender, command) =>
 {
     // Non-file-management commands can be processed here.
+    await Task.CompletedTask;
 });
 ```
 

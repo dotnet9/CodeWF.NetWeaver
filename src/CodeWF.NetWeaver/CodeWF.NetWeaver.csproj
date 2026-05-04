@@ -4,12 +4,12 @@
 		<TargetFrameworks>net10.0;net11.0</TargetFrameworks>
 		<Nullable>enable</Nullable>
 		<LangVersion>latest</LangVersion>
-		<Description>CodeWF.NetWeaver is a concise and powerful C# library that supports AOT for handling TCP and UDP packet grouping and unpacking operations. CodeWF.NetWeaver 是一个简洁而强大的C#库，支持AOT，用于处理TCP和UDP数据包的组包和解包操作。</Description>
+		<Description>CodeWF.NetWeaver is an AOT-friendly C# packet serialization library for TCP and UDP protocols. CodeWF.NetWeaver 是一个面向 TCP/UDP 协议的 AOT 友好型数据包序列化库。</Description>
 		<ApplicationIcon>Resources\logo.ico</ApplicationIcon>
 		<Title>CodeWF.NetWeaver</Title>
 		<PackageIcon>logo.png</PackageIcon>
 		<PackageReadmeFile>README.md</PackageReadmeFile>
-		<PackageTags>C#;TCP;UDP;</PackageTags>
+		<PackageTags>dotnet;networking;serialization;tcp;udp;aot</PackageTags>
 		<Platforms>AnyCPU;x64</Platforms>
 	</PropertyGroup>
 

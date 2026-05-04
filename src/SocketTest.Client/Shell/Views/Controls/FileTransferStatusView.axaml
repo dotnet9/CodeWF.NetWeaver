@@ -8,18 +8,12 @@
              x:Class="SocketTest.Client.Shell.Views.Controls.FileTransferStatusView"
              prism:ViewModelLocator.AutoWireViewModel="True"
              x:DataType="vm:FileTransferStatusViewModel">
-    <Grid ColumnDefinitions="Auto,Auto,Auto,*" ColumnSpacing="18">
-        <StackPanel Orientation="Horizontal" Spacing="6">
-            <TextBlock Foreground="#9CA3AF" Text="队列概览" />
-            <TextBlock Foreground="White" Text="{Binding QueueSummary}" />
-        </StackPanel>
-        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
-            <TextBlock Foreground="#9CA3AF" Text="实时速度" />
-            <TextBlock Foreground="White" Text="{Binding TransferSpeed}" />
-        </StackPanel>
-        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6">
-            <TextBlock Foreground="#9CA3AF" Text="总进度" />
-            <TextBlock Foreground="White" Text="{Binding TotalProgress, StringFormat={}{0:F1}%}" />
-        </StackPanel>
+    <Grid ColumnDefinitions="Auto,*,Auto,*,Auto,*" ColumnSpacing="8">
+        <TextBlock Foreground="#9CA3AF" Text="队列概览" />
+        <TextBlock Grid.Column="1" Foreground="White" TextTrimming="CharacterEllipsis" Text="{Binding QueueSummary}" />
+        <TextBlock Grid.Column="2" Foreground="#9CA3AF" Text="实时速度" />
+        <TextBlock Grid.Column="3" Foreground="White" TextTrimming="CharacterEllipsis" Text="{Binding TransferSpeed}" />
+        <TextBlock Grid.Column="4" Foreground="#9CA3AF" Text="总进度" />
+        <TextBlock Grid.Column="5" Foreground="White" Text="{Binding TotalProgress, StringFormat={}{0:F1}%}" />
     </Grid>
 </UserControl>

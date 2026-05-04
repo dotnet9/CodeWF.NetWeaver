@@ -1,7 +1,9 @@
 # 更新日志
 
-## Unreleased（2026-05-03）
+## Unreleased（2026-05-04）
 
+🔨[优化]-补充仓库级 `.editorconfig` 与 `.gitattributes`，统一 UTF-8、行尾和 C# 基础样式规则
+🔨[优化]-调整核心 NuGet 包描述与标签，提升包检索信息的专业度
 🔨[优化]-仓库切换为 `Directory.Packages.props` 中央包管理，统一类库、测试项目与示例项目的 NuGet 版本入口
 🔨[优化]-开发基线升级到 `.NET 11`，新增 `global.json` 锁定 SDK，并补齐根目录 `pack.bat` 打包脚本
 🔨[优化]-统一仓库级打包元数据与 README/CHANGELOG 注入逻辑，完善解决方案清单与开发文档说明

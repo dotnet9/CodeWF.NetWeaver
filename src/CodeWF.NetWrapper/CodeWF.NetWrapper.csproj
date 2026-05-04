@@ -9,7 +9,7 @@
 		<Description>CodeWF.NetWrapper builds on CodeWF.NetWeaver and provides TCP/UDP helpers, command dispatching, and file transfer or file management capabilities.</Description>
 		<PackageIcon>logo.png</PackageIcon>
 		<PackageReadmeFile>README.md</PackageReadmeFile>
-		<PackageTags>c#,eventbus,socket</PackageTags>
+		<PackageTags>dotnet;networking;socket;tcp;udp;file-transfer</PackageTags>
 	</PropertyGroup>
 
 	<ItemGroup>

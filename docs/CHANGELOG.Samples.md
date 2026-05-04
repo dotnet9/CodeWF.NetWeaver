@@ -1,7 +1,10 @@
 # 更新日志
 
-## Unreleased（2026-05-03）
+## Unreleased（2026-05-04）
 
+🔨[优化]-优化 README 中的安装、运行示例和代码片段，补充 `CodeWF.NetWrapper` 的安装入口
+🔨[优化]-打磨 AOT 示例代码，使用显式类型构造替代运行时动态创建，减少示例构建告警噪声
+🔨[优化]-优化客户端与服务端示例界面圆角、工具栏换行、状态栏截断和传输进度展示
 🔨[优化]-`SocketTest.Client` 与 `SocketTest.Server` 升级到 `.NET 11`、`Avalonia 12.0.2` 与 `Semi.Avalonia 12.0.1`
 🔨[优化]-示例工程改用 `CodeWF.AvaloniaControls.ProDataGrid` 和 `ProDataGridSemiTheme`，替代旧版免费 `Avalonia.Controls.DataGrid` 方案
 🔨[优化]-统一示例发布配置与根目录 `publish_all.bat` / `publishbase.bat` 脚本，发布输出集中到根目录 `publish/`
