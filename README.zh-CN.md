@@ -44,9 +44,9 @@ NuGet\Install-Package CodeWF.NetWeaver
 - 开发 SDK：`.NET 11` 预览版，通过 `global.json` 锁定
 - 包管理方式：使用 `Directory.Packages.props` 统一做中央包管理
 - 核心类库：`CodeWF.NetWeaver` 与 `CodeWF.NetWrapper`
-- 示例 UI 技术栈：`Avalonia 12.0.2`、`Semi.Avalonia 12.0.1`、`ReactiveUI.Avalonia 12.0.1`
+- 示例 UI 技术栈：`Avalonia 12.0.3`、`Semi.Avalonia 12.0.1`、`ReactiveUI.Avalonia 12.0.1`
 - 免费策略：`Prism.DryIoc.Avalonia` 固定为最后一个免费可用的 `8.1.97.11073`
-- 表格迁移：示例工程已从旧版免费 `Avalonia.Controls.DataGrid` 链路切换到 `CodeWF.AvaloniaControls.ProDataGrid`
+- 表格迁移：示例工程已从旧版免费 `Avalonia.Controls.DataGrid` 链路切换到开源 `ProDataGrid` 与自研开源 `CodeWF.AvaloniaControls.ProDataGrid.Themes`，不再使用非开源 Semi ProDataGrid 主题包
 
 ## 构建与脚本
 
@@ -258,3 +258,31 @@ dotnet test src\CodeWF.NetWrapper.Tests\CodeWF.NetWrapper.Tests.csproj
 设计说明文档见：
 
 [CodeWF-NetWeaver-Design-Principles.md](CodeWF-NetWeaver-Design-Principles.md)
+
+## 第三方开源组件审计
+
+检查时间：2026-05-20。检查范围包括 NuGet 元数据、恢复后的 `project.assets.json`、NuGet.org 信息以及上游源码/许可证链接。优先接受 MIT / Apache-2.0 / BSD。
+
+本次整改：
+
+- 示例工程移除 `Semi.Avalonia.ProDataGrid`，改用 MIT 的 `ProDataGrid` 和自研开源 `CodeWF.AvaloniaControls.ProDataGrid.Themes` 包。
+- 移除 `AvaloniaUI.DiagnosticsSupport`，因为该包未公开明确的开源许可证和源码仓库。
+- 示例/测试中的聚合包 `CodeWF.Tools` 改为按需引用 `CodeWF.Tools.Core` / `CodeWF.Tools.Files`，避免不需要图片能力时引入 Magick 链路。
+- 启用传递包 pin，并将 `System.Configuration.ConfigurationManager`、`System.Drawing.Common`、`System.Security.Cryptography.ProtectedData`、`System.Security.Permissions`、`System.Windows.Extensions` 固定到 `10.0.8`，移除旧 `4.7.0` 传递依赖链。
+- 已将通过审计的包线更新到 `Avalonia 12.0.3`、`CodeWF.EventBus 3.4.5.5`、`CodeWF.LogViewer.Avalonia 12.0.3.1`、`CodeWF.AvaloniaControls.ProDataGrid.Themes 12.0.3.2`、`CodeWF.Tools.Core` / `CodeWF.Tools.Files 1.3.13.2`、`coverlet.collector 10.0.1`。
+
+| 包 | 协议 | 源码/项目地址 | 结论 |
+| --- | --- | --- | --- |
+| `Avalonia` / `Avalonia.Desktop` / `Avalonia.Fonts.Inter` / `Avalonia.Markup.Xaml.Loader` | MIT | https://github.com/AvaloniaUI/Avalonia | 通过，`12.0.3` |
+| `CodeWF.EventBus` / `CodeWF.Log.Core` / `CodeWF.LogViewer.Avalonia` / `CodeWF.AvaloniaControls.ProDataGrid.Themes` / `CodeWF.Tools.Core` / `CodeWF.Tools.Files` | MIT | CodeWF 自研仓库 | 自研开源包；当前使用 `CodeWF.EventBus 3.4.5.5`、`CodeWF.Log.Core 12.0.3.1`、`CodeWF.LogViewer.Avalonia 12.0.3.1`、`CodeWF.AvaloniaControls.ProDataGrid.Themes 12.0.3.2`、`CodeWF.Tools.* 1.3.13.2` |
+| `Lorem.Universal.Net` | MIT | https://github.com/trichards57/Lorem.Universal.NET | 示例依赖，通过 |
+| `Microsoft.NET.Test.Sdk` | MIT | https://github.com/microsoft/vstest | 测试依赖，通过 |
+| `Prism.DryIoc.Avalonia` | MIT | https://github.com/AvaloniaCommunity/Prism.Avalonia | 通过，固定到 8.x 开源线 |
+| `ProDataGrid` | MIT | https://github.com/wieslawsoltes/ProDataGrid | 通过 |
+| `ReactiveUI.Avalonia` | MIT | https://github.com/reactiveui/reactiveui | 通过 |
+| `Semi.Avalonia` | MIT | https://github.com/irihitech/Semi.Avalonia | 通过，仅使用开源主体包 |
+| `System.Configuration.ConfigurationManager` / `System.Drawing.Common` / `System.Security.Cryptography.ProtectedData` / `System.Security.Permissions` / `System.Windows.Extensions` | MIT | https://github.com/dotnet/dotnet | 通过，固定到 `10.0.8` |
+| `coverlet.collector` | MIT | https://github.com/coverlet-coverage/coverlet | 测试依赖，通过，`10.0.1` |
+| `xunit` / `xunit.runner.visualstudio` | Apache-2.0 | https://github.com/xunit/xunit | 测试依赖，通过 |
+
+传递依赖检查结论：Avalonia / SkiaSharp / ANGLE、ProDataGrid、CodeWF.AvaloniaControls.ProDataGrid.Themes、CodeWF.Tools.Files（`CsvHelper`、`MiniExcel`、`SharpCompress`、`YamlDotNet`）、Prism.Avalonia、ReactiveUI 链路均有公开源码。有效恢复资产不再包含 `Semi.Avalonia.ProDataGrid`、`AvaloniaUI.DiagnosticsSupport`、`Magick.NET-Q16-AnyCPU`、`System.Drawing.Common 4.7.0`、`System.Configuration.ConfigurationManager 4.7.0` 或 `System.Security.Cryptography.ProtectedData 4.7.0`。

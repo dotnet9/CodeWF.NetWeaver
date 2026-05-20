@@ -44,9 +44,9 @@ NuGet\Install-Package CodeWF.NetWeaver
 - Development SDK: `.NET 11` preview, pinned through `global.json`
 - Package management: centralized with `Directory.Packages.props`
 - Core libraries: `CodeWF.NetWeaver` and `CodeWF.NetWrapper`
-- Sample UI stack: `Avalonia 12.0.2`, `Semi.Avalonia 12.0.1`, `ReactiveUI.Avalonia 12.0.1`
+- Sample UI stack: `Avalonia 12.0.3`, `Semi.Avalonia 12.0.1`, `ReactiveUI.Avalonia 12.0.1`
 - Free-only policy: `Prism.DryIoc.Avalonia` remains pinned to `8.1.97.11073`
-- Grid migration: the sample applications now use `CodeWF.AvaloniaControls.ProDataGrid` instead of the old free `Avalonia.Controls.DataGrid` line
+- Grid migration: the sample applications now use the open-source `ProDataGrid` package and the in-house open `CodeWF.AvaloniaControls.ProDataGrid.Themes` package instead of the old free `Avalonia.Controls.DataGrid` line or non-open Semi ProDataGrid theme package
 
 ## Build And Scripts
 
@@ -259,3 +259,31 @@ dotnet test src\CodeWF.NetWrapper.Tests\CodeWF.NetWrapper.Tests.csproj
 The design note document is available here:
 
 [CodeWF-NetWeaver-Design-Principles.md](CodeWF-NetWeaver-Design-Principles.md)
+
+## Third-Party Open Source Audit
+
+Checked on 2026-05-20 with NuGet metadata, restored `project.assets.json`, and upstream source/license links. MIT / Apache-2.0 / BSD are preferred.
+
+Remediation:
+
+- Removed `Semi.Avalonia.ProDataGrid` from sample projects and switched to MIT `ProDataGrid` plus the in-house open `CodeWF.AvaloniaControls.ProDataGrid.Themes` package.
+- Removed `AvaloniaUI.DiagnosticsSupport` because the package does not publish a clear open-source license or source repository.
+- Replaced sample/test references to aggregate `CodeWF.Tools` with `CodeWF.Tools.Core` / `CodeWF.Tools.Files` so the samples no longer pull the image/Magick dependency chain unless they need it.
+- Enabled transitive package pinning and pinned `System.Configuration.ConfigurationManager`, `System.Drawing.Common`, `System.Security.Cryptography.ProtectedData`, `System.Security.Permissions`, and `System.Windows.Extensions` to `10.0.8`, removing old `4.7.0` transitive dependency chains.
+- Updated the approved package line to `Avalonia 12.0.3`, `CodeWF.EventBus 3.4.5.5`, `CodeWF.LogViewer.Avalonia 12.0.3.1`, `CodeWF.AvaloniaControls.ProDataGrid.Themes 12.0.3.2`, `CodeWF.Tools.Core` / `CodeWF.Tools.Files 1.3.13.2`, and `coverlet.collector 10.0.1`.
+
+| Package | License | Source | Status |
+| --- | --- | --- | --- |
+| `Avalonia` / `Avalonia.Desktop` / `Avalonia.Fonts.Inter` / `Avalonia.Markup.Xaml.Loader` | MIT | https://github.com/AvaloniaUI/Avalonia | Approved, `12.0.3` |
+| `CodeWF.EventBus` / `CodeWF.Log.Core` / `CodeWF.LogViewer.Avalonia` / `CodeWF.AvaloniaControls.ProDataGrid.Themes` / `CodeWF.Tools.Core` / `CodeWF.Tools.Files` | MIT | CodeWF repositories | Own open-source packages; using `CodeWF.EventBus 3.4.5.5`, `CodeWF.Log.Core 12.0.3.1`, `CodeWF.LogViewer.Avalonia 12.0.3.1`, `CodeWF.AvaloniaControls.ProDataGrid.Themes 12.0.3.2`, `CodeWF.Tools.* 1.3.13.2` |
+| `Lorem.Universal.Net` | MIT | https://github.com/trichards57/Lorem.Universal.NET | Approved, sample-only |
+| `Microsoft.NET.Test.Sdk` | MIT | https://github.com/microsoft/vstest | Approved, test-only |
+| `Prism.DryIoc.Avalonia` | MIT | https://github.com/AvaloniaCommunity/Prism.Avalonia | Approved, pinned to 8.x |
+| `ProDataGrid` | MIT | https://github.com/wieslawsoltes/ProDataGrid | Approved |
+| `ReactiveUI.Avalonia` | MIT | https://github.com/reactiveui/reactiveui | Approved |
+| `Semi.Avalonia` | MIT | https://github.com/irihitech/Semi.Avalonia | Approved, only the open core package is used |
+| `System.Configuration.ConfigurationManager` / `System.Drawing.Common` / `System.Security.Cryptography.ProtectedData` / `System.Security.Permissions` / `System.Windows.Extensions` | MIT | https://github.com/dotnet/dotnet | Approved, pinned to `10.0.8` |
+| `coverlet.collector` | MIT | https://github.com/coverlet-coverage/coverlet | Approved, `10.0.1`, test-only |
+| `xunit` / `xunit.runner.visualstudio` | Apache-2.0 | https://github.com/xunit/xunit | Approved, test-only |
+
+Transitive dependencies from Avalonia/SkiaSharp/ANGLE, ProDataGrid, CodeWF.AvaloniaControls.ProDataGrid.Themes, CodeWF.Tools.Files (`CsvHelper`, `MiniExcel`, `SharpCompress`, `YamlDotNet`), Prism.Avalonia, and ReactiveUI were checked and are source-open. Effective restore assets no longer contain `Semi.Avalonia.ProDataGrid`, `AvaloniaUI.DiagnosticsSupport`, `Magick.NET-Q16-AnyCPU`, `System.Drawing.Common 4.7.0`, `System.Configuration.ConfigurationManager 4.7.0`, or `System.Security.Cryptography.ProtectedData 4.7.0`.

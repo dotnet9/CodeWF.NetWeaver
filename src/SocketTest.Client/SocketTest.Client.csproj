@@ -29,12 +29,12 @@
     <PackageReference Include="Avalonia" />
     <PackageReference Include="Avalonia.Desktop" />
     <PackageReference Include="Avalonia.Fonts.Inter" />
-    <PackageReference Condition="'$(Configuration)' == 'Debug'" Include="AvaloniaUI.DiagnosticsSupport" />
     <PackageReference Include="ReactiveUI.Avalonia" />
     <PackageReference Include="Lorem.Universal.Net" />
     <PackageReference Include="Semi.Avalonia" />
-    <PackageReference Include="CodeWF.AvaloniaControls.ProDataGrid" />
-    <PackageReference Include="CodeWF.Tools" />
+    <PackageReference Include="ProDataGrid" />
+    <PackageReference Include="CodeWF.AvaloniaControls.ProDataGrid.Themes" />
+    <PackageReference Include="CodeWF.Tools.Core" />
     <PackageReference Include="CodeWF.LogViewer.Avalonia" />
     <PackageReference Include="Prism.DryIoc.Avalonia" />
   </ItemGroup>
