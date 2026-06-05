@@ -86,6 +86,93 @@ public sealed class TcpSocketFileTransferTests : IAsyncLifetime
         await WaitForConditionAsync(() => !Directory.Exists(managedDirectory));
     }
 
+    [Fact]
+    public async Task Stop_RemovesClientFromServer()
+    {
+        var port = GetFreePort();
+        var server = new TcpSocketServer();
+        var client = new TcpSocketClient();
+
+        var serverResult = await server.StartAsync("TestServer", IPAddress.Loopback.ToString(), port);
+        Assert.True(serverResult.IsSuccess, serverResult.ErrorMessage);
+
+        try
+        {
+            var clientResult = await client.ConnectAsync("TestClient", IPAddress.Loopback.ToString(), port);
+            Assert.True(clientResult.IsSuccess, clientResult.ErrorMessage);
+
+            await WaitForConditionAsync(() => server.Clients.Count == 1);
+
+            client.Stop();
+
+            await WaitForConditionAsync(() => server.Clients.IsEmpty);
+        }
+        finally
+        {
+            await server.StopAsync();
+        }
+    }
+
+    [Fact]
+    public async Task ServerStop_MarksClientAsDisconnected()
+    {
+        var port = GetFreePort();
+        var server = new TcpSocketServer();
+        var client = new TcpSocketClient();
+
+        var serverResult = await server.StartAsync("TestServer", IPAddress.Loopback.ToString(), port);
+        Assert.True(serverResult.IsSuccess, serverResult.ErrorMessage);
+
+        try
+        {
+            var clientResult = await client.ConnectAsync("TestClient", IPAddress.Loopback.ToString(), port);
+            Assert.True(clientResult.IsSuccess, clientResult.ErrorMessage);
+
+            await WaitForConditionAsync(() => server.Clients.Count == 1);
+
+            await server.StopAsync();
+
+            await WaitForConditionAsync(() => !client.IsRunning && client.LocalEndPoint == null && !client.CanSend);
+        }
+        finally
+        {
+            client.Stop();
+            await server.StopAsync();
+        }
+    }
+
+    [Fact]
+    public async Task Stop_AllowsClientToReconnect()
+    {
+        var port = GetFreePort();
+        var server = new TcpSocketServer();
+        var client = new TcpSocketClient();
+
+        var serverResult = await server.StartAsync("TestServer", IPAddress.Loopback.ToString(), port);
+        Assert.True(serverResult.IsSuccess, serverResult.ErrorMessage);
+
+        try
+        {
+            var firstConnect = await client.ConnectAsync("TestClient", IPAddress.Loopback.ToString(), port);
+            Assert.True(firstConnect.IsSuccess, firstConnect.ErrorMessage);
+
+            await WaitForConditionAsync(() => server.Clients.Count == 1);
+
+            client.Stop();
+            await WaitForConditionAsync(() => server.Clients.IsEmpty);
+
+            var secondConnect = await client.ConnectAsync("TestClient", IPAddress.Loopback.ToString(), port);
+            Assert.True(secondConnect.IsSuccess, secondConnect.ErrorMessage);
+
+            await WaitForConditionAsync(() => server.Clients.Count == 1 && client.CanSend);
+        }
+        finally
+        {
+            client.Stop();
+            await server.StopAsync();
+        }
+    }
+
     private string CreateDirectory(string name)
     {
         var path = Path.Combine(_workspaceRoot, name);

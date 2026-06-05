@@ -14,7 +14,7 @@ namespace CodeWF.NetWrapper.Helpers;
 
 public partial class TcpSocketClient
 {
-    private readonly Channel<SocketCommand> _fileTransferResponses = Channel.CreateUnbounded<SocketCommand>();
+    private Channel<SocketCommand> _fileTransferResponses = Channel.CreateUnbounded<SocketCommand>();
 
     /// <summary>
     /// 文件传输块大小（64KB），每次传输的数据块大小
@@ -225,9 +225,9 @@ public partial class TcpSocketClient
     /// <summary>
     /// 处理文件传输响应（内部方法，在独立线程中运行）
     /// </summary>
-    private async Task ProcessingFileTransferResponsesAsync()
+    private async Task ProcessingFileTransferResponsesAsync(ChannelReader<SocketCommand> fileTransferResponses)
     {
-        await foreach (var command in _fileTransferResponses.Reader.ReadAllAsync())
+        await foreach (var command in fileTransferResponses.ReadAllAsync())
         {
             try
             {

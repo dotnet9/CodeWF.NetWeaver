@@ -13,7 +13,6 @@
 
 ## V2.1.0（2026-04-27）
 
-😄[新增]-在 `Directory.Build.props` 中增加 `TestSamplesVersion`，独立维护测试示例版本号  
 😄[新增]-为测试示例建立独立更新日志文档  
 🔨[优化]-服务端启动后后台静默预热首轮进程快照，`RequestServiceInfo` 改为直接读取缓存并快速响应  
 🔨[优化]-客户端连接握手调整为先请求 `RequestServiceInfo`，收到响应后再请求 `RequestUdpAddress`  

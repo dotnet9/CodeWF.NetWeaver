@@ -32,17 +32,18 @@ public static class NetHelper
     /// <param name="socket">要关闭的 Socket 对象</param>
     public static void CloseSocket(this Socket? socket)
     {
+        string? remoteEndPoint = null;
         try
         {
-            // TODO这段代码不能使服务端收到客户端断开连接通知，暂时注释，后面解决
-            //if (socket?.Connected == true)
-            //{
-            //    socket.Shutdown(SocketShutdown.Both);
-            //}
+            remoteEndPoint = socket?.RemoteEndPoint?.ToString();
+            if (socket?.Connected == true)
+            {
+                socket.Shutdown(SocketShutdown.Both);
+            }
         }
         catch (Exception ex)
         {
-            Logger.Error($"关闭Socket连接（{socket?.RemoteEndPoint}）时发生异常",ex, $"关闭Socket连接（{socket?.RemoteEndPoint}）时发生异常，详细信息请查看日志文件");
+            Logger.Error($"关闭Socket连接（{remoteEndPoint}）时发生异常", ex, $"关闭Socket连接（{remoteEndPoint}）时发生异常，详细信息请查看日志文件");
         }
         finally
         {

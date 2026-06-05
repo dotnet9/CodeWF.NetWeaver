@@ -211,7 +211,7 @@ public partial class TcpSocketServer
         }
 
         session.TokenSource?.Cancel();
-        session.TcpSocket?.Close();
+        session.TcpSocket?.CloseSocket();
 
         Clients.TryRemove(key, out _);
 
@@ -263,6 +263,8 @@ public partial class TcpSocketServer
                 var (success, buffer, headInfo) = await client.TcpSocket!.ReadPacketAsync();
                 if (!success)
                 {
+                    Logger.Warn($"{ServerMark} 客户端({tcpClientKey})连接已断开，将移除该客户端");
+                    await RemoveClientAsync(tcpClientKey);
                     break;
                 }
 
