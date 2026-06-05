@@ -5,7 +5,7 @@
 		<Nullable>enable</Nullable>
 		<LangVersion>latest</LangVersion>
 		<Description>CodeWF.NetWeaver is an AOT-friendly C# packet serialization library for TCP and UDP protocols. CodeWF.NetWeaver 是一个面向 TCP/UDP 协议的 AOT 友好型数据包序列化库。</Description>
-		<ApplicationIcon>Resources\logo.ico</ApplicationIcon>
+		<ApplicationIcon>..\..\logo.ico</ApplicationIcon>
 		<Title>CodeWF.NetWeaver</Title>
 		<PackageIcon>logo.png</PackageIcon>
 		<PackageReadmeFile>README.md</PackageReadmeFile>

@@ -9,7 +9,7 @@
     <PublishAot>true</PublishAot>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
     <AssemblyTitle>SocketTest.Client</AssemblyTitle>
-    <ApplicationIcon>Assets\logo.ico</ApplicationIcon>
+    <ApplicationIcon>..\..\logo.ico</ApplicationIcon>
   </PropertyGroup>
 
   <PropertyGroup Condition="$([MSBuild]::IsTargetFrameworkCompatible('$(TargetFramework)', 'net11.0-windows'))">
@@ -19,10 +19,7 @@
 
   <ItemGroup>
     <AvaloniaResource Include="Assets\**" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Content Include="Assets\logo.ico" />
+    <AvaloniaResource Include="..\..\logo.ico" Link="Assets\logo.ico" />
   </ItemGroup>
 
   <ItemGroup>
