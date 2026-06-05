@@ -17,7 +17,7 @@ public class UdpSocketClient
     /// <summary>
     /// 接收缓冲区通道。
     /// </summary>
-    private readonly Channel<SocketCommand> _receivedBuffers = Channel.CreateUnbounded<SocketCommand>();
+    private Channel<SocketCommand> _receivedBuffers = Channel.CreateUnbounded<SocketCommand>();
 
     /// <summary>
     /// UDP 客户端对象。
@@ -70,6 +70,11 @@ public class UdpSocketClient
     /// <param name="systemId">客户端系统 ID。</param>
     public async Task ConnectAsync(string serverMark, string serverIP, int serverPort, string endpoint, long systemId)
     {
+        if (_client != null || IsRunning)
+        {
+            Stop();
+        }
+
         ServerMark = serverMark;
         ServerIP = serverIP;
         ServerPort = serverPort;
@@ -77,6 +82,7 @@ public class UdpSocketClient
 
         try
         {
+            var receivedBuffers = ResetReceivedBuffers();
             if (!IPAddress.TryParse(ServerIP, out var multicastAddress))
             {
                 throw new InvalidOperationException($"无效的 UDP 组播地址：{ServerIP}");
@@ -104,11 +110,13 @@ public class UdpSocketClient
 
             IsRunning = true;
 
-            _ = Task.Run(ReceiveDataAsync);
-            _ = Task.Run(CheckCommandMeAsync);
+            _ = Task.Run(async () => await ReceiveDataAsync(_client, receivedBuffers.Writer));
+            _ = Task.Run(async () => await CheckCommandMeAsync(receivedBuffers.Reader));
         }
         catch (Exception ex)
         {
+            CloseClient();
+            CompleteReceivedBuffers();
             IsRunning = false;
             Logger.Error(
                 $"{ServerMark} 连接异常",
@@ -125,19 +133,18 @@ public class UdpSocketClient
     {
         try
         {
-            _receivedBuffers.Writer.Complete();
-            _client?.Close();
-            _client = null;
+            IsRunning = false;
+            CompleteReceivedBuffers();
+            CloseClient();
             Logger.Info($"{ServerMark} 停止");
             return true;
         }
         catch (Exception ex)
         {
             Logger.Error($"{ServerMark} 停止异常", ex, $"{ServerMark} 停止异常，详细信息请查看日志文件");
+            IsRunning = false;
+            return false;
         }
-
-        IsRunning = false;
-        return false;
     }
 
     #endregion
@@ -147,19 +154,19 @@ public class UdpSocketClient
     /// <summary>
     /// 接收数据。
     /// </summary>
-    private async Task ReceiveDataAsync()
+    private async Task ReceiveDataAsync(UdpClient client, ChannelWriter<SocketCommand> receivedBuffers)
     {
-        while (IsRunning)
+        while (IsRunning && ReferenceEquals(_client, client))
         {
             try
             {
-                if (_client?.Client == null)
+                if (client.Client == null)
                 {
                     await Task.Delay(TimeSpan.FromMilliseconds(10));
                     continue;
                 }
 
-                var result = await _client.ReceiveAsync();
+                var result = await client.ReceiveAsync();
                 var data = result.Buffer;
                 var readIndex = 0;
                 if (!data.ReadHead(ref readIndex, out var headInfo)
@@ -174,17 +181,23 @@ public class UdpSocketClient
                     continue;
                 }
 
-                _receivedBuffers.Writer.TryWrite(new SocketCommand(headInfo!, data));
+                receivedBuffers.TryWrite(new SocketCommand(headInfo!, data));
             }
             catch (SocketException ex)
             {
-                Logger.Error(ex.SocketErrorCode == SocketError.Interrupted
-                    ? $"{ServerMark} Udp 中断，停止接收数据。"
-                    : $"{ServerMark} 接收 Udp 数据异常：{ex.Message}");
+                if (IsRunning && ReferenceEquals(_client, client))
+                {
+                    Logger.Error(ex.SocketErrorCode == SocketError.Interrupted
+                        ? $"{ServerMark} Udp 中断，停止接收数据。"
+                        : $"{ServerMark} 接收 Udp 数据异常：{ex.Message}");
+                }
             }
             catch (Exception ex)
             {
-                Logger.Error($"接收 Udp 数据异常：{ex.Message}");
+                if (IsRunning && ReferenceEquals(_client, client))
+                {
+                    Logger.Error($"接收 Udp 数据异常：{ex.Message}");
+                }
             }
         }
     }
@@ -192,17 +205,30 @@ public class UdpSocketClient
     /// <summary>
     /// 检查消息通道。
     /// </summary>
-    private async Task CheckCommandMeAsync()
+    private async Task CheckCommandMeAsync(ChannelReader<SocketCommand> receivedBuffers)
     {
-        while (!IsRunning)
-        {
-            await Task.Delay(TimeSpan.FromMilliseconds(10));
-        }
-
-        await foreach (var message in _receivedBuffers.Reader.ReadAllAsync())
+        await foreach (var message in receivedBuffers.ReadAllAsync())
         {
             Received?.Invoke(this, message);
         }
+    }
+
+    private Channel<SocketCommand> ResetReceivedBuffers()
+    {
+        _receivedBuffers = Channel.CreateUnbounded<SocketCommand>();
+        return _receivedBuffers;
+    }
+
+    private void CompleteReceivedBuffers()
+    {
+        _receivedBuffers.Writer.TryComplete();
+    }
+
+    private void CloseClient()
+    {
+        var client = _client;
+        _client = null;
+        client?.Close();
     }
 
     private static IPAddress ResolveLocalAddress(string? endpoint)

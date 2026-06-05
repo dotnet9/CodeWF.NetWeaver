@@ -145,7 +145,7 @@ public partial class TcpSocketClient
             try
             {
                 var (success, buffer, headInfo) = await socket.ReadPacketAsync();
-                if (!success)
+                if (!success || buffer == null || headInfo == null)
                 {
                     await HandleServerReceiveStoppedAsync(socket, responses, fileTransferResponses, localEndPoint);
                     break;

@@ -1,26 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
   <title>CodeWF NetWeaver logo</title>
-  <desc>A simple woven network mark forming a memorable N and W shape.</desc>
-  <defs>
-    <linearGradient id="bg" x1="80" y1="40" x2="432" y2="472" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#111827"/>
-      <stop offset="1" stop-color="#0f172a"/>
-    </linearGradient>
-    <linearGradient id="weave" x1="104" y1="164" x2="408" y2="348" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#22d3ee"/>
-      <stop offset="0.52" stop-color="#38bdf8"/>
-      <stop offset="1" stop-color="#a3e635"/>
-    </linearGradient>
-  </defs>
-  <rect width="512" height="512" rx="104" fill="url(#bg)"/>
-  <path d="M126 348V164l130 184 130-184v184" fill="none" stroke="#e5f8ff" stroke-width="54" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M126 348V164l130 184 130-184v184" fill="none" stroke="url(#weave)" stroke-width="34" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M126 164l130 184 130-184" fill="none" stroke="#0f172a" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" opacity="0.42"/>
-  <g fill="#f8fafc" stroke="#0f172a" stroke-width="10">
-    <circle cx="126" cy="164" r="24"/>
-    <circle cx="126" cy="348" r="24"/>
-    <circle cx="256" cy="348" r="24"/>
-    <circle cx="386" cy="164" r="24"/>
-    <circle cx="386" cy="348" r="24"/>
-  </g>
+  <desc>A minimal socket port mark with two data contacts.</desc>
+  <rect width="512" height="512" rx="96" fill="#101820"/>
+  <rect x="88" y="158" width="336" height="216" rx="64" fill="#32d7c5"/>
+  <rect x="140" y="214" width="232" height="104" rx="32" fill="#101820"/>
+  <circle cx="204" cy="266" r="26" fill="#f8fafc"/>
+  <circle cx="308" cy="266" r="26" fill="#f8fafc"/>
 </svg>

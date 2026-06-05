@@ -173,6 +173,53 @@ public sealed class TcpSocketFileTransferTests : IAsyncLifetime
         }
     }
 
+    [Fact]
+    public async Task StopAsync_AllowsServerInstanceToRestart()
+    {
+        var port = GetFreePort();
+        var server = new TcpSocketServer();
+        var client = new TcpSocketClient();
+
+        var firstStart = await server.StartAsync("TestServer", IPAddress.Loopback.ToString(), port);
+        Assert.True(firstStart.IsSuccess, firstStart.ErrorMessage);
+        await server.StopAsync();
+
+        var secondStart = await server.StartAsync("TestServer", IPAddress.Loopback.ToString(), port);
+        Assert.True(secondStart.IsSuccess, secondStart.ErrorMessage);
+
+        try
+        {
+            var clientResult = await client.ConnectAsync("TestClient", IPAddress.Loopback.ToString(), port);
+            Assert.True(clientResult.IsSuccess, clientResult.ErrorMessage);
+
+            await WaitForConditionAsync(() => server.Clients.Count == 1);
+        }
+        finally
+        {
+            client.Stop();
+            await server.StopAsync();
+        }
+    }
+
+    [Fact]
+    public async Task UdpSocketClient_StopMarksStoppedAndAllowsReconnect()
+    {
+        var port = GetFreePort();
+        var client = new UdpSocketClient();
+
+        await client.ConnectAsync("UdpTestClient", UdpSocketServer.LoopbackIP, port, "127.0.0.1:50000", 1);
+        await WaitForConditionAsync(() => client.IsRunning);
+
+        Assert.True(client.Stop());
+        Assert.False(client.IsRunning);
+
+        await client.ConnectAsync("UdpTestClient", UdpSocketServer.LoopbackIP, port, "127.0.0.1:50000", 1);
+        await WaitForConditionAsync(() => client.IsRunning);
+
+        Assert.True(client.Stop());
+        Assert.False(client.IsRunning);
+    }
+
     private string CreateDirectory(string name)
     {
         var path = Path.Combine(_workspaceRoot, name);

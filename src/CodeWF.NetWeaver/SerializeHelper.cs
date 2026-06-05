@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Reflection;
 using System.Text;
@@ -54,7 +53,9 @@ public partial class SerializeHelper
     {
         if (ObjectPropertyInfos.TryGetValue(type, out var propertyInfos)) return propertyInfos;
 
-        propertyInfos = type.GetProperties();
+        propertyInfos = type.GetProperties()
+            .OrderBy(property => property.MetadataToken)
+            .ToArray();
         ObjectPropertyInfos[type] = propertyInfos;
         return propertyInfos;
     }
@@ -92,27 +93,23 @@ public partial class SerializeHelper
         isDictionary = false;
         genericArguments = Type.EmptyTypes;
 
-        // IsGenericType 用来判断当前类型是否是泛型类型。
-        // 例如 List<int> / Dictionary<string, int> 会返回 true，普通类和数组则返回 false。
-        if (!type.IsGenericType)
-        {
-            return false;
-        }
-
         // GetGenericTypeDefinition() 会把 List<int> 还原成 List<>，
         // 方便我们统一判断“它属于哪一类泛型容器”。
-        var genericTypeDefinition = type.GetGenericTypeDefinition();
-        if (IsListDefinition(genericTypeDefinition))
+        if (type.IsGenericType)
         {
-            genericArguments = type.GetGenericArguments();
-            return true;
-        }
+            var genericTypeDefinition = type.GetGenericTypeDefinition();
+            if (IsListDefinition(genericTypeDefinition))
+            {
+                genericArguments = type.GetGenericArguments();
+                return true;
+            }
 
-        if (IsDictionaryDefinition(genericTypeDefinition))
-        {
-            genericArguments = type.GetGenericArguments();
-            isDictionary = true;
-            return true;
+            if (IsDictionaryDefinition(genericTypeDefinition))
+            {
+                genericArguments = type.GetGenericArguments();
+                isDictionary = true;
+                return true;
+            }
         }
 
         // 有些属性声明的是自定义集合类型，本身未必就是 List<>/Dictionary<>，

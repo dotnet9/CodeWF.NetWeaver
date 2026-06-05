@@ -1,5 +1,4 @@
 using System;
-using System.Buffers;
 using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
@@ -15,14 +14,14 @@ public static partial class SerializeHelper
     public const int MaxUdpPacketSize = 65507;
 
     /// <summary>
+    /// TCP单包最大大小，避免异常或恶意长度字段导致过大内存分配
+    /// </summary>
+    public static int MaxTcpPacketSize { get; set; } = 64 * 1024 * 1024;
+
+    /// <summary>
     /// 网络数据包头部固定大小，头部固定字段数据类型大小(PacketSize + SystemId + ObjectId + ObjectVersion + UnixTimeMilliseconds)
     /// </summary>
     public const int PacketHeadLen = sizeof(int) + sizeof(long) + sizeof(ushort) + sizeof(byte) + sizeof(long);
-
-    /// <summary>
-    /// 数组、列表、字典等数据结构数据量字段大小：如Length、Count
-    /// </summary>
-    public const int ArrayOrDictionaryCountSize = 4;
 
     /// <summary>
     /// 从Socket异步读取指定数量的字节，确保读取到完整的字节数
@@ -58,44 +57,45 @@ public static partial class SerializeHelper
     /// </summary>
     /// <param name="socket">Socket对象</param>
     /// <param name="cancellationToken">取消令牌</param>
-    /// <returns>元组，包含是否成功读取数据包、读取的数据包和解析的网络头信息</returns>
-    public static async Task<(bool Success, byte[] Buffer, NetHeadInfo NetObject)> ReadPacketAsync(this Socket socket,
+    /// <returns>元组，包含是否成功读取数据包、读取的数据包和解析的网络头信息；失败时数据包和网络头信息不可用</returns>
+    public static async Task<(bool Success, byte[]? Buffer, NetHeadInfo? NetObject)> ReadPacketAsync(this Socket socket,
         CancellationToken cancellationToken = default)
     {
-        // 使用ArrayPool.Shared.Rent来减少内存分配
-        var lenBuffer = ArrayPool<byte>.Shared.Rent(4);
-        try
+        var lenBuffer = new byte[sizeof(int)];
+        if (!await socket.ReceiveExactAsync(lenBuffer, 0, lenBuffer.Length, cancellationToken))
         {
-            if (!await socket.ReceiveExactAsync(lenBuffer, 0, 4, cancellationToken))
-            {
-                return (false, Array.Empty<byte>(), new NetHeadInfo());
-            }
-
-            var bufferLen = BitConverter.ToInt32(lenBuffer.AsSpan(0, 4));
-            var buffer = ArrayPool<byte>.Shared.Rent(bufferLen);
-            try
-            {
-                lenBuffer.AsSpan(0, 4).CopyTo(buffer.AsSpan(0, 4));
-
-                if (!await socket.ReceiveExactAsync(buffer, 4, bufferLen - 4, cancellationToken))
-                {
-                    ArrayPool<byte>.Shared.Return(buffer);
-                    return (false, Array.Empty<byte>(), new NetHeadInfo());
-                }
-
-                var readIndex = 0;
-                var success = ReadHead(buffer, ref readIndex, out var netObject);
-                return (success, buffer, netObject!);
-            }
-            catch
-            {
-                ArrayPool<byte>.Shared.Return(buffer);
-                throw;
-            }
+            return ReadPacketFailed();
         }
-        finally
+
+        var bufferLen = BitConverter.ToInt32(lenBuffer.AsSpan(0, lenBuffer.Length));
+        if (!IsValidTcpPacketLength(bufferLen))
         {
-            ArrayPool<byte>.Shared.Return(lenBuffer);
+            return ReadPacketFailed();
         }
+
+        var buffer = new byte[bufferLen];
+        lenBuffer.CopyTo(buffer.AsSpan(0, lenBuffer.Length));
+        if (!await socket.ReceiveExactAsync(buffer, lenBuffer.Length, bufferLen - lenBuffer.Length,
+                cancellationToken))
+        {
+            return ReadPacketFailed();
+        }
+
+        var readIndex = 0;
+        var success = ReadHead(buffer, ref readIndex, out var netObject);
+        return success
+            ? (true, buffer, netObject)
+            : ReadPacketFailed();
+    }
+
+    private static bool IsValidTcpPacketLength(int bufferLen)
+    {
+        var maxPacketSize = Math.Max(MaxTcpPacketSize, PacketHeadLen);
+        return bufferLen >= PacketHeadLen && bufferLen <= maxPacketSize;
+    }
+
+    private static (bool Success, byte[]? Buffer, NetHeadInfo? NetObject) ReadPacketFailed()
+    {
+        return (false, null, null);
     }
 }

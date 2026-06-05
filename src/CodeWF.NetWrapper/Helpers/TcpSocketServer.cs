@@ -26,7 +26,7 @@ public partial class TcpSocketServer
     /// </summary>
     public readonly ConcurrentDictionary<string, TcpSession> Clients = new();
 
-    private readonly Channel<(string ClientKey, SocketCommand Command)> _requests =
+    private Channel<(string ClientKey, SocketCommand Command)> _requests =
         Channel.CreateUnbounded<(string, SocketCommand)>();
 
     private PeriodicTimer? _detectionTimer;
@@ -100,11 +100,12 @@ public partial class TcpSocketServer
             Logger.Info($"{ServerMark} 启动成功，服务地址是：{ServerIP}:{ServerPort}");
 
             _listenTokenSource = new CancellationTokenSource();
+            var (requests, fileTransferRequests) = ResetRequestChannels();
 
-            _ = Task.Run(ListenForClientsAsync);
-            _ = Task.Run(ProcessingRequestsAsync);
-            _ = Task.Run(ProcessingFileTransferRequestsAsync);
-            _ = Task.Run(DetectionClientsAsync);
+            _ = Task.Run(async () => await ListenForClientsAsync(_listenTokenSource, requests.Writer));
+            _ = Task.Run(async () => await ProcessingRequestsAsync(requests.Reader, fileTransferRequests.Writer));
+            _ = Task.Run(async () => await ProcessingFileTransferRequestsAsync(fileTransferRequests.Reader));
+            _ = Task.Run(async () => await DetectionClientsAsync(_listenTokenSource));
 
             return (IsSuccess: true, ErrorMessage: null);
         }
@@ -133,6 +134,9 @@ public partial class TcpSocketServer
             }
         }
 
+        CompleteRequestChannels();
+        _uploadContexts.Clear();
+        _downloadContexts.Clear();
         Server?.Close(0);
         Server = null;
         _listenTokenSource = null;
@@ -222,13 +226,16 @@ public partial class TcpSocketServer
     /// <summary>
     /// 监听客户端连接请求（内部方法）
     /// </summary>
-    private async Task ListenForClientsAsync()
+    private async Task ListenForClientsAsync(CancellationTokenSource listenTokenSource,
+        ChannelWriter<(string ClientKey, SocketCommand Command)> requests)
     {
-        while (IsRunning && _listenTokenSource?.IsCancellationRequested != true && Server != null)
+        var server = Server;
+        while (IsRunning && ReferenceEquals(_listenTokenSource, listenTokenSource) &&
+               !listenTokenSource.IsCancellationRequested && server != null)
         {
             try
             {
-                var socketClient = await Server.AcceptAsync();
+                var socketClient = await server.AcceptAsync();
                 var session = await CacheClientAsync(socketClient);
                 await EventBus.EventBus.Default.PublishAsync(new SocketClientChangedCommand(this));
 
@@ -236,11 +243,11 @@ public partial class TcpSocketServer
 
                 Logger.Info($"{ServerMark} 客户端({socketClientKey})连接上线");
 
-                _ = Task.Run(async () => await HandleClientAsync(session));
+                _ = Task.Run(async () => await HandleClientAsync(session, listenTokenSource, requests));
             }
             catch (Exception ex)
             {
-                if (IsRunning)
+                if (IsRunning && ReferenceEquals(_listenTokenSource, listenTokenSource))
                 {
                     Logger.Error($"{ServerMark} 处理客户端连接上线异常", ex, uiContent: $"{ServerMark} 处理客户端连接上线异常，详细信息请查看日志文件");
                 }
@@ -252,23 +259,25 @@ public partial class TcpSocketServer
     /// 处理客户端数据接收（内部方法）
     /// </summary>
     /// <param name="client">TCP 会话对象</param>
-    private async Task HandleClientAsync(TcpSession client)
+    private async Task HandleClientAsync(TcpSession client, CancellationTokenSource listenTokenSource,
+        ChannelWriter<(string ClientKey, SocketCommand Command)> requests)
     {
         var tcpClientKey = client.TcpSocket?.RemoteEndPoint?.ToString() ?? string.Empty;
-        while (IsRunning && _listenTokenSource?.IsCancellationRequested != true &&
+        while (IsRunning && ReferenceEquals(_listenTokenSource, listenTokenSource) &&
+               !listenTokenSource.IsCancellationRequested &&
                client.TokenSource?.IsCancellationRequested != true)
         {
             try
             {
                 var (success, buffer, headInfo) = await client.TcpSocket!.ReadPacketAsync();
-                if (!success)
+                if (!success || buffer == null || headInfo == null)
                 {
                     Logger.Warn($"{ServerMark} 客户端({tcpClientKey})连接已断开，将移除该客户端");
                     await RemoveClientAsync(tcpClientKey);
                     break;
                 }
 
-                await _requests.Writer.WriteAsync((tcpClientKey, new SocketCommand(headInfo!, buffer, client.TcpSocket)));
+                await requests.WriteAsync((tcpClientKey, new SocketCommand(headInfo, buffer, client.TcpSocket)));
             }
             catch (SocketException ex)
             {
@@ -292,9 +301,10 @@ public partial class TcpSocketServer
     /// <summary>
     /// 处理客户端请求（内部方法）
     /// </summary>
-    private async Task ProcessingRequestsAsync()
+    private async Task ProcessingRequestsAsync(ChannelReader<(string ClientKey, SocketCommand Command)> requests,
+        ChannelWriter<(string ClientKey, SocketCommand Command)> fileTransferRequests)
     {
-        await foreach (var (clientKey, command) in _requests.Reader.ReadAllAsync())
+        await foreach (var (clientKey, command) in requests.ReadAllAsync())
         {
             if (!Clients.TryGetValue(clientKey, out var client))
             {
@@ -314,7 +324,7 @@ public partial class TcpSocketServer
                     command.IsCommand<CreateDirectoryRequest>() ||
                     command.IsCommand<DeletePathRequest>())
                 {
-                    await _fileTransferRequests.Writer.WriteAsync((clientKey, command));
+                    await fileTransferRequests.WriteAsync((clientKey, command));
                 }
                 else
                 {
@@ -327,6 +337,20 @@ public partial class TcpSocketServer
                     uiContent: $"{ServerMark} 处理客户端请求异常，详细信息请查看日志文件");
             }
         }
+    }
+
+    private (Channel<(string ClientKey, SocketCommand Command)> Requests,
+        Channel<(string ClientKey, SocketCommand Command)> FileTransferRequests) ResetRequestChannels()
+    {
+        _requests = Channel.CreateUnbounded<(string, SocketCommand)>();
+        _fileTransferRequests = Channel.CreateUnbounded<(string, SocketCommand)>();
+        return (_requests, _fileTransferRequests);
+    }
+
+    private void CompleteRequestChannels()
+    {
+        _requests.Writer.TryComplete();
+        _fileTransferRequests.Writer.TryComplete();
     }
 
     /// <summary>
@@ -360,15 +384,16 @@ public partial class TcpSocketServer
     /// <summary>
     /// 定时检测客户端连接状态（内部方法）
     /// </summary>
-    private async Task DetectionClientsAsync()
+    private async Task DetectionClientsAsync(CancellationTokenSource listenTokenSource)
     {
-        if (_listenTokenSource == null)
+        if (!ReferenceEquals(_listenTokenSource, listenTokenSource))
             return;
 
         _detectionTimer = new PeriodicTimer(TimeSpan.FromSeconds(5));
         try
         {
-            while (await _detectionTimer.WaitForNextTickAsync(_listenTokenSource.Token))
+            while (ReferenceEquals(_listenTokenSource, listenTokenSource) &&
+                   await _detectionTimer.WaitForNextTickAsync(listenTokenSource.Token))
             {
                 var clientKeys = Clients.Keys;
                 foreach (var clientKey in clientKeys)

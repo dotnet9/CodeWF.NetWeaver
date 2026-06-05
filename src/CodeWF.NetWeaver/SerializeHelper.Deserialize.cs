@@ -173,31 +173,35 @@ public partial class SerializeHelper
     private static object DeserializeComplexValue(BinaryReader reader, Type propertyType)
     {
         var count = reader.ReadInt32();
-        // GetGenericArguments() 用来取出泛型参数。
-        // 例如 List<int> 得到 [int]，Dictionary<string, double> 得到 [string, double]。
-        var genericArguments = propertyType.GetGenericArguments();
-        var complexObj = CreateInstance(propertyType);
+        if (count < 0)
+        {
+            throw new InvalidDataException($"Collection count for {propertyType.FullName} cannot be negative.");
+        }
+
+        if (!TryGetCollectionMetadata(propertyType, out var genericArguments, out var isDictionary))
+        {
+            throw new InvalidOperationException($"Type {propertyType.FullName} is not a supported collection type.");
+        }
+
+        var complexObj = CreateCollectionInstance(propertyType, genericArguments, isDictionary);
 
         for (var i = 0; i < count; i++)
         {
             var key = DeserializeValue(reader, genericArguments[0]);
-            switch (genericArguments.Length)
+            if (!isDictionary)
             {
-                case 1:
-                    // 反序列化列表时，这里的 key 实际上就是列表项本身。
-                    (complexObj as IList)?.Add(key);
-                    break;
-                case 2:
+                // 反序列化列表时，这里的 key 实际上就是列表项本身。
+                (complexObj as IList)?.Add(key);
+            }
+            else
+            {
+                var value = DeserializeValue(reader, genericArguments[1]);
+                if (key == null)
                 {
-                    var value = DeserializeValue(reader, genericArguments[1]);
-                    if (key == null)
-                    {
-                        throw new InvalidDataException($"Dictionary key for {propertyType.FullName} cannot be null.");
-                    }
-
-                    (complexObj as IDictionary)?[key] = value;
-                    break;
+                    throw new InvalidDataException($"Dictionary key for {propertyType.FullName} cannot be null.");
                 }
+
+                (complexObj as IDictionary)?[key] = value;
             }
         }
 
@@ -213,6 +217,11 @@ public partial class SerializeHelper
     private static object? DeserializeArrayValue(BinaryReader reader, Type propertyType)
     {
         var length = reader.ReadInt32();
+        if (length < 0)
+        {
+            throw new InvalidDataException($"Array length for {propertyType.FullName} cannot be negative.");
+        }
+
         // GetElementType() 返回数组元素类型，例如 int[] 返回 int。
         var elementType = propertyType.GetElementType();
         if (elementType == null) return null;

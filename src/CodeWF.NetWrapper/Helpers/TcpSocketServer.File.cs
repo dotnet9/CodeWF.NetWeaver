@@ -17,7 +17,7 @@ namespace CodeWF.NetWrapper.Helpers;
 
 public partial class TcpSocketServer
 {
-    private readonly Channel<(string ClientKey, SocketCommand Command)> _fileTransferRequests =
+    private Channel<(string ClientKey, SocketCommand Command)> _fileTransferRequests =
         Channel.CreateUnbounded<(string, SocketCommand)>();
     private readonly ConcurrentDictionary<string, ServerUploadContext> _uploadContexts = new();
     private readonly ConcurrentDictionary<string, ServerDownloadContext> _downloadContexts = new();
@@ -36,9 +36,10 @@ public partial class TcpSocketServer
     /// <summary>
     /// 处理文件传输请求（内部方法，在独立线程中运行）
     /// </summary>
-    private async Task ProcessingFileTransferRequestsAsync()
+    private async Task ProcessingFileTransferRequestsAsync(
+        ChannelReader<(string ClientKey, SocketCommand Command)> fileTransferRequests)
     {
-        await foreach (var (clientKey, command) in _fileTransferRequests.Reader.ReadAllAsync())
+        await foreach (var (clientKey, command) in fileTransferRequests.ReadAllAsync())
         {
             if (!Clients.TryGetValue(clientKey, out var client))
             {

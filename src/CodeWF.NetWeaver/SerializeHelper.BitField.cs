@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using CodeWF.NetWeaver.Base;
 
@@ -28,9 +29,9 @@ public partial class SerializeHelper
     }
 
     /// <summary>
-    /// 缓存位字段属性信息的字典，键为类型名称，提高反射效率
+    /// 缓存位字段属性信息的字典，键为类型，提高反射效率
     /// </summary>
-    private static readonly ConcurrentDictionary<string, BitFieldPropertyInfo[]> BitFieldPropertiesCache = new();
+    private static readonly ConcurrentDictionary<Type, BitFieldPropertyInfo[]> BitFieldPropertiesCache = new();
 
     /// <summary>
     /// 获取指定类型的位字段属性信息列表，使用缓存提高效率
@@ -39,13 +40,14 @@ public partial class SerializeHelper
     /// <returns>位字段属性信息列表</returns>
     private static BitFieldPropertyInfo[] GetBitFieldProperties<T>()
     {
-        var typeName = typeof(T).Name;
-        if (BitFieldPropertiesCache.TryGetValue(typeName, out var cached))
+        var type = typeof(T);
+        if (BitFieldPropertiesCache.TryGetValue(type, out var cached))
         {
             return cached;
         }
 
-        var properties = typeof(T).GetProperties();
+        var properties = type.GetProperties()
+            .OrderBy(property => property.MetadataToken);
         var bitFieldProperties = new List<BitFieldPropertyInfo>();
 
         foreach (var property in properties)
@@ -63,8 +65,9 @@ public partial class SerializeHelper
             });
         }
 
-        BitFieldPropertiesCache[typeName] = bitFieldProperties.ToArray();
-        return bitFieldProperties.ToArray();
+        var result = bitFieldProperties.ToArray();
+        BitFieldPropertiesCache[type] = result;
+        return result;
     }
 
     /// <summary>
@@ -130,9 +133,22 @@ public partial class SerializeHelper
     /// <param name="size">位大小</param>
     private static void SetBitValue(ref byte[] buffer, int value, int offset, int size)
     {
-        var mask = (1 << size) - 1;
-        buffer[offset / 8] |= (byte)((value & mask) << (offset % 8));
-        if (offset % 8 + size > 8) buffer[offset / 8 + 1] |= (byte)((value & mask) >> (8 - offset % 8));
+        ValidateBitField(offset, size);
+
+        var rawValue = unchecked((uint)value);
+        var mask = size == sizeof(int) * 8 ? uint.MaxValue : (1u << size) - 1u;
+        rawValue &= mask;
+
+        for (var bitIndex = 0; bitIndex < size; bitIndex++)
+        {
+            if (((rawValue >> bitIndex) & 1u) == 0)
+            {
+                continue;
+            }
+
+            var targetBit = offset + bitIndex;
+            buffer[targetBit / 8] |= (byte)(1 << (targetBit % 8));
+        }
     }
 
     /// <summary>
@@ -145,10 +161,36 @@ public partial class SerializeHelper
     /// <returns>位字段值</returns>
     private static object GetValueFromBit(byte[] buffer, int offset, int size, Type propertyType)
     {
-        var mask = (1 << size) - 1;
-        var bitValue = (buffer[offset / 8] >> (offset % 8)) & mask;
-        if (offset % 8 + size > 8) bitValue |= (buffer[offset / 8 + 1] << (8 - offset % 8)) & mask;
+        ValidateBitField(offset, size);
+
+        uint bitValue = 0;
+        for (var bitIndex = 0; bitIndex < size; bitIndex++)
+        {
+            var sourceBit = offset + bitIndex;
+            if ((buffer[sourceBit / 8] & (1 << (sourceBit % 8))) != 0)
+            {
+                bitValue |= 1u << bitIndex;
+            }
+        }
+
+        if (propertyType.IsEnum)
+        {
+            return Enum.ToObject(propertyType, bitValue);
+        }
 
         return Convert.ChangeType(bitValue, propertyType);
+    }
+
+    private static void ValidateBitField(int offset, int size)
+    {
+        if (offset < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(offset), "Bit offset cannot be negative.");
+        }
+
+        if (size <= 0 || size > sizeof(int) * 8)
+        {
+            throw new ArgumentOutOfRangeException(nameof(size), "Bit field size must be between 1 and 32.");
+        }
     }
 }
