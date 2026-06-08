@@ -1,31 +1,40 @@
 <Project>
-	<PropertyGroup>
-		<BaseIntermediateOutputPath>$(MSBuildThisFileDirectory).vs\$(SolutionName)\Intermediate\$(MSBuildProjectName)\</BaseIntermediateOutputPath>
-		<OutputPath>$(MSBuildThisFileDirectory)Output\</OutputPath>
-		<AppendTargetFrameworkToOutputPath>true</AppendTargetFrameworkToOutputPath>
-		<Version>2.1.2.1</Version>
-		<Company>https://codewf.com</Company>
-		<Authors>CodeWF</Authors>
-		<Owners>https://codewf.com</Owners>
-		<Copyright>Copyright (c) https://codewf.com 2026</Copyright>
-		<RepositoryUrl>https://github.com/dotnet9/CodeWF.NetWeaver</RepositoryUrl>
-		<PackageProjectUrl>https://github.com/dotnet9/CodeWF.NetWeaver</PackageProjectUrl>
-		<RepositoryType>git</RepositoryType>
-		<PackageLicenseExpression>MIT</PackageLicenseExpression>
-		<PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
-		<PublishRepositoryUrl>true</PublishRepositoryUrl>
-		<ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
-		<CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
-		<PackageIcon Condition="'$(IsPackable)' == 'true' and '$(PackageIcon)' == ''">logo.png</PackageIcon>
-		<PackageReadmeFile Condition="'$(IsPackable)' == 'true' and '$(PackageReadmeFile)' == ''">README.md</PackageReadmeFile>
-	</PropertyGroup>
-
-	<PropertyGroup>
-		<IsTestSamplesProject>false</IsTestSamplesProject>
-		<IsTestSamplesProject Condition="$([System.String]::Copy('$(MSBuildProjectName)').EndsWith('.Tests'))">true</IsTestSamplesProject>
-		<IsTestSamplesProject Condition="$([System.String]::Copy('$(MSBuildProjectName)').EndsWith('.Test'))">true</IsTestSamplesProject>
-		<IsTestSamplesProject Condition="'$(MSBuildProjectName)' == 'CodeWF.NetWeaver.AOTTest'">true</IsTestSamplesProject>
-		<IsTestSamplesProject Condition="'$(MSBuildProjectName)' == 'SocketTest.Client'">true</IsTestSamplesProject>
-		<IsTestSamplesProject Condition="'$(MSBuildProjectName)' == 'SocketTest.Server'">true</IsTestSamplesProject>
-	</PropertyGroup>
+  <PropertyGroup>
+    <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
+    <DebugType>portable</DebugType>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <IncludeSymbols>true</IncludeSymbols>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <BaseIntermediateOutputPath>$(MSBuildThisFileDirectory).vs\$(SolutionName)\Intermediate\$(MSBuildProjectName)\</BaseIntermediateOutputPath>
+    <OutputPath>$(MSBuildThisFileDirectory)Output\</OutputPath>
+    <AppendTargetFrameworkToOutputPath>true</AppendTargetFrameworkToOutputPath>
+    <Version>2.1.2.3</Version>
+    <Company>https://codewf.com</Company>
+    <Authors>CodeWF</Authors>
+    <Owners>https://codewf.com</Owners>
+    <Copyright>Copyright (c) https://codewf.com 2026</Copyright>
+    <RepositoryUrl>https://github.com/dotnet9/CodeWF.NetWeaver</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/dotnet9/CodeWF.NetWeaver</PackageProjectUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+    <PackageIcon Condition="'$(IsPackable)' == 'true' and '$(PackageIcon)' == ''">logo.png</PackageIcon>
+    <PackageReadmeFile Condition="'$(IsPackable)' == 'true' and '$(PackageReadmeFile)' == ''">README.md</PackageReadmeFile>
+  </PropertyGroup>
+  <PropertyGroup>
+    <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
+    <DebugType>portable</DebugType>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <IncludeSymbols>true</IncludeSymbols>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <IsTestSamplesProject>false</IsTestSamplesProject>
+    <IsTestSamplesProject Condition="$([System.String]::Copy('$(MSBuildProjectName)').EndsWith('.Tests'))">true</IsTestSamplesProject>
+    <IsTestSamplesProject Condition="$([System.String]::Copy('$(MSBuildProjectName)').EndsWith('.Test'))">true</IsTestSamplesProject>
+    <IsTestSamplesProject Condition="'$(MSBuildProjectName)' == 'CodeWF.NetWeaver.AOTTest'">true</IsTestSamplesProject>
+    <IsTestSamplesProject Condition="'$(MSBuildProjectName)' == 'SocketTest.Client'">true</IsTestSamplesProject>
+    <IsTestSamplesProject Condition="'$(MSBuildProjectName)' == 'SocketTest.Server'">true</IsTestSamplesProject>
+  </PropertyGroup>
 </Project>

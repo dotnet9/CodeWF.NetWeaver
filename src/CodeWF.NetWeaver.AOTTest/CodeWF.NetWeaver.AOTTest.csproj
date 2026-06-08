@@ -1,23 +1,20 @@
 <Project Sdk="Microsoft.NET.Sdk">
-
-	<PropertyGroup>
-		<OutputType>Exe</OutputType>
-		<TargetFramework>net11.0</TargetFramework>
-		<ImplicitUsings>enable</ImplicitUsings>
-		<Nullable>enable</Nullable>
-		<PublishAot>true</PublishAot>
-		<InvariantGlobalization>true</InvariantGlobalization>
-		<Platforms>AnyCPU;x64</Platforms>
-		<IsTrimmable>true</IsTrimmable>
-		<PublishTrimmed>true</PublishTrimmed>
-	</PropertyGroup>
-
-	<ItemGroup>
-	  <PackageReference Include="CodeWF.Tools.Core" />
-	</ItemGroup>
-
-	<ItemGroup>
-		<ProjectReference Include="..\CodeWF.NetWeaver\CodeWF.NetWeaver.csproj" />
-	</ItemGroup>
-
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <ApplicationIcon>..\..\logo.ico</ApplicationIcon>
+    <TargetFramework>net11.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <PublishAot>true</PublishAot>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <Platforms>AnyCPU;x64</Platforms>
+    <IsTrimmable>true</IsTrimmable>
+    <PublishTrimmed>true</PublishTrimmed>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="CodeWF.Tools.Core" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\CodeWF.NetWeaver\CodeWF.NetWeaver.csproj" />
+  </ItemGroup>
 </Project>

@@ -5,6 +5,6 @@
              x:Class="SocketTest.Client.App">
     <Application.Styles>
         <semi:SemiTheme Locale="zh-CN" />
-        <codewf:CodeWFProDataGridTheme />
+        <codewf:DataGridSemiTheme />
     </Application.Styles>
 </Application>

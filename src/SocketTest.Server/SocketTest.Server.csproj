@@ -12,17 +12,14 @@
     <AssemblyTitle>SocketTest.Server</AssemblyTitle>
     <ApplicationIcon>..\..\logo.ico</ApplicationIcon>
   </PropertyGroup>
-
   <PropertyGroup Condition="$([MSBuild]::IsTargetFrameworkCompatible('$(TargetFramework)', 'net11.0-windows'))">
     <IsTrimmable>true</IsTrimmable>
     <PublishTrimmed>true</PublishTrimmed>
   </PropertyGroup>
-
   <ItemGroup>
     <AvaloniaResource Include="Assets\**" />
     <AvaloniaResource Include="..\..\logo.ico" Link="Assets\logo.ico" />
   </ItemGroup>
-
   <ItemGroup>
     <PackageReference Include="Avalonia" />
     <PackageReference Include="Avalonia.Desktop" />
@@ -36,7 +33,6 @@
     <PackageReference Include="CodeWF.Tools.Files" />
     <PackageReference Include="Prism.DryIoc.Avalonia" />
   </ItemGroup>
-
   <ItemGroup>
     <ProjectReference Include="..\SocketDto\SocketDto.csproj" />
   </ItemGroup>

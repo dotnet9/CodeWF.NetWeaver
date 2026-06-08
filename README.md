@@ -8,6 +8,13 @@
 
 `CodeWF.NetWrapper` 构建在它之上，提供 TCP/UDP 帮助类、命令分发，以及文件传输 / 文件管理能力。
 
+## 仓库规范
+
+- 当前版本：`2.1.2.3`，版本号统一维护在根目录 `Directory.Build.props` 的 `<Version>` 节点。
+- NuGet 包项目统一支持 `net8.0;net10.0`；Demo、App、测试与内部应用项目统一使用 `net11.0` / `net11.0-windows`。
+- 根目录 `logo.svg`、`logo.png`、`logo.ico` 是唯一图标源，子工程只通过 MSBuild `Link` 引用，不维护图标副本。
+- 运行时帮助、Markdown 示例、内置备忘录、设计说明等业务文档按功能保留；仓库级入口文档使用根目录 `README.md` 和 `UpdateLog.md`。
+
 ## 项目组成
 
 | 项目 | 说明 |
@@ -39,7 +46,7 @@ NuGet\Install-Package CodeWF.NetWeaver
 
 ## 仓库基线
 
-- 开发 SDK：`.NET 11` 预览版，通过 `global.json` 锁定
+- 开发 SDK：使用本机或 CI 环境安装的 .NET SDK，不再维护 `global.json`
 - 包管理方式：使用 `Directory.Packages.props` 统一做中央包管理
 - 核心类库：`CodeWF.NetWeaver` 与 `CodeWF.NetWrapper`
 - 示例 UI 技术栈：`Avalonia 12.0.3`、`Semi.Avalonia 12.0.1`、`ReactiveUI.Avalonia 12.0.1`

@@ -3,10 +3,8 @@
     <File Path="Directory.Build.props" />
     <File Path="Directory.Build.targets" />
     <File Path="Directory.Packages.props" />
-    <File Path="docs/CHANGELOG.md" />
-    <File Path="docs/CHANGELOG.Samples.md" />
+    <File Path="UpdateLog.md" />
     <File Path="docs/CodeWF-NetWeaver-Design-Principles.md" />
-    <File Path="global.json" />
     <File Path="pack.bat" />
     <File Path="publish_all.bat" />
     <File Path="publishbase.bat" />
