@@ -6,7 +6,10 @@ namespace SocketTest.Client.Shell.ViewModels;
 
 public sealed class ClientModuleTabsViewModel : ReactiveObject
 {
-    public ClientModuleTabsViewModel() => PublishSelectedTab();
+    public ClientModuleTabsViewModel()
+    {
+        PublishSelectedTab();
+    }
 
     public int SelectedTabIndex
     {

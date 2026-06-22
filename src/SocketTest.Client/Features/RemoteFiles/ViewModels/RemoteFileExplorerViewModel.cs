@@ -1,17 +1,4 @@
-﻿using CodeWF.EventBus;
-using CodeWF.Log.Core;
-using CodeWF.NetWrapper.Commands;
-using CodeWF.NetWrapper.Helpers;
-using CodeWF.NetWrapper.Models;
-using CodeWF.NetWrapper.Requests;
-using CodeWF.NetWrapper.Response;
-using ReactiveUI;
-using SocketTest.Client.Features.RemoteFiles.Models;
-using SocketTest.Client.Features.Transfers.Messages;
-using SocketTest.Client.Shell.Messages;
-using SocketTest.Client.Shell.Services;
-using Avalonia.Threading;
-using System;
+﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -19,38 +6,54 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Avalonia.Threading;
+using CodeWF.EventBus;
+using CodeWF.Log.Core;
+using CodeWF.NetWeaver.Base;
+using CodeWF.NetWrapper.Commands;
+using CodeWF.NetWrapper.Helpers;
+using CodeWF.NetWrapper.Requests;
+using CodeWF.NetWrapper.Response;
+using ReactiveUI;
+using SocketTest.Client.Features.RemoteFiles.Models;
+using SocketTest.Client.Features.Transfers.Messages;
+using SocketTest.Client.Shell.Messages;
+using SocketTest.Client.Shell.Services;
 
 namespace SocketTest.Client.Features.RemoteFiles.ViewModels;
 
 public class RemoteFileExplorerViewModel : ReactiveObject
 {
     private readonly ClientApplicationStateService _appState;
-    private readonly TcpSocketClient _tcpHelper;
-    private readonly ConcurrentDictionary<int, PendingBrowseRequest> _pendingBrowseRequests = new();
-    private readonly ConcurrentDictionary<int, TaskCompletionSource<CreateDirectoryResponse>> _pendingCreateRequests = new();
-    private readonly ConcurrentDictionary<int, TaskCompletionSource<DeletePathResponse>> _pendingDeleteRequests = new();
     private readonly List<RemoteFileEntry> _currentDirectoryItems = [];
+    private readonly ConcurrentDictionary<int, PendingBrowseRequest> _pendingBrowseRequests = new();
+
+    private readonly ConcurrentDictionary<int, TaskCompletionSource<CreateDirectoryResponse>> _pendingCreateRequests =
+        new();
+
+    private readonly ConcurrentDictionary<int, TaskCompletionSource<DeletePathResponse>> _pendingDeleteRequests = new();
     private readonly List<RemoteFileEntry> _searchResults = [];
-    private string _currentDirectoryPath = "/";
-    private string _searchKeyword = string.Empty;
-    private bool _searchRecursive = true;
-    private bool _isListView = true;
-    private bool _isBusy;
-    private bool _isSearchMode;
-    private string _statusMessage = "请先连接到服务端。";
-    private int _currentSearchPage = 1;
-    private int _searchPageSize = 40;
-    private bool _isCreateDialogOpen;
-    private string _pendingDirectoryName = "新建文件夹";
+    private readonly TcpSocketClient _tcpHelper;
     private string _createDialogHint = string.Empty;
     private string _createDirectoryBasePath = "/";
-    private bool _isDeleteDialogOpen;
+    private string _currentDirectoryPath = "/";
+    private int _currentSearchPage = 1;
     private string _deleteDialogMessage = string.Empty;
-    private RemoteFileEntry? _selectedEntry;
+    private bool _isBusy;
+    private bool _isCreateDialogOpen;
+    private bool _isDeleteDialogOpen;
+    private bool _isListView = true;
+    private bool _isSearchMode;
     private RemoteFileEntry? _pendingDeleteEntry;
-    private RemoteDirectoryNode? _selectedNode;
-    private CancellationTokenSource? _searchCancellationTokenSource;
+    private string _pendingDirectoryName = "新建文件夹";
     private bool _rootDisplaysDriveList = true;
+    private CancellationTokenSource? _searchCancellationTokenSource;
+    private string _searchKeyword = string.Empty;
+    private int _searchPageSize = 40;
+    private bool _searchRecursive = true;
+    private RemoteFileEntry? _selectedEntry;
+    private RemoteDirectoryNode? _selectedNode;
+    private string _statusMessage = "请先连接到服务端。";
 
     public RemoteFileExplorerViewModel(TcpSocketClient tcpHelper, ClientApplicationStateService appState)
     {
@@ -240,7 +243,7 @@ public class RemoteFileExplorerViewModel : ReactiveObject
     public void CancelDeleteCommand() => CancelDeleteDialog();
 
     /// <summary>
-    /// 连接断开时统一清理待完成请求和当前界面状态，连接建立后的初始化由启动完成事件触发。
+    ///     连接断开时统一清理待完成请求和当前界面状态，连接建立后的初始化由启动完成事件触发。
     /// </summary>
     public async Task HandleConnectionStateChangedAsync(bool isConnected)
     {
@@ -251,7 +254,7 @@ public class RemoteFileExplorerViewModel : ReactiveObject
     }
 
     /// <summary>
-    /// 初始化远程文件浏览器，并确保首次展示的根目录和目录树来源一致。
+    ///     初始化远程文件浏览器，并确保首次展示的根目录和目录树来源一致。
     /// </summary>
     public async Task InitializeExplorerAsync()
     {
@@ -349,14 +352,16 @@ public class RemoteFileExplorerViewModel : ReactiveObject
             return;
         }
 
-        var transfers = files.Select(file => (file, CombineRemotePath(remoteDirectory, Path.GetFileName(file)))).ToList();
+        var transfers = files.Select(file => (file, CombineRemotePath(remoteDirectory, Path.GetFileName(file))))
+            .ToList();
         await PublishUploadTasksAsync(transfers);
         StatusMessage = $"已加入 {transfers.Count} 个上传任务。";
     }
 
     public void ShowCreateDirectoryDialogFor(RemoteFileEntry? entry) => ShowCreateDirectoryDialog(entry);
 
-    public void ShowCreateDirectoryDialogForNode(RemoteDirectoryNode? node) => ShowCreateDirectoryDialog(ToEntryOrNull(node));
+    public void ShowCreateDirectoryDialogForNode(RemoteDirectoryNode? node) =>
+        ShowCreateDirectoryDialog(ToEntryOrNull(node));
 
     public void ShowDeleteDialogFor(RemoteFileEntry? entry) => ShowDeleteDialog(entry);
 
@@ -377,7 +382,8 @@ public class RemoteFileExplorerViewModel : ReactiveObject
             return;
         }
 
-        var folderName = Path.GetFileName(localFolderPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+        var folderName =
+            Path.GetFileName(localFolderPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
         var remoteRootPath = CombineRemotePath(remoteDirectory, folderName);
 
         try
@@ -593,7 +599,7 @@ public class RemoteFileExplorerViewModel : ReactiveObject
     }
 
     /// <summary>
-    /// 统一分发文件浏览相关响应，保证分页目录查询与创建/删除确认都走同一条日志链路。
+    ///     统一分发文件浏览相关响应，保证分页目录查询与创建/删除确认都走同一条日志链路。
     /// </summary>
     [EventHandler]
     public void ReceivedSocketCommand(SocketCommand message)
@@ -820,13 +826,15 @@ public class RemoteFileExplorerViewModel : ReactiveObject
     }
 
     /// <summary>
-    /// 发送目录浏览请求，并在分页响应全部到齐后再返回聚合后的目录项。
+    ///     发送目录浏览请求，并在分页响应全部到齐后再返回聚合后的目录项。
     /// </summary>
-    private async Task<List<RemoteFileEntry>> BrowseDirectoryAsync(string directoryPath, CancellationToken cancellationToken = default)
+    private async Task<List<RemoteFileEntry>> BrowseDirectoryAsync(string directoryPath,
+        CancellationToken cancellationToken = default)
     {
         var normalizedRequestPath = PathsEqual(directoryPath, "/") ? string.Empty : directoryPath;
         var taskId = NetHelper.GetTaskId();
-        var completionSource = new TaskCompletionSource<List<RemoteFileEntry>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var completionSource =
+            new TaskCompletionSource<List<RemoteFileEntry>>(TaskCreationOptions.RunContinuationsAsynchronously);
         var request = new PendingBrowseRequest(directoryPath, completionSource);
         _pendingBrowseRequests[taskId] = request;
 
@@ -848,7 +856,7 @@ public class RemoteFileExplorerViewModel : ReactiveObject
     }
 
     /// <summary>
-    /// 发送创建目录请求，并把返回结果统一转换为成功值或异常。
+    ///     发送创建目录请求，并把返回结果统一转换为成功值或异常。
     /// </summary>
     private async Task CreateDirectoryRequestAsync(string directoryPath)
     {
@@ -867,7 +875,7 @@ public class RemoteFileExplorerViewModel : ReactiveObject
     }
 
     /// <summary>
-    /// 发送删除路径请求，并复用统一的请求-应答桥接逻辑处理最终确认对象。
+    ///     发送删除路径请求，并复用统一的请求-应答桥接逻辑处理最终确认对象。
     /// </summary>
     private async Task DeletePathRequestAsync(string filePath, bool isDirectory)
     {
@@ -886,7 +894,8 @@ public class RemoteFileExplorerViewModel : ReactiveObject
         }
     }
 
-    private async Task<RemoteDirectoryNode?> EnsureNodeForPathAsync(string directoryPath, IReadOnlyCollection<RemoteFileEntry>? currentItems = null)
+    private async Task<RemoteDirectoryNode?> EnsureNodeForPathAsync(string directoryPath,
+        IReadOnlyCollection<RemoteFileEntry>? currentItems = null)
     {
         var normalizedPath = NormalizeDirectoryInput(directoryPath);
         var rootNode = await EnsureRootNodeLoadedAsync(PathsEqual(normalizedPath, "/") ? currentItems : null);
@@ -930,7 +939,8 @@ public class RemoteFileExplorerViewModel : ReactiveObject
         return currentNode;
     }
 
-    private async Task<RemoteDirectoryNode> EnsureRootNodeLoadedAsync(IReadOnlyCollection<RemoteFileEntry>? rootItems = null)
+    private async Task<RemoteDirectoryNode> EnsureRootNodeLoadedAsync(
+        IReadOnlyCollection<RemoteFileEntry>? rootItems = null)
     {
         var rootNode = GetOrCreateRootNode();
         if (rootNode.ChildrenLoaded)
@@ -982,7 +992,8 @@ public class RemoteFileExplorerViewModel : ReactiveObject
 
         if (PathsEqual(directoryPath, "/"))
         {
-            _rootDisplaysDriveList = _currentDirectoryItems.Count > 0 && _currentDirectoryItems.All(item => item.IsDrive);
+            _rootDisplaysDriveList =
+                _currentDirectoryItems.Count > 0 && _currentDirectoryItems.All(item => item.IsDrive);
         }
 
         SelectedEntry = null;
@@ -992,7 +1003,8 @@ public class RemoteFileExplorerViewModel : ReactiveObject
     private void PopulateNodeChildren(RemoteDirectoryNode node, IEnumerable<RemoteFileEntry> items)
     {
         node.Children.Clear();
-        foreach (var child in items.Where(item => item.IsDirectory).OrderBy(item => item.Name, StringComparer.OrdinalIgnoreCase))
+        foreach (var child in items.Where(item => item.IsDirectory)
+                     .OrderBy(item => item.Name, StringComparer.OrdinalIgnoreCase))
         {
             node.Children.Add(CreateNode(child));
         }
@@ -1149,7 +1161,8 @@ public class RemoteFileExplorerViewModel : ReactiveObject
     }
 
     private static bool PathsEqual(string left, string right) =>
-        string.Equals(NormalizeComparisonPath(left), NormalizeComparisonPath(right), StringComparison.OrdinalIgnoreCase);
+        string.Equals(NormalizeComparisonPath(left), NormalizeComparisonPath(right),
+            StringComparison.OrdinalIgnoreCase);
 
     private static string NormalizeComparisonPath(string path)
     {
@@ -1368,7 +1381,7 @@ public class RemoteFileExplorerViewModel : ReactiveObject
     }
 
     /// <summary>
-    /// 为一次 TCP 请求建立 TaskCompletionSource，把“异步发送 + 后续响应”桥接成可 await 的任务。
+    ///     为一次 TCP 请求建立 TaskCompletionSource，把“异步发送 + 后续响应”桥接成可 await 的任务。
     /// </summary>
     private async Task<TResponse> SendRequestAsync<TResponse>(
         ConcurrentDictionary<int, TaskCompletionSource<TResponse>> pendingRequests,
@@ -1382,7 +1395,7 @@ public class RemoteFileExplorerViewModel : ReactiveObject
         return await completionSource.Task;
     }
 
-    private async Task SendTcpRequestAsync(CodeWF.NetWeaver.Base.INetObject request)
+    private async Task SendTcpRequestAsync(INetObject request)
     {
         Logger.Info($"客户端 -> 服务端 文件 TCP：{request}");
         await _tcpHelper.SendCommandAsync(request);

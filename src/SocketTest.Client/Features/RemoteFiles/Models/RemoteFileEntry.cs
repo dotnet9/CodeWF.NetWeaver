@@ -1,5 +1,5 @@
-using ReactiveUI;
 using System;
+using ReactiveUI;
 
 namespace SocketTest.Client.Features.RemoteFiles.Models;
 
@@ -17,7 +17,11 @@ public class RemoteFileEntry : ReactiveObject
 
     public DateTime LastModifiedTime { get; init; }
 
-    public bool IsSelected { get; set => this.RaiseAndSetIfChanged(ref field, value); }
+    public bool IsSelected
+    {
+        get;
+        set => this.RaiseAndSetIfChanged(ref field, value);
+    }
 
     public string EntryTypeText => IsDrive ? "磁盘" : IsDirectory ? "文件夹" : "文件";
 

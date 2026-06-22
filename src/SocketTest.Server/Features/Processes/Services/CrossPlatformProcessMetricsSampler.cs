@@ -4,7 +4,7 @@ using System.Diagnostics;
 namespace SocketTest.Server.Features.Processes.Services;
 
 /// <summary>
-/// 默认跨平台采样器。优先保证 Windows/Linux/mac 可运行，细粒度指标后续可按平台增强。
+///     默认跨平台采样器。优先保证 Windows/Linux/mac 可运行，细粒度指标后续可按平台增强。
 /// </summary>
 internal sealed class CrossPlatformProcessMetricsSampler : IProcessMetricsSampler
 {

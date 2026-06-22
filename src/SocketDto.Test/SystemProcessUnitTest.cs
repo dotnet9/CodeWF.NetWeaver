@@ -1,15 +1,11 @@
 using CodeWF.NetWeaver;
 using CodeWF.NetWeaver.Base;
-using System.Text;
-using System.Text.Json;
 using Xunit.Abstractions;
 
 namespace SocketDto.Test;
 
 public class SystemProcessUnitTest
 {
-    private readonly ITestOutputHelper _testOutputHelper;
-
     /// <summary>
     ///     Œ¥”≈ªØ
     /// </summary>
@@ -75,6 +71,8 @@ public class SystemProcessUnitTest
             Status = 1
         }
     };
+
+    private readonly ITestOutputHelper _testOutputHelper;
 
     public SystemProcessUnitTest(ITestOutputHelper testOutputHelper)
     {

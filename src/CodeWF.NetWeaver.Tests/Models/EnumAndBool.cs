@@ -1,4 +1,5 @@
 ﻿namespace CodeWF.NetWeaver.Tests.Models;
+
 public class EnumAndBool
 {
     public string Name { get; set; } = string.Empty;

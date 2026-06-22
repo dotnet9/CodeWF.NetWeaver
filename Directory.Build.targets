@@ -1,14 +1,16 @@
 <Project>
-	<PropertyGroup Condition="'$(IsPackable)' == 'true'">
-		<GeneratePackageOnBuild Condition="'$(GeneratePackageOnBuild)' == ''">true</GeneratePackageOnBuild>
-	</PropertyGroup>
+    <PropertyGroup Condition="'$(IsPackable)' == 'true'">
+        <GeneratePackageOnBuild Condition="'$(GeneratePackageOnBuild)' == ''">true</GeneratePackageOnBuild>
+    </PropertyGroup>
 
-	<ItemGroup Condition="'$(IsPackable)' == 'true' and '$(PackageReadmeFile)' == 'README.md'">
-		<None Include="$(MSBuildThisFileDirectory)README.md" Pack="true" PackagePath="" Link="README.md" Visible="false" />
-		<None Include="$(MSBuildThisFileDirectory)UpdateLog.md" Pack="true" PackagePath="" Link="UpdateLog.md" Visible="false" Condition="Exists('$(MSBuildThisFileDirectory)UpdateLog.md')" />
-	</ItemGroup>
+    <ItemGroup Condition="'$(IsPackable)' == 'true' and '$(PackageReadmeFile)' == 'README.md'">
+        <None Include="$(MSBuildThisFileDirectory)README.md" Pack="true" PackagePath="" Link="README.md"
+              Visible="false" />
+        <None Include="$(MSBuildThisFileDirectory)UpdateLog.md" Pack="true" PackagePath="" Link="UpdateLog.md"
+              Visible="false" Condition="Exists('$(MSBuildThisFileDirectory)UpdateLog.md')" />
+    </ItemGroup>
 
-	<ItemGroup Condition="'$(IsPackable)' == 'true' and '$(PackageIcon)' == 'logo.png'">
-		<None Include="$(MSBuildThisFileDirectory)logo.png" Pack="true" PackagePath="" Link="logo.png" Visible="false" />
-	</ItemGroup>
+    <ItemGroup Condition="'$(IsPackable)' == 'true' and '$(PackageIcon)' == 'logo.png'">
+        <None Include="$(MSBuildThisFileDirectory)logo.png" Pack="true" PackagePath="" Link="logo.png" Visible="false" />
+    </ItemGroup>
 </Project>

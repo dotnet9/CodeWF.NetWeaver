@@ -12,11 +12,23 @@ public sealed class ClientStatusBarViewModel : ReactiveObject
         ApplySelectedTab(0);
     }
 
-    public bool IsProcessMonitorTabSelected { get; private set => this.RaiseAndSetIfChanged(ref field, value); }
+    public bool IsProcessMonitorTabSelected
+    {
+        get;
+        private set => this.RaiseAndSetIfChanged(ref field, value);
+    }
 
-    public bool IsRemoteFileExplorerTabSelected { get; private set => this.RaiseAndSetIfChanged(ref field, value); }
+    public bool IsRemoteFileExplorerTabSelected
+    {
+        get;
+        private set => this.RaiseAndSetIfChanged(ref field, value);
+    }
 
-    public bool IsFileTransferTabSelected { get; private set => this.RaiseAndSetIfChanged(ref field, value); }
+    public bool IsFileTransferTabSelected
+    {
+        get;
+        private set => this.RaiseAndSetIfChanged(ref field, value);
+    }
 
     [EventHandler]
     private void ReceiveClientShellTabChanged(ClientShellTabChangedMessage message) =>

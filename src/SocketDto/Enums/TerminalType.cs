@@ -1,7 +1,7 @@
 ﻿namespace SocketDto.Enums;
 
 /// <summary>
-/// 终端类型
+///     终端类型
 /// </summary>
 public enum TerminalType
 {

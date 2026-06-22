@@ -24,7 +24,7 @@ public class NumberFormatUnitTest
     }
 
 
-    string NumberToString(int number)
+    private string NumberToString(int number)
     {
         if (Math.Abs(number) > Max)
         {
@@ -34,7 +34,7 @@ public class NumberFormatUnitTest
         return $"{number}";
     }
 
-    string NumberToString(double number)
+    private string NumberToString(double number)
     {
         if (number != 0.0 && (Math.Abs(number) > Max || Math.Abs(number) < Min))
         {

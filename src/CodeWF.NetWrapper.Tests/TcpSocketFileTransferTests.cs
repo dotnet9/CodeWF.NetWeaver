@@ -8,7 +8,8 @@ namespace CodeWF.NetWrapper.Tests;
 
 public sealed class TcpSocketFileTransferTests : IAsyncLifetime
 {
-    private readonly string _workspaceRoot = Path.Combine(Path.GetTempPath(), "CodeWF.NetWrapper.Tests", Guid.NewGuid().ToString("N"));
+    private readonly string _workspaceRoot =
+        Path.Combine(Path.GetTempPath(), "CodeWF.NetWrapper.Tests", Guid.NewGuid().ToString("N"));
 
     public Task InitializeAsync()
     {
@@ -40,7 +41,7 @@ public sealed class TcpSocketFileTransferTests : IAsyncLifetime
         await harness.Client.UploadFileAsync(localFile, serverFile);
 
         await WaitForConditionAsync(() => File.Exists(serverFile) &&
-                                         new FileInfo(serverFile).Length == new FileInfo(localFile).Length);
+                                          new FileInfo(serverFile).Length == new FileInfo(localFile).Length);
 
         Assert.Equal(await ComputeHashAsync(localFile), await ComputeHashAsync(serverFile));
     }
@@ -60,7 +61,7 @@ public sealed class TcpSocketFileTransferTests : IAsyncLifetime
 
         var localFile = Path.Combine(localRoot, "server.bin");
         await WaitForConditionAsync(() => File.Exists(localFile) &&
-                                         new FileInfo(localFile).Length == new FileInfo(serverFile).Length);
+                                          new FileInfo(localFile).Length == new FileInfo(serverFile).Length);
 
         Assert.Equal(await ComputeHashAsync(serverFile), await ComputeHashAsync(localFile));
     }

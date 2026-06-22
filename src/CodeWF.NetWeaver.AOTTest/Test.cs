@@ -1,5 +1,5 @@
-using CodeWF.NetWeaver.AOTTest.Dto;
 using System.Collections;
+using CodeWF.NetWeaver.AOTTest.Dto;
 using CodeWF.NetWeaver.AOTTest.Models;
 using CodeWF.Tools.Extensions;
 
@@ -16,7 +16,7 @@ public static class Test
             PageSize = 3,
             PageCount = 67,
             PageIndex = 1,
-            Records = new List<double>() { 2.0, 1.0, 3.0 },
+            Records = new List<double> { 2.0, 1.0, 3.0 },
             Processes = new List<ProcessItem>()
         };
 
@@ -128,7 +128,7 @@ public static class Test
     {
         try
         {
-            var dict = new Dictionary<int, int>() { { 1, 2 }, { 3, 4 }, { 5, 6 }, { 7, 8 } };
+            var dict = new Dictionary<int, int> { { 1, 2 }, { 3, 4 }, { 5, 6 }, { 7, 8 } };
             var type = typeof(Dictionary<int, int>);
 
             Console.WriteLine($"直接获取Dictionary长度：{dict.Count}");
@@ -159,7 +159,7 @@ public static class Test
     {
         try
         {
-            var dict = new Dictionary<string, double>() { { "1", 2 }, { "3", 4 }, { "5", 6 }, { "7", 8 } };
+            var dict = new Dictionary<string, double> { { "1", 2 }, { "3", 4 }, { "5", 6 }, { "7", 8 } };
             var type = typeof(Dictionary<string, double>);
 
             Console.WriteLine($"直接获取Dictionary长度：{dict.Count}");
@@ -189,14 +189,14 @@ public static class Test
     {
         try
         {
-            var person = new PersonDto()
+            var person = new PersonDto
             {
                 Name = "NetWeaver",
                 Tags = [1, 2, 3],
                 Addresses = ["四川", "成都"],
-                Projects = [new Project() { Id = 1, Name = "Math" }, new Project() { Id = 2, Name = "Chinese" }],
-                Records = new() { { 1, 98 }, { 2, 99 } },
-                Course = new() { { "Math", 98.5 }, { "Chinese", 99.5 } }
+                Projects = [new Project { Id = 1, Name = "Math" }, new Project { Id = 2, Name = "Chinese" }],
+                Records = new Dictionary<int, int> { { 1, 98 }, { 2, 99 } },
+                Course = new Dictionary<string, double> { { "Math", 98.5 }, { "Chinese", 99.5 } }
             };
             var buffer = person.SerializeObject();
             var newPerson = buffer.DeserializeObject(typeof(PersonDto)) as PersonDto;

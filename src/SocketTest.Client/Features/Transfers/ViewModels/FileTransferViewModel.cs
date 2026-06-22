@@ -1,3 +1,12 @@
+using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Collections.Specialized;
+using System.ComponentModel;
+using System.IO;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using Avalonia.Threading;
 using CodeWF.EventBus;
 using CodeWF.Log.Core;
@@ -7,14 +16,6 @@ using ReactiveUI;
 using SocketTest.Client.Features.Transfers.Messages;
 using SocketTest.Client.Features.Transfers.Models;
 using SocketTest.Client.Shell.Services;
-using System;
-using System.Collections.ObjectModel;
-using System.Collections.Specialized;
-using System.ComponentModel;
-using System.IO;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 using Timer = System.Timers.Timer;
 
 namespace SocketTest.Client.Features.Transfers.ViewModels;
@@ -23,11 +24,11 @@ public class FileTransferViewModel : ReactiveObject
 {
     private readonly ClientApplicationStateService _appState;
     private readonly Timer _updateTimer;
-    private DateTime _lastUpdateTime = DateTime.Now;
-    private long _lastTotalBytesTransferred;
-    private bool _isProcessingQueue;
-    private FileTransferItem? _activeTransfer;
     private TaskCompletionSource<FileTransferOutcomeEventArgs>? _activeCompletionSource;
+    private FileTransferItem? _activeTransfer;
+    private bool _isProcessingQueue;
+    private long _lastTotalBytesTransferred;
+    private DateTime _lastUpdateTime = DateTime.Now;
 
     public FileTransferViewModel(TcpSocketClient tcpHelper, ClientApplicationStateService appState)
     {
@@ -71,14 +72,18 @@ public class FileTransferViewModel : ReactiveObject
         }
     } = "0 B/s";
 
-    public string QueueSummary { get; private set => this.RaiseAndSetIfChanged(ref field, value); } = "暂无传输任务";
+    public string QueueSummary
+    {
+        get;
+        private set => this.RaiseAndSetIfChanged(ref field, value);
+    } = "暂无传输任务";
 
     public int SelectedCount => FileTransferList.Count(item => item.IsSelected);
 
     public void EnqueueUploads(params (string LocalPath, string RemotePath)[] uploads) =>
-        EnqueueUploads((System.Collections.Generic.IEnumerable<(string LocalPath, string RemotePath)>)uploads);
+        EnqueueUploads((IEnumerable<(string LocalPath, string RemotePath)>)uploads);
 
-    public void EnqueueUploads(System.Collections.Generic.IEnumerable<(string LocalPath, string RemotePath)> uploads)
+    public void EnqueueUploads(IEnumerable<(string LocalPath, string RemotePath)> uploads)
     {
         foreach (var (localPath, remotePath) in uploads)
         {
@@ -99,9 +104,9 @@ public class FileTransferViewModel : ReactiveObject
     }
 
     public void EnqueueDownloads(params (string RemotePath, string LocalPath)[] downloads) =>
-        EnqueueDownloads((System.Collections.Generic.IEnumerable<(string RemotePath, string LocalPath)>)downloads);
+        EnqueueDownloads((IEnumerable<(string RemotePath, string LocalPath)>)downloads);
 
-    public void EnqueueDownloads(System.Collections.Generic.IEnumerable<(string RemotePath, string LocalPath)> downloads)
+    public void EnqueueDownloads(IEnumerable<(string RemotePath, string LocalPath)> downloads)
     {
         foreach (var (remotePath, localPath) in downloads)
         {
@@ -147,7 +152,8 @@ public class FileTransferViewModel : ReactiveObject
 
     public void ClearCompletedTransfers()
     {
-        foreach (var item in FileTransferList.Where(x => x.State is FileTransferState.Completed or FileTransferState.Failed).ToList())
+        foreach (var item in FileTransferList
+                     .Where(x => x.State is FileTransferState.Completed or FileTransferState.Failed).ToList())
         {
             if (item.State == FileTransferState.Running)
             {
@@ -245,7 +251,7 @@ public class FileTransferViewModel : ReactiveObject
     }
 
     /// <summary>
-    /// 串行消费传输队列，保证同一时刻只有一个文件占用底层 TCP 文件传输会话。
+    ///     串行消费传输队列，保证同一时刻只有一个文件占用底层 TCP 文件传输会话。
     /// </summary>
     private async Task ProcessQueueAsync()
     {
@@ -266,19 +272,23 @@ public class FileTransferViewModel : ReactiveObject
                 }
 
                 _activeTransfer = nextTransfer;
-                _activeCompletionSource = new TaskCompletionSource<FileTransferOutcomeEventArgs>(TaskCreationOptions.RunContinuationsAsynchronously);
+                _activeCompletionSource =
+                    new TaskCompletionSource<FileTransferOutcomeEventArgs>(TaskCreationOptions
+                        .RunContinuationsAsynchronously);
 
                 nextTransfer.CancellationSource?.Dispose();
                 nextTransfer.CancellationSource = new CancellationTokenSource();
                 nextTransfer.MarkRunning(nextTransfer.Direction == FileTransferDirection.Upload ? "正在上传" : "正在下载");
-                Logger.Info($"传输队列开始：{DescribeTransferDirection(nextTransfer.Direction)} {nextTransfer.SourcePath} -> {nextTransfer.DestinationPath}");
+                Logger.Info(
+                    $"传输队列开始：{DescribeTransferDirection(nextTransfer.Direction)} {nextTransfer.SourcePath} -> {nextTransfer.DestinationPath}");
                 UpdateDashboard();
 
                 try
                 {
                     if (nextTransfer.Direction == FileTransferDirection.Upload)
                     {
-                        await TcpHelper.UploadFileAsync(nextTransfer.SourcePath, nextTransfer.DestinationPath, nextTransfer.CancellationSource.Token);
+                        await TcpHelper.UploadFileAsync(nextTransfer.SourcePath, nextTransfer.DestinationPath,
+                            nextTransfer.CancellationSource.Token);
                     }
                     else
                     {
@@ -289,7 +299,8 @@ public class FileTransferViewModel : ReactiveObject
                         }
 
                         Directory.CreateDirectory(localDirectory);
-                        await TcpHelper.DownloadFileAsync(nextTransfer.SourcePath, localDirectory, nextTransfer.CancellationSource.Token);
+                        await TcpHelper.DownloadFileAsync(nextTransfer.SourcePath, localDirectory,
+                            nextTransfer.CancellationSource.Token);
                     }
 
                     var outcome = await _activeCompletionSource.Task.WaitAsync(nextTransfer.CancellationSource.Token);
@@ -297,7 +308,8 @@ public class FileTransferViewModel : ReactiveObject
                 }
                 catch (OperationCanceledException)
                 {
-                    Logger.Warn($"传输队列已取消：{DescribeTransferDirection(nextTransfer.Direction)} {nextTransfer.SourcePath} -> {nextTransfer.DestinationPath}");
+                    Logger.Warn(
+                        $"传输队列已取消：{DescribeTransferDirection(nextTransfer.Direction)} {nextTransfer.SourcePath} -> {nextTransfer.DestinationPath}");
                     nextTransfer.MarkPaused("已停止，可继续传输");
                 }
                 catch (Exception ex)
@@ -322,7 +334,7 @@ public class FileTransferViewModel : ReactiveObject
     }
 
     /// <summary>
-    /// 把底层文件传输库上报的进度事件映射回当前队列项，统一刷新界面摘要。
+    ///     把底层文件传输库上报的进度事件映射回当前队列项，统一刷新界面摘要。
     /// </summary>
     private void HandleFileTransferProgress(object? sender, FileTransferProgressEventArgs e)
     {
@@ -352,7 +364,7 @@ public class FileTransferViewModel : ReactiveObject
     }
 
     /// <summary>
-    /// 把底层文件传输结果事件映射回队列项，并唤醒当前等待完成态的传输任务。
+    ///     把底层文件传输结果事件映射回队列项，并唤醒当前等待完成态的传输任务。
     /// </summary>
     private void HandleFileTransferOutcome(object? sender, FileTransferOutcomeEventArgs e)
     {
@@ -381,7 +393,8 @@ public class FileTransferViewModel : ReactiveObject
 
     private void ApplyTransferOutcome(FileTransferItem item, FileTransferOutcomeEventArgs outcome)
     {
-        Logger.Info($"传输结果：方向={DescribeTransferDirection(item.Direction)}，源={item.SourcePath}，目标={item.DestinationPath}，成功={outcome.Success}，已取消={outcome.IsCancelled}，消息={outcome.Message}");
+        Logger.Info(
+            $"传输结果：方向={DescribeTransferDirection(item.Direction)}，源={item.SourcePath}，目标={item.DestinationPath}，成功={outcome.Success}，已取消={outcome.IsCancelled}，消息={outcome.Message}");
 
         if (outcome.IsCancelled)
         {
@@ -415,7 +428,8 @@ public class FileTransferViewModel : ReactiveObject
             : item.SourcePath;
 
         return item.Direction == (isUpload ? FileTransferDirection.Upload : FileTransferDirection.Download)
-               && string.Equals(NormalizePath(itemRemotePath), NormalizePath(remoteFilePath), StringComparison.OrdinalIgnoreCase);
+               && string.Equals(NormalizePath(itemRemotePath), NormalizePath(remoteFilePath),
+                   StringComparison.OrdinalIgnoreCase);
     }
 
     private static string NormalizePath(string path) => path.Replace('\\', '/').Trim();
@@ -457,7 +471,8 @@ public class FileTransferViewModel : ReactiveObject
 
     private void HandleTransferPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName is nameof(FileTransferItem.IsSelected) or nameof(FileTransferItem.Progress) or nameof(FileTransferItem.State) or nameof(FileTransferItem.TransferredBytes))
+        if (e.PropertyName is nameof(FileTransferItem.IsSelected) or nameof(FileTransferItem.Progress)
+            or nameof(FileTransferItem.State) or nameof(FileTransferItem.TransferredBytes))
         {
             UpdateDashboard();
             this.RaisePropertyChanged(nameof(SelectedCount));

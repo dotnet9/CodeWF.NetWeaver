@@ -1,13 +1,13 @@
-using CodeWF.NetWrapper.Abstractions;
-using CodeWF.NetWrapper.Response;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using CodeWF.NetWrapper.Abstractions;
+using CodeWF.NetWrapper.Response;
 
 namespace CodeWF.NetWrapper.Services;
 
 /// <summary>
-/// 基于 System.IO 的物理文件系统实现，适用于 Windows、Linux 与 macOS。
+///     基于 System.IO 的物理文件系统实现，适用于 Windows、Linux 与 macOS。
 /// </summary>
 public sealed class PhysicalManagedFileSystem : IManagedFileSystem
 {

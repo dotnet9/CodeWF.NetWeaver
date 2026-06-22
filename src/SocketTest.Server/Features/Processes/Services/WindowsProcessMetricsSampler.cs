@@ -6,7 +6,7 @@ using System.Runtime.InteropServices;
 namespace SocketTest.Server.Features.Processes.Services;
 
 /// <summary>
-/// Windows 平台增强采样器，提供进程 I/O 与 TCP 连接统计。
+///     Windows 平台增强采样器，提供进程 I/O 与 TCP 连接统计。
 /// </summary>
 internal sealed class WindowsProcessMetricsSampler : IProcessMetricsSampler
 {
@@ -94,6 +94,22 @@ internal sealed class WindowsProcessMetricsSampler : IProcessMetricsSampler
 
     private static class NativeMethods
     {
+        public enum MibTcpState
+        {
+            Closed = 1,
+            Listen = 2,
+            SynSent = 3,
+            SynRcvd = 4,
+            Established = 5,
+            FinWait1 = 6,
+            FinWait2 = 7,
+            CloseWait = 8,
+            Closing = 9,
+            LastAck = 10,
+            TimeWait = 11,
+            DeleteTcb = 12
+        }
+
         public const int AF_INET = 2;
         public const int TcpTableOwnerPidAll = 5;
 
@@ -119,22 +135,6 @@ internal sealed class WindowsProcessMetricsSampler : IProcessMetricsSampler
             public uint RemoteAddr;
             public uint RemotePort;
             public int OwningPid;
-        }
-
-        public enum MibTcpState
-        {
-            Closed = 1,
-            Listen = 2,
-            SynSent = 3,
-            SynRcvd = 4,
-            Established = 5,
-            FinWait1 = 6,
-            FinWait2 = 7,
-            CloseWait = 8,
-            Closing = 9,
-            LastAck = 10,
-            TimeWait = 11,
-            DeleteTcb = 12
         }
     }
 }

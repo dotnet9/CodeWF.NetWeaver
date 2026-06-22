@@ -4,28 +4,28 @@ using CodeWF.NetWrapper.Models;
 namespace CodeWF.NetWrapper.Response;
 
 /// <summary>
-/// 通用 Socket 响应对象。
+///     通用 Socket 响应对象。
 /// </summary>
 [NetHead(SocketConstants.CommonSocketResponseObjectId, 1)]
 public class CommonSocketResponse : INetObject
 {
     /// <summary>
-    /// 请求任务 ID，用于把响应与原请求对应起来。
+    ///     请求任务 ID，用于把响应与原请求对应起来。
     /// </summary>
     public int TaskId { get; set; }
 
     /// <summary>
-    /// 响应状态码。
+    ///     响应状态码。
     /// </summary>
     public byte Status { get; set; }
 
     /// <summary>
-    /// 响应消息。
+    ///     响应消息。
     /// </summary>
     public string? Message { get; set; }
 
     /// <summary>
-    /// 创建一个成功响应对象。
+    ///     创建一个成功响应对象。
     /// </summary>
     /// <param name="taskId">请求任务 ID。</param>
     /// <param name="message">响应消息。</param>
@@ -41,7 +41,7 @@ public class CommonSocketResponse : INetObject
     }
 
     /// <summary>
-    /// 创建一个失败响应对象。
+    ///     创建一个失败响应对象。
     /// </summary>
     /// <param name="taskId">请求任务 ID。</param>
     /// <param name="message">响应消息。</param>

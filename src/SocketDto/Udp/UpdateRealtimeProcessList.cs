@@ -27,7 +27,7 @@ public class UpdateRealtimeProcessList : INetObject
     public int PageIndex { get; set; }
 
     /// <summary>
-    /// 一个进程占2字节(short)
+    ///     一个进程占2字节(short)
     /// </summary>
     public byte[] Cpus { get; set; } = null!;
 
@@ -48,5 +48,6 @@ public class UpdateRealtimeProcessList : INetObject
     /// </summary>
     [NetFieldOffset(30, 10)]
     public byte[] Networks { get; set; } = null!;
+
     public override string ToString() => $"实时进程增量页(页={PageIndex + 1}/{PageCount},页大小={PageSize})";
 }

@@ -1,19 +1,18 @@
+using System.Collections.Generic;
 using SocketDto.Response;
 using SocketDto.Udp;
-using System.Collections.Generic;
 
 namespace SocketTest.Server.Features.Processes.Services;
 
 /// <summary>
-/// 进程快照提供器接口。上层只依赖该接口，便于未来替换为 Android、iOS 或鸿蒙实现。
+///     进程快照提供器接口。上层只依赖该接口，便于未来替换为 Android、iOS 或鸿蒙实现。
 /// </summary>
 internal interface IProcessSnapshotProvider
 {
-    ProcessSnapshotRefreshResult RefreshSnapshot();
-
     bool IsInitialized { get; }
 
     int ProcessCount { get; }
+    ProcessSnapshotRefreshResult RefreshSnapshot();
 
     ResponseServiceInfo GetServiceInfo(int taskId);
 

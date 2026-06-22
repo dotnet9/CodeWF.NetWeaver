@@ -13,7 +13,8 @@
             CornerRadius="8">
         <Grid ColumnDefinitions="Auto,*,Auto,*,Auto,*" ColumnSpacing="8">
             <TextBlock Foreground="#9CA3AF" Text="状态" />
-            <TextBlock Grid.Column="1" Foreground="White" TextTrimming="CharacterEllipsis" Text="{Binding ServiceStatusText}" />
+            <TextBlock Grid.Column="1" Foreground="White" TextTrimming="CharacterEllipsis"
+                       Text="{Binding ServiceStatusText}" />
             <TextBlock Grid.Column="2" Foreground="#9CA3AF" Text="进程数" />
             <TextBlock Grid.Column="3" Foreground="White" Text="{Binding CurrentProcessCount}" />
             <TextBlock Grid.Column="4" Foreground="#9CA3AF" Text="客户端" />

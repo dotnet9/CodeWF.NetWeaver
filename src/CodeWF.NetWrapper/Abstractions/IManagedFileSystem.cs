@@ -1,11 +1,11 @@
-using CodeWF.NetWrapper.Response;
 using System.Collections.Generic;
 using System.IO;
+using CodeWF.NetWrapper.Response;
 
 namespace CodeWF.NetWrapper.Abstractions;
 
 /// <summary>
-/// 服务端文件系统抽象接口。未来接入移动端或沙箱存储时可替换具体实现。
+///     服务端文件系统抽象接口。未来接入移动端或沙箱存储时可替换具体实现。
 /// </summary>
 public interface IManagedFileSystem
 {

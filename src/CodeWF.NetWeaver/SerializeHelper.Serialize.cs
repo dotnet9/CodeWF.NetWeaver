@@ -1,19 +1,19 @@
-using CodeWF.NetWeaver.Base;
 using System;
 using System.Collections;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using CodeWF.NetWeaver.Base;
 
 namespace CodeWF.NetWeaver;
 
 /// <summary>
-/// SerializeHelper 的序列化部分实现
+///     SerializeHelper 的序列化部分实现
 /// </summary>
 public partial class SerializeHelper
 {
     /// <summary>
-    /// 序列化网络对象为字节数组
+    ///     序列化网络对象为字节数组
     /// </summary>
     /// <typeparam name="T">网络对象类型</typeparam>
     /// <param name="data">要序列化的对象</param>
@@ -24,7 +24,10 @@ public partial class SerializeHelper
     public static byte[] Serialize<T>(this T data, long systemId, DateTimeOffset sendTime = default)
         where T : INetObject
     {
-        if (data == null) throw new ArgumentNullException(nameof(data));
+        if (data == null)
+        {
+            throw new ArgumentNullException(nameof(data));
+        }
 
         var netObjectInfo = data.GetType().GetNetObjectHead();
         var bodyBuffer = data.SerializeObject();
@@ -44,14 +47,17 @@ public partial class SerializeHelper
     }
 
     /// <summary>
-    /// 序列化对象为字节数组
+    ///     序列化对象为字节数组
     /// </summary>
     /// <typeparam name="T">对象类型</typeparam>
     /// <param name="data">要序列化的对象</param>
     /// <returns>序列化后的字节数组</returns>
     public static byte[] SerializeObject<T>(this T data)
     {
-        if (data == null) throw new ArgumentNullException(nameof(data));
+        if (data == null)
+        {
+            throw new ArgumentNullException(nameof(data));
+        }
 
         using var stream = new MemoryStream();
         using var writer = new BinaryWriter(stream, DefaultEncoding);
@@ -60,14 +66,17 @@ public partial class SerializeHelper
     }
 
     /// <summary>
-    /// 序列化对象为字节数组
+    ///     序列化对象为字节数组
     /// </summary>
     /// <param name="data">要序列化的对象</param>
     /// <param name="type">对象类型</param>
     /// <returns>序列化后的字节数组</returns>
     public static byte[] SerializeObject(this object data, Type type)
     {
-        if (data == null) throw new ArgumentNullException(nameof(data));
+        if (data == null)
+        {
+            throw new ArgumentNullException(nameof(data));
+        }
 
         using var stream = new MemoryStream();
         using var writer = new BinaryWriter(stream, DefaultEncoding);
@@ -76,14 +85,17 @@ public partial class SerializeHelper
     }
 
     /// <summary>
-    /// 序列化对象的所有属性
+    ///     序列化对象的所有属性
     /// </summary>
     /// <typeparam name="T">对象类型</typeparam>
     /// <param name="writer">BinaryWriter 实例</param>
     /// <param name="data">要序列化的对象</param>
     private static void SerializeProperties<T>(BinaryWriter writer, T data)
     {
-        if (data == null) throw new ArgumentNullException(nameof(data));
+        if (data == null)
+        {
+            throw new ArgumentNullException(nameof(data));
+        }
 
         var properties = GetProperties(data.GetType())
             .Where(p => p.GetCustomAttribute(typeof(NetIgnoreMemberAttribute)) == null);
@@ -94,7 +106,7 @@ public partial class SerializeHelper
     }
 
     /// <summary>
-    /// 序列化单个属性
+    ///     序列化单个属性
     /// </summary>
     /// <typeparam name="T">对象类型</typeparam>
     /// <param name="writer">BinaryWriter 实例</param>
@@ -109,7 +121,7 @@ public partial class SerializeHelper
     }
 
     /// <summary>
-    /// 根据类型序列化值
+    ///     根据类型序列化值
     /// </summary>
     /// <param name="writer">BinaryWriter 实例</param>
     /// <param name="value">要序列化的值</param>
@@ -117,21 +129,31 @@ public partial class SerializeHelper
     private static void SerializeValue(BinaryWriter writer, object? value, Type valueType)
     {
         if (IsScalarType(valueType))
+        {
             SerializeBaseValue(writer, value, valueType);
+        }
         // IsArray 只负责识别“是否是数组”，元素类型还要再通过 GetElementType() 读取。
         else if (valueType.IsArray)
+        {
             SerializeArrayValue(writer, value, valueType);
+        }
         else if (TryGetCollectionMetadata(valueType, out var genericArguments, out var isDictionary))
+        {
             SerializeComplexValue(writer, value, genericArguments, isDictionary);
+        }
         else if (value != null)
+        {
             SerializeProperties(writer, value);
+        }
         else
+        {
             throw new InvalidOperationException(
                 $"Reference type {valueType.FullName} is null. Non-collection reference types do not support null serialization.");
+        }
     }
 
     /// <summary>
-    /// 序列化基本类型、字符串和枚举（性能优化版本，直接转换避免 Parse 开销）
+    ///     序列化基本类型、字符串和枚举（性能优化版本，直接转换避免 Parse 开销）
     /// </summary>
     /// <param name="writer">BinaryWriter 实例</param>
     /// <param name="value">要序列化的值</param>
@@ -206,7 +228,7 @@ public partial class SerializeHelper
     }
 
     /// <summary>
-    /// 序列化数组
+    ///     序列化数组
     /// </summary>
     /// <param name="writer">BinaryWriter 实例</param>
     /// <param name="value">要序列化的数组</param>
@@ -233,7 +255,7 @@ public partial class SerializeHelper
     }
 
     /// <summary>
-    /// 序列化复杂类型（如 List、Dictionary）
+    ///     序列化复杂类型（如 List、Dictionary）
     /// </summary>
     /// <param name="writer">BinaryWriter 实例</param>
     /// <param name="value">要序列化的对象</param>
@@ -270,6 +292,7 @@ public partial class SerializeHelper
             return;
         }
 
-        throw new InvalidOperationException($"Unsupported collection value for {string.Join(", ", genericArguments.Select(x => x.Name))}.");
+        throw new InvalidOperationException(
+            $"Unsupported collection value for {string.Join(", ", genericArguments.Select(x => x.Name))}.");
     }
 }

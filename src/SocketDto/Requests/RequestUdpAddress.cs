@@ -10,5 +10,6 @@ public class RequestUdpAddress : INetObject
     ///     任务Id
     /// </summary>
     public int TaskId { get; set; }
+
     public override string ToString() => $"请求UDP地址(TaskId={TaskId})";
 }

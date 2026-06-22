@@ -21,5 +21,6 @@ public class ResponseUdpAddress : INetObject
     ///     组播端口
     /// </summary>
     public int Port { get; set; }
+
     public override string ToString() => $"返回UDP地址(TaskId={TaskId},Ip={Ip},端口={Port})";
 }

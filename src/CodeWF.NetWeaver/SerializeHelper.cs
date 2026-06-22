@@ -9,17 +9,17 @@ using CodeWF.NetWeaver.Base;
 namespace CodeWF.NetWeaver;
 
 /// <summary>
-/// 序列化辅助类，提供对象的序列化和反序列化功能
+///     序列化辅助类，提供对象的序列化和反序列化功能
 /// </summary>
 public partial class SerializeHelper
 {
     /// <summary>
-    /// 缓存对象属性信息的字典，提高反射效率
+    ///     缓存对象属性信息的字典，提高反射效率
     /// </summary>
     private static readonly ConcurrentDictionary<Type, PropertyInfo[]> ObjectPropertyInfos = new();
 
     /// <summary>
-    /// 支持直接按标量读写的数据类型
+    ///     支持直接按标量读写的数据类型
     /// </summary>
     private static readonly HashSet<Type> ScalarTypes =
     [
@@ -40,18 +40,21 @@ public partial class SerializeHelper
     ];
 
     /// <summary>
-    /// 默认编码，用于字符串的序列化和反序列化
+    ///     默认编码，用于字符串的序列化和反序列化
     /// </summary>
     public static Encoding DefaultEncoding = Encoding.UTF8;
 
     /// <summary>
-    /// 获取指定类型的属性信息列表，使用缓存提高效率
+    ///     获取指定类型的属性信息列表，使用缓存提高效率
     /// </summary>
     /// <param name="type">要获取属性的类型</param>
     /// <returns>属性信息列表</returns>
     private static PropertyInfo[] GetProperties(Type type)
     {
-        if (ObjectPropertyInfos.TryGetValue(type, out var propertyInfos)) return propertyInfos;
+        if (ObjectPropertyInfos.TryGetValue(type, out var propertyInfos))
+        {
+            return propertyInfos;
+        }
 
         propertyInfos = type.GetProperties()
             .OrderBy(property => property.MetadataToken)
@@ -61,7 +64,7 @@ public partial class SerializeHelper
     }
 
     /// <summary>
-    /// 判断类型是否可按基础标量直接序列化
+    ///     判断类型是否可按基础标量直接序列化
     /// </summary>
     private static bool IsScalarType(Type type)
     {
@@ -69,7 +72,7 @@ public partial class SerializeHelper
     }
 
     /// <summary>
-    /// 判断类型是否为支持的集合类型，并返回集合泛型参数
+    ///     判断类型是否为支持的集合类型，并返回集合泛型参数
     /// </summary>
     private static bool TryGetCollectionMetadata(Type type, out Type[] genericArguments, out bool isDictionary)
     {
@@ -140,7 +143,7 @@ public partial class SerializeHelper
     }
 
     /// <summary>
-    /// 创建集合实例，优先使用目标类型本身，其次回退到 List/Dictionary
+    ///     创建集合实例，优先使用目标类型本身，其次回退到 List/Dictionary
     /// </summary>
     private static object CreateCollectionInstance(Type type, Type[] genericArguments, bool isDictionary)
     {
@@ -160,7 +163,7 @@ public partial class SerializeHelper
     }
 
     /// <summary>
-    /// 获取网络对象的头部信息
+    ///     获取网络对象的头部信息
     /// </summary>
     /// <param name="netObjectType">网络对象类型</param>
     /// <returns>网络对象头部属性</returns>
@@ -173,7 +176,7 @@ public partial class SerializeHelper
     }
 
     /// <summary>
-    /// 获取网络对象的头部信息
+    ///     获取网络对象的头部信息
     /// </summary>
     /// <returns>网络对象头部属性</returns>
     /// <exception cref="Exception">当类型未标记 NetHeadAttribute 时抛出异常</exception>
@@ -186,7 +189,7 @@ public partial class SerializeHelper
     }
 
     /// <summary>
-    /// 从字节数组中读取网络对象头部信息
+    ///     从字节数组中读取网络对象头部信息
     /// </summary>
     /// <param name="buffer">字节数组</param>
     /// <param name="readIndex">读取起始索引</param>
@@ -194,7 +197,7 @@ public partial class SerializeHelper
     /// <returns>是否成功读取头部信息</returns>
     public static bool ReadHead(this byte[] buffer, ref int readIndex, out NetHeadInfo netObjectHeadInfo)
     {
-        if (ReadHead(buffer.AsSpan(readIndex), out netObjectHeadInfo, out var bytesConsumed))
+        if (buffer.AsSpan(readIndex).ReadHead(out netObjectHeadInfo, out var bytesConsumed))
         {
             readIndex += bytesConsumed;
             return true;
@@ -204,7 +207,7 @@ public partial class SerializeHelper
     }
 
     /// <summary>
-    /// 从Span<byte>中读取网络对象头部信息（高性能版本）
+    ///     从Span<byte>中读取网络对象头部信息（高性能版本）
     /// </summary>
     /// <param name="span">字节Span</param>
     /// <param name="netObjectHeadInfo">输出的网络对象头部信息</param>
@@ -215,7 +218,10 @@ public partial class SerializeHelper
         netObjectHeadInfo = null!;
         bytesConsumed = 0;
         // 检查缓冲区长度是否足够
-        if (span.Length < PacketHeadLen) return false;
+        if (span.Length < PacketHeadLen)
+        {
+            return false;
+        }
 
         netObjectHeadInfo = new NetHeadInfo();
 
@@ -237,27 +243,27 @@ public partial class SerializeHelper
     }
 
     /// <summary>
-    /// 检查网络对象头部信息是否匹配指定的类型
+    ///     检查网络对象头部信息是否匹配指定的类型
     /// </summary>
     /// <typeparam name="T">要检查的类型</typeparam>
     /// <param name="netObjectHeadInfo">网络对象头部信息</param>
     /// <returns>是否匹配</returns>
     public static bool IsNetObject<T>(this NetHeadInfo netObjectHeadInfo)
     {
-        var netObjectAttribute = GetNetObjectHead(typeof(T));
+        var netObjectAttribute = typeof(T).GetNetObjectHead();
         return netObjectAttribute.Id == netObjectHeadInfo.ObjectId &&
                netObjectAttribute.Version == netObjectHeadInfo.ObjectVersion;
     }
 
     /// <summary>
-    /// 检查网络对象头部信息是否匹配指定的类型，但版本号不同
+    ///     检查网络对象头部信息是否匹配指定的类型，但版本号不同
     /// </summary>
     /// <typeparam name="T">要检查的类型</typeparam>
     /// <param name="netObjectHeadInfo">网络对象头部信息</param>
     /// <returns>是否匹配</returns>
     public static bool IsNetObjectDiffVersion<T>(this NetHeadInfo netObjectHeadInfo)
     {
-        var netObjectAttribute = GetNetObjectHead(typeof(T));
+        var netObjectAttribute = typeof(T).GetNetObjectHead();
         return netObjectAttribute.Id == netObjectHeadInfo.ObjectId &&
                netObjectAttribute.Version != netObjectHeadInfo.ObjectVersion;
     }

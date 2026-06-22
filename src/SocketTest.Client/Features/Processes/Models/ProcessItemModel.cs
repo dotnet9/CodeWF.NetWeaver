@@ -1,8 +1,8 @@
-﻿using CodeWF.Tools.Extensions;
+﻿using System;
+using CodeWF.Tools.Extensions;
 using ReactiveUI;
 using SocketDto.Enums;
 using SocketDto.Response;
-using System;
 
 namespace SocketTest.Client.Features.Processes.Models;
 
@@ -28,82 +28,146 @@ public class ProcessItemModel : ReactiveObject
     /// <summary>
     ///     进程名称
     /// </summary>
-    public string? Name { get; set => this.RaiseAndSetIfChanged(ref field, value); }
+    public string? Name
+    {
+        get;
+        set => this.RaiseAndSetIfChanged(ref field, value);
+    }
 
     /// <summary>
     ///     进程类型
     /// </summary>
-    public ProcessType Type { get; set => this.RaiseAndSetIfChanged(ref field, value); }
+    public ProcessType Type
+    {
+        get;
+        set => this.RaiseAndSetIfChanged(ref field, value);
+    }
 
     /// <summary>
     ///     进程状态
     /// </summary>
-    public ProcessStatus Status { get; set => this.RaiseAndSetIfChanged(ref field, value); }
+    public ProcessStatus Status
+    {
+        get;
+        set => this.RaiseAndSetIfChanged(ref field, value);
+    }
 
     /// <summary>
-    /// 进程一般状态
+    ///     进程一般状态
     /// </summary>
-    public AlarmStatus AlarmStatus { get; set => this.RaiseAndSetIfChanged(ref field, value); }
+    public AlarmStatus AlarmStatus
+    {
+        get;
+        set => this.RaiseAndSetIfChanged(ref field, value);
+    }
 
     /// <summary>
     ///     发布者
     /// </summary>
-    public string? Publisher { get; set => this.RaiseAndSetIfChanged(ref field, value); }
+    public string? Publisher
+    {
+        get;
+        set => this.RaiseAndSetIfChanged(ref field, value);
+    }
 
     /// <summary>
     ///     命令行
     /// </summary>
-    public string? CommandLine { get; set => this.RaiseAndSetIfChanged(ref field, value); }
+    public string? CommandLine
+    {
+        get;
+        set => this.RaiseAndSetIfChanged(ref field, value);
+    }
 
     /// <summary>
     ///     CPU使用率
     /// </summary>
-    public short Cpu { get; set => this.RaiseAndSetIfChanged(ref field, value); }
+    public short Cpu
+    {
+        get;
+        set => this.RaiseAndSetIfChanged(ref field, value);
+    }
 
     /// <summary>
     ///     内存使用大小
     /// </summary>
-    public short Memory { get; set => this.RaiseAndSetIfChanged(ref field, value); }
+    public short Memory
+    {
+        get;
+        set => this.RaiseAndSetIfChanged(ref field, value);
+    }
 
     /// <summary>
     ///     磁盘使用大小
     /// </summary>
-    public short Disk { get; set => this.RaiseAndSetIfChanged(ref field, value); }
+    public short Disk
+    {
+        get;
+        set => this.RaiseAndSetIfChanged(ref field, value);
+    }
 
     /// <summary>
     ///     网络使用值
     /// </summary>
-    public short Network { get; set => this.RaiseAndSetIfChanged(ref field, value); }
+    public short Network
+    {
+        get;
+        set => this.RaiseAndSetIfChanged(ref field, value);
+    }
 
     /// <summary>
     ///     GPU
     /// </summary>
-    public short Gpu { get; set => this.RaiseAndSetIfChanged(ref field, value); }
+    public short Gpu
+    {
+        get;
+        set => this.RaiseAndSetIfChanged(ref field, value);
+    }
 
     /// <summary>
     ///     GPU引擎
     /// </summary>
-    public GpuEngine GpuEngine { get; set => this.RaiseAndSetIfChanged(ref field, value); }
+    public GpuEngine GpuEngine
+    {
+        get;
+        set => this.RaiseAndSetIfChanged(ref field, value);
+    }
 
     /// <summary>
     ///     电源使用情况
     /// </summary>
-    public PowerUsage PowerUsage { get; set => this.RaiseAndSetIfChanged(ref field, value); }
+    public PowerUsage PowerUsage
+    {
+        get;
+        set => this.RaiseAndSetIfChanged(ref field, value);
+    }
 
     /// <summary>
     ///     电源使用情况趋势
     /// </summary>
-    public PowerUsage PowerUsageTrend { get; set => this.RaiseAndSetIfChanged(ref field, value); }
+    public PowerUsage PowerUsageTrend
+    {
+        get;
+        set => this.RaiseAndSetIfChanged(ref field, value);
+    }
 
     /// <summary>
     ///     上次更新时间
     /// </summary>
-    public DateTime LastUpdateTime { get; set => this.RaiseAndSetIfChanged(ref field, value); }
+    public DateTime LastUpdateTime
+    {
+        get;
+        set => this.RaiseAndSetIfChanged(ref field, value);
+    }
 
     /// <summary>
     ///     更新时间
     /// </summary>
-    public DateTime UpdateTime { get; set => this.RaiseAndSetIfChanged(ref field, value); }
+    public DateTime UpdateTime
+    {
+        get;
+        set => this.RaiseAndSetIfChanged(ref field, value);
+    }
 
     public void Update(ProcessItem process, int timestampStartYear)
     {

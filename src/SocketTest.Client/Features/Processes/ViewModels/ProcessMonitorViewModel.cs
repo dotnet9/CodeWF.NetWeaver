@@ -1,6 +1,14 @@
+using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using Avalonia.Threading;
 using CodeWF.EventBus;
 using CodeWF.Log.Core;
+using CodeWF.NetWeaver.Base;
 using CodeWF.NetWrapper.Commands;
 using CodeWF.NetWrapper.Helpers;
 using ReactiveUI;
@@ -14,37 +22,33 @@ using SocketTest.Client.Features.Processes.Models;
 using SocketTest.Client.Infrastructure.Collections;
 using SocketTest.Client.Shell.Messages;
 using SocketTest.Client.Shell.Services;
-using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace SocketTest.Client.Features.Processes.ViewModels;
 
 public class ProcessMonitorViewModel : ReactiveObject
 {
     private const int ProcessStructureChangeDebounceMilliseconds = 1000;
+    private readonly ClientApplicationStateService _appState;
+    private readonly ConcurrentDictionary<int, PendingRequestInfo> _pendingRequests = new();
+
+    private readonly ConcurrentDictionary<int, TaskCompletionSource<ResponseTerminateProcess>>
+        _pendingTerminateRequests = new();
+
+    private readonly Dictionary<int, ProcessItemModel> _processLookup = [];
+    private readonly object _processStructureChangeDebounceSyncRoot = new();
 
     private readonly List<ProcessItemModel> _receivedProcesses = [];
-    private readonly Dictionary<int, ProcessItemModel> _processLookup = [];
-    private readonly ConcurrentDictionary<int, TaskCompletionSource<ResponseTerminateProcess>> _pendingTerminateRequests = new();
-    private readonly ConcurrentDictionary<int, PendingRequestInfo> _pendingRequests = new();
-    private readonly ClientApplicationStateService _appState;
-    private readonly object _processStructureChangeDebounceSyncRoot = new();
+    private int _activeProcessTaskId = -1;
+    private int _expectedProcessPages;
     private bool _isGridRefreshQueued;
     private bool _isProcessIdRequestInFlight;
     private bool _isProcessListRequestInFlight;
     private bool _pendingProcessRefresh;
-    private int[]? _processIds;
-    private int _timestampStartYear = 2020;
-    private int _activeProcessTaskId = -1;
-    private int _expectedProcessPages;
-    private int _receivedProcessPages;
-    private CancellationTokenSource? _processStructureChangeDebounceCts;
     private ProcessItemModel? _pendingTerminateProcess;
+    private int[]? _processIds;
+    private CancellationTokenSource? _processStructureChangeDebounceCts;
+    private int _receivedProcessPages;
+    private int _timestampStartYear = 2020;
 
     public ProcessMonitorViewModel(
         TcpSocketClient tcpHelper,
@@ -65,11 +69,23 @@ public class ProcessMonitorViewModel : ReactiveObject
 
     public string ProcessSummary => $"当前显示 {DisplayProcesses.Count:N0} 个进程";
 
-    public ProcessItemModel? SelectedProcess { get; set => this.RaiseAndSetIfChanged(ref field, value); }
+    public ProcessItemModel? SelectedProcess
+    {
+        get;
+        set => this.RaiseAndSetIfChanged(ref field, value);
+    }
 
-    public bool IsTerminateDialogOpen { get; private set => this.RaiseAndSetIfChanged(ref field, value); }
+    public bool IsTerminateDialogOpen
+    {
+        get;
+        private set => this.RaiseAndSetIfChanged(ref field, value);
+    }
 
-    public string TerminateDialogMessage { get; private set => this.RaiseAndSetIfChanged(ref field, value); } = string.Empty;
+    public string TerminateDialogMessage
+    {
+        get;
+        private set => this.RaiseAndSetIfChanged(ref field, value);
+    } = string.Empty;
 
     public TcpSocketClient TcpHelper { get; }
 
@@ -119,7 +135,8 @@ public class ProcessMonitorViewModel : ReactiveObject
         }
 
         var taskId = NetHelper.GetTaskId();
-        var completionSource = new TaskCompletionSource<ResponseTerminateProcess>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var completionSource =
+            new TaskCompletionSource<ResponseTerminateProcess>(TaskCreationOptions.RunContinuationsAsynchronously);
         _pendingTerminateRequests[taskId] = completionSource;
 
         await SendTcpCommandAsync(new RequestTerminateProcess
@@ -467,7 +484,7 @@ public class ProcessMonitorViewModel : ReactiveObject
         await SendTcpCommandAsync(new RequestProcessList { TaskId = NetHelper.GetTaskId() });
     }
 
-    private async Task SendTcpCommandAsync(CodeWF.NetWeaver.Base.INetObject command)
+    private async Task SendTcpCommandAsync(INetObject command)
     {
         TrackPendingRequest(command);
         Logger.Info($"客户端 -> 服务端 TCP：{command}");
@@ -549,7 +566,8 @@ public class ProcessMonitorViewModel : ReactiveObject
 
     private void StartPendingProcessRefreshIfNeeded()
     {
-        if (!_pendingProcessRefresh || _isProcessIdRequestInFlight || _isProcessListRequestInFlight || !TcpHelper.IsRunning)
+        if (!_pendingProcessRefresh || _isProcessIdRequestInFlight || _isProcessListRequestInFlight ||
+            !TcpHelper.IsRunning)
         {
             return;
         }
@@ -571,18 +589,21 @@ public class ProcessMonitorViewModel : ReactiveObject
         cts?.Dispose();
     }
 
-    private void TrackPendingRequest(CodeWF.NetWeaver.Base.INetObject command)
+    private void TrackPendingRequest(INetObject command)
     {
         switch (command)
         {
             case RequestProcessIDList request:
-                _pendingRequests[request.TaskId] = new PendingRequestInfo(nameof(RequestProcessIDList), Stopwatch.GetTimestamp());
+                _pendingRequests[request.TaskId] =
+                    new PendingRequestInfo(nameof(RequestProcessIDList), Stopwatch.GetTimestamp());
                 break;
             case RequestProcessList request:
-                _pendingRequests[request.TaskId] = new PendingRequestInfo(nameof(RequestProcessList), Stopwatch.GetTimestamp());
+                _pendingRequests[request.TaskId] =
+                    new PendingRequestInfo(nameof(RequestProcessList), Stopwatch.GetTimestamp());
                 break;
             case RequestTerminateProcess request:
-                _pendingRequests[request.TaskId] = new PendingRequestInfo(nameof(RequestTerminateProcess), Stopwatch.GetTimestamp());
+                _pendingRequests[request.TaskId] =
+                    new PendingRequestInfo(nameof(RequestTerminateProcess), Stopwatch.GetTimestamp());
                 break;
         }
     }
@@ -598,8 +619,6 @@ public class ProcessMonitorViewModel : ReactiveObject
         Logger.Info($"客户端收到 {responseName}，对应 {pending.RequestName} 往返耗时 {elapsedMilliseconds:F1} ms。");
     }
 
-    private readonly record struct PendingRequestInfo(string RequestName, long StartedAt);
-
     private static void LogIncomingTcpCommand(object command) =>
         Logger.Info($"服务端 -> 客户端 TCP：{command}");
 
@@ -612,7 +631,6 @@ public class ProcessMonitorViewModel : ReactiveObject
 
         if (command is UpdateGeneralProcessList general && general.PageIndex > 0)
         {
-            return;
         }
 
         // Logger.Info($"服务端 -> 客户端 UDP：{command}");
@@ -622,4 +640,6 @@ public class ProcessMonitorViewModel : ReactiveObject
     {
         _appState.ProcessSummary = ProcessSummary;
     }
+
+    private readonly record struct PendingRequestInfo(string RequestName, long StartedAt);
 }

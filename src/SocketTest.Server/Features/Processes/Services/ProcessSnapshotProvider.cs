@@ -1,8 +1,3 @@
-using CodeWF.NetWeaver;
-using CodeWF.Tools.Extensions;
-using SocketDto.Enums;
-using SocketDto.Response;
-using SocketDto.Udp;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -13,16 +8,22 @@ using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Runtime.InteropServices;
 using System.Threading;
+using CodeWF.NetWeaver;
+using CodeWF.Tools.Extensions;
+using SocketDto.Enums;
+using SocketDto.Response;
+using SocketDto.Udp;
 
 namespace SocketTest.Server.Features.Processes.Services;
 
 internal sealed class ProcessSnapshotProvider : IProcessSnapshotProvider
 {
-    private readonly object _syncRoot = new();
-    private readonly Dictionary<int, ProcessHistory> _previousHistory = [];
+    public const int TimestampStartYear = 2023;
     private readonly IProcessMetricsSampler _metricsSampler;
-    private ProcessSnapshotState _snapshotState;
+    private readonly Dictionary<int, ProcessHistory> _previousHistory = [];
+    private readonly object _syncRoot = new();
     private DateTime _lastCaptureUtc = DateTime.UtcNow.AddSeconds(-1);
+    private ProcessSnapshotState _snapshotState;
 
     public ProcessSnapshotProvider(IProcessMetricsSampler metricsSampler)
     {
@@ -32,8 +33,6 @@ internal sealed class ProcessSnapshotProvider : IProcessSnapshotProvider
             Array.Empty<int>(),
             BuildServiceInfo(DateTime.Now.GetSpecialUnixTimeSeconds(TimestampStartYear)));
     }
-
-    public const int TimestampStartYear = 2023;
 
     public ProcessSnapshotRefreshResult RefreshSnapshot()
     {
@@ -114,13 +113,7 @@ internal sealed class ProcessSnapshotProvider : IProcessSnapshotProvider
         }
     }
 
-    public int ProcessCount
-    {
-        get
-        {
-            return Volatile.Read(ref _snapshotState).Processes.Length;
-        }
-    }
+    public int ProcessCount => Volatile.Read(ref _snapshotState).Processes.Length;
 
     public ResponseServiceInfo GetServiceInfo(int taskId)
     {
@@ -341,7 +334,8 @@ internal sealed class ProcessSnapshotProvider : IProcessSnapshotProvider
         var diskBytesPerSecond = previous != null && hasIoCounters
             ? CalculateIoBytesPerSecond(previous.IoDataBytes, totalIoBytes, elapsedSeconds)
             : 0d;
-        var networkActivityCount = networkConnections.TryGetValue(pid, out var activeConnections) ? activeConnections : 0;
+        var networkActivityCount =
+            networkConnections.TryGetValue(pid, out var activeConnections) ? activeConnections : 0;
 
         snapshotItem = new ProcessSnapshotItem(item, diskBytesPerSecond, networkActivityCount);
         history = new ProcessHistory(
@@ -430,7 +424,7 @@ internal sealed class ProcessSnapshotProvider : IProcessSnapshotProvider
                 var property = computerInfoType.GetProperty("TotalPhysicalMemory");
                 if (instance != null && property?.GetValue(instance) is ulong totalPhysicalMemory)
                 {
-                    return (long)Math.Min(totalPhysicalMemory, (ulong)long.MaxValue);
+                    return (long)Math.Min(totalPhysicalMemory, long.MaxValue);
                 }
             }
         }

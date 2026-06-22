@@ -1,29 +1,29 @@
-using CodeWF.NetWeaver.Base;
 using System;
 using System.Collections;
 using System.IO;
 using System.Reflection;
+using CodeWF.NetWeaver.Base;
 
 namespace CodeWF.NetWeaver;
 
 /// <summary>
-/// SerializeHelper 的反序列化部分实现
+///     SerializeHelper 的反序列化部分实现
 /// </summary>
 public partial class SerializeHelper
 {
     /// <summary>
-    /// 从字节数组反序列化对象
+    ///     从字节数组反序列化对象
     /// </summary>
     /// <typeparam name="T">要反序列化的对象类型</typeparam>
     /// <param name="buffer">字节数组</param>
     /// <returns>反序列化后的对象</returns>
     public static T Deserialize<T>(this byte[] buffer) where T : new()
     {
-        return DeserializeObject<T>(buffer, PacketHeadLen);
+        return buffer.DeserializeObject<T>(PacketHeadLen);
     }
 
     /// <summary>
-    /// 从字节数组反序列化对象
+    ///     从字节数组反序列化对象
     /// </summary>
     /// <typeparam name="T">要反序列化的对象类型</typeparam>
     /// <param name="buffer">字节数组</param>
@@ -39,7 +39,7 @@ public partial class SerializeHelper
     }
 
     /// <summary>
-    /// 从字节数组反序列化对象
+    ///     从字节数组反序列化对象
     /// </summary>
     /// <param name="buffer">字节数组</param>
     /// <param name="type">要反序列化的对象类型</param>
@@ -53,7 +53,7 @@ public partial class SerializeHelper
     }
 
     /// <summary>
-    /// 创建实例
+    ///     创建实例
     /// </summary>
     /// <param name="type">类型</param>
     /// <returns>创建的实例</returns>
@@ -69,20 +69,25 @@ public partial class SerializeHelper
     }
 
     /// <summary>
-    /// 反序列化对象的所有属性
+    ///     反序列化对象的所有属性
     /// </summary>
     /// <typeparam name="T">对象类型</typeparam>
     /// <param name="reader">BinaryReader 实例</param>
     /// <param name="data">要反序列化的对象</param>
     private static void DeserializeProperties<T>(BinaryReader reader, T data)
     {
-        if (data == null) throw new ArgumentNullException(nameof(data));
+        if (data == null)
+        {
+            throw new ArgumentNullException(nameof(data));
+        }
 
         var properties = GetProperties(data.GetType());
         foreach (var property in properties)
         {
             if (property.GetCustomAttribute(typeof(NetIgnoreMemberAttribute)) is NetIgnoreMemberAttribute _)
+            {
                 continue;
+            }
 
             try
             {
@@ -97,7 +102,7 @@ public partial class SerializeHelper
     }
 
     /// <summary>
-    /// 根据类型反序列化值
+    ///     根据类型反序列化值
     /// </summary>
     /// <param name="reader">BinaryReader 实例</param>
     /// <param name="propertyType">属性类型</param>
@@ -108,19 +113,27 @@ public partial class SerializeHelper
 
         // IsArray 用来判断是否为数组类型，例如 int[]、string[]。
         if (IsScalarType(propertyType))
+        {
             value = DeserializeBaseValue(reader, propertyType);
+        }
         else if (propertyType.IsArray)
+        {
             value = DeserializeArrayValue(reader, propertyType);
+        }
         else if (TryGetCollectionMetadata(propertyType, out _, out _))
+        {
             value = DeserializeComplexValue(reader, propertyType);
+        }
         else
+        {
             value = DeserializeObject(reader, propertyType);
+        }
 
         return value;
     }
 
     /// <summary>
-    /// 反序列化基本类型、字符串和枚举
+    ///     反序列化基本类型、字符串和枚举
     /// </summary>
     /// <param name="reader">BinaryReader 实例</param>
     /// <param name="propertyType">属性类型</param>
@@ -135,37 +148,81 @@ public partial class SerializeHelper
             return Enum.ToObject(propertyType, reader.ReadInt32());
         }
 
-        if (propertyType == typeof(byte)) return reader.ReadByte();
-        if (propertyType == typeof(char)) return reader.ReadChar();
-        if (propertyType == typeof(sbyte)) return reader.ReadSByte();
+        if (propertyType == typeof(byte))
+        {
+            return reader.ReadByte();
+        }
 
-        if (propertyType == typeof(short)) return reader.ReadInt16();
+        if (propertyType == typeof(char))
+        {
+            return reader.ReadChar();
+        }
 
-        if (propertyType == typeof(ushort)) return reader.ReadUInt16();
+        if (propertyType == typeof(sbyte))
+        {
+            return reader.ReadSByte();
+        }
 
-        if (propertyType == typeof(int)) return reader.ReadInt32();
+        if (propertyType == typeof(short))
+        {
+            return reader.ReadInt16();
+        }
 
-        if (propertyType == typeof(uint)) return reader.ReadUInt32();
+        if (propertyType == typeof(ushort))
+        {
+            return reader.ReadUInt16();
+        }
 
-        if (propertyType == typeof(long)) return reader.ReadInt64();
+        if (propertyType == typeof(int))
+        {
+            return reader.ReadInt32();
+        }
 
-        if (propertyType == typeof(ulong)) return reader.ReadUInt64();
+        if (propertyType == typeof(uint))
+        {
+            return reader.ReadUInt32();
+        }
 
-        if (propertyType == typeof(float)) return reader.ReadSingle();
+        if (propertyType == typeof(long))
+        {
+            return reader.ReadInt64();
+        }
 
-        if (propertyType == typeof(double)) return reader.ReadDouble();
+        if (propertyType == typeof(ulong))
+        {
+            return reader.ReadUInt64();
+        }
 
-        if (propertyType == typeof(decimal)) return reader.ReadDecimal();
+        if (propertyType == typeof(float))
+        {
+            return reader.ReadSingle();
+        }
 
-        if (propertyType == typeof(string)) return reader.ReadString();
+        if (propertyType == typeof(double))
+        {
+            return reader.ReadDouble();
+        }
 
-        if (propertyType == typeof(bool)) return reader.ReadBoolean();
+        if (propertyType == typeof(decimal))
+        {
+            return reader.ReadDecimal();
+        }
+
+        if (propertyType == typeof(string))
+        {
+            return reader.ReadString();
+        }
+
+        if (propertyType == typeof(bool))
+        {
+            return reader.ReadBoolean();
+        }
 
         throw new Exception($"Unsupported data type: {propertyType.Name}");
     }
 
     /// <summary>
-    /// 反序列化复杂类型（如 List、Dictionary）
+    ///     反序列化复杂类型（如 List、Dictionary）
     /// </summary>
     /// <param name="reader">BinaryReader 实例</param>
     /// <param name="propertyType">属性类型</param>
@@ -209,7 +266,7 @@ public partial class SerializeHelper
     }
 
     /// <summary>
-    /// 反序列化数组
+    ///     反序列化数组
     /// </summary>
     /// <param name="reader">BinaryReader 实例</param>
     /// <param name="propertyType">数组类型</param>
@@ -224,7 +281,11 @@ public partial class SerializeHelper
 
         // GetElementType() 返回数组元素类型，例如 int[] 返回 int。
         var elementType = propertyType.GetElementType();
-        if (elementType == null) return null;
+        if (elementType == null)
+        {
+            return null;
+        }
+
         var array = Array.CreateInstance(elementType, length);
         for (var i = 0; i < length; i++)
         {
@@ -237,7 +298,7 @@ public partial class SerializeHelper
     }
 
     /// <summary>
-    /// 反序列化对象
+    ///     反序列化对象
     /// </summary>
     /// <param name="reader">BinaryReader 实例</param>
     /// <param name="type">对象类型</param>

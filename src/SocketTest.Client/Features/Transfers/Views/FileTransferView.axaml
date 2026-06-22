@@ -26,7 +26,8 @@
                 <StackPanel Spacing="8">
                     <Grid ColumnDefinitions="*,Auto">
                         <TextBlock Foreground="#667085" Text="总进度" />
-                        <TextBlock Grid.Column="1" FontSize="20" FontWeight="SemiBold" Text="{Binding TotalProgress, StringFormat={}{0:F1}%}" />
+                        <TextBlock Grid.Column="1" FontSize="20" FontWeight="SemiBold"
+                                   Text="{Binding TotalProgress, StringFormat={}{0:F1}%}" />
                     </Grid>
                     <ProgressBar Height="6"
                                  Minimum="0"
@@ -81,7 +82,8 @@
                         <DataGridTemplateColumn Width="54" Header="选中">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate x:DataType="models:FileTransferItem">
-                                    <CheckBox HorizontalAlignment="Center" IsChecked="{Binding IsSelected, Mode=TwoWay}" />
+                                    <CheckBox HorizontalAlignment="Center"
+                                              IsChecked="{Binding IsSelected, Mode=TwoWay}" />
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellTemplate>
                         </DataGridTemplateColumn>

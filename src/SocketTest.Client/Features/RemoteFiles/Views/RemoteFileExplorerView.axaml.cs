@@ -1,12 +1,12 @@
+using System;
+using System.Linq;
+using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
 using SocketTest.Client.Features.RemoteFiles.Models;
 using SocketTest.Client.Features.RemoteFiles.ViewModels;
-using System;
-using System.Linq;
-using System.Threading.Tasks;
 
 namespace SocketTest.Client.Features.RemoteFiles.Views;
 
@@ -19,7 +19,8 @@ public partial class RemoteFileExplorerView : UserControl
 
     private async void NavigationTree_OnSelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
-        if (GetViewModel() is not { } viewModel || e.AddedItems.OfType<RemoteDirectoryNode>().FirstOrDefault() is not { } node)
+        if (GetViewModel() is not { } viewModel || e.AddedItems.OfType<RemoteDirectoryNode>().FirstOrDefault() is not
+                { } node)
         {
             return;
         }
@@ -88,11 +89,14 @@ public partial class RemoteFileExplorerView : UserControl
             GetContextEntry(sender) ?? ToEntry(GetTreeContextNode(sender)));
     }
 
-    private async void DownloadSelectionButton_OnClick(object? sender, RoutedEventArgs e) => await DownloadTargetAsync(sender);
+    private async void DownloadSelectionButton_OnClick(object? sender, RoutedEventArgs e) =>
+        await DownloadTargetAsync(sender);
 
-    private async void DownloadEntryMenuItem_OnClick(object? sender, RoutedEventArgs e) => await DownloadTargetAsync(sender);
+    private async void DownloadEntryMenuItem_OnClick(object? sender, RoutedEventArgs e) =>
+        await DownloadTargetAsync(sender);
 
-    private async void DownloadTreeNodeMenuItem_OnClick(object? sender, RoutedEventArgs e) => await DownloadTargetAsync(sender);
+    private async void DownloadTreeNodeMenuItem_OnClick(object? sender, RoutedEventArgs e) =>
+        await DownloadTargetAsync(sender);
 
     private async Task DownloadTargetAsync(object? sender)
     {
@@ -195,13 +199,17 @@ public partial class RemoteFileExplorerView : UserControl
         }
     }
 
-    private void UploadFilesForEntryMenuItem_OnClick(object? sender, RoutedEventArgs e) => UploadFilesButton_OnClick(sender, e);
+    private void UploadFilesForEntryMenuItem_OnClick(object? sender, RoutedEventArgs e) =>
+        UploadFilesButton_OnClick(sender, e);
 
-    private void UploadFolderForEntryMenuItem_OnClick(object? sender, RoutedEventArgs e) => UploadFolderButton_OnClick(sender, e);
+    private void UploadFolderForEntryMenuItem_OnClick(object? sender, RoutedEventArgs e) =>
+        UploadFolderButton_OnClick(sender, e);
 
-    private void UploadFilesForTreeNodeMenuItem_OnClick(object? sender, RoutedEventArgs e) => UploadFilesButton_OnClick(sender, e);
+    private void UploadFilesForTreeNodeMenuItem_OnClick(object? sender, RoutedEventArgs e) =>
+        UploadFilesButton_OnClick(sender, e);
 
-    private void UploadFolderForTreeNodeMenuItem_OnClick(object? sender, RoutedEventArgs e) => UploadFolderButton_OnClick(sender, e);
+    private void UploadFolderForTreeNodeMenuItem_OnClick(object? sender, RoutedEventArgs e) =>
+        UploadFolderButton_OnClick(sender, e);
 
     private RemoteFileExplorerViewModel? GetViewModel() => DataContext as RemoteFileExplorerViewModel;
 
@@ -212,9 +220,11 @@ public partial class RemoteFileExplorerView : UserControl
         return viewModel != null && topLevel != null;
     }
 
-    private static RemoteFileEntry? GetContextEntry(object? sender) => (sender as MenuItem)?.DataContext as RemoteFileEntry;
+    private static RemoteFileEntry? GetContextEntry(object? sender) =>
+        (sender as MenuItem)?.DataContext as RemoteFileEntry;
 
-    private static RemoteDirectoryNode? GetTreeContextNode(object? sender) => (sender as MenuItem)?.DataContext as RemoteDirectoryNode;
+    private static RemoteDirectoryNode? GetTreeContextNode(object? sender) =>
+        (sender as MenuItem)?.DataContext as RemoteDirectoryNode;
 
     private static RemoteFileEntry? ToEntry(RemoteDirectoryNode? node)
     {

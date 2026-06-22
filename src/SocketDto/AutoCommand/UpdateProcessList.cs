@@ -12,5 +12,6 @@ public class UpdateProcessList : INetObject
     ///     进程列表
     /// </summary>
     public List<ProcessItem>? Processes { get; set; }
+
     public override string ToString() => $"更新进程列表(数量={Processes?.Count ?? 0})";
 }

@@ -15,7 +15,7 @@ public class ResponseProcessListUnitTest
             Flag = true,
             Kind = SampleEnum.SecondValue
         };
-        var buffer = SerializeHelper.SerializeObject(obj);
+        var buffer = obj.SerializeObject();
         var newObj = buffer.DeserializeObject<EnumAndBool>();
         Assert.Equal(obj.Name, newObj.Name);
         Assert.Equal(obj.Flag, newObj.Flag);
@@ -89,14 +89,14 @@ public class ResponseProcessListUnitTest
     [Fact]
     public void Test_SerializeAndDeserializeObject_Success()
     {
-        var obj = new Student()
+        var obj = new Student
         {
             Id = 1,
             Name = "codewf",
             Record = double.NaN
         };
 
-        var buffer = SerializeHelper.SerializeObject(obj);
+        var buffer = obj.SerializeObject();
         var newObj = buffer.DeserializeObject<Student>();
 
         Assert.Equal(obj.Id, newObj.Id);

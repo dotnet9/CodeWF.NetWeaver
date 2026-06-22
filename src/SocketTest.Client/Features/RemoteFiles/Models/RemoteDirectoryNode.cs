@@ -1,5 +1,5 @@
-using ReactiveUI;
 using System.Collections.ObjectModel;
+using ReactiveUI;
 
 namespace SocketTest.Client.Features.RemoteFiles.Models;
 
@@ -17,13 +17,29 @@ public class RemoteDirectoryNode : ReactiveObject
 
     public bool IsPlaceholder { get; init; }
 
-    public bool IsExpanded { get; set => this.RaiseAndSetIfChanged(ref field, value); }
+    public bool IsExpanded
+    {
+        get;
+        set => this.RaiseAndSetIfChanged(ref field, value);
+    }
 
-    public bool IsSelected { get; set => this.RaiseAndSetIfChanged(ref field, value); }
+    public bool IsSelected
+    {
+        get;
+        set => this.RaiseAndSetIfChanged(ref field, value);
+    }
 
-    public bool IsLoading { get; set => this.RaiseAndSetIfChanged(ref field, value); }
+    public bool IsLoading
+    {
+        get;
+        set => this.RaiseAndSetIfChanged(ref field, value);
+    }
 
-    public bool ChildrenLoaded { get; set => this.RaiseAndSetIfChanged(ref field, value); }
+    public bool ChildrenLoaded
+    {
+        get;
+        set => this.RaiseAndSetIfChanged(ref field, value);
+    }
 
     public ObservableCollection<RemoteDirectoryNode> Children { get; } = [];
 

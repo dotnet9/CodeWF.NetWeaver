@@ -1,6 +1,6 @@
+using System.ComponentModel;
 using ReactiveUI;
 using SocketTest.Client.Shell.Services;
-using System.ComponentModel;
 
 namespace SocketTest.Client.Shell.ViewModels;
 

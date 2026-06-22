@@ -9,22 +9,22 @@ namespace CodeWF.NetWeaver;
 public static partial class SerializeHelper
 {
     /// <summary>
-    /// UDP建议最大包大小
+    ///     UDP建议最大包大小
     /// </summary>
     public const int MaxUdpPacketSize = 65507;
 
     /// <summary>
-    /// TCP单包最大大小，避免异常或恶意长度字段导致过大内存分配
-    /// </summary>
-    public static int MaxTcpPacketSize { get; set; } = 64 * 1024 * 1024;
-
-    /// <summary>
-    /// 网络数据包头部固定大小，头部固定字段数据类型大小(PacketSize + SystemId + ObjectId + ObjectVersion + UnixTimeMilliseconds)
+    ///     网络数据包头部固定大小，头部固定字段数据类型大小(PacketSize + SystemId + ObjectId + ObjectVersion + UnixTimeMilliseconds)
     /// </summary>
     public const int PacketHeadLen = sizeof(int) + sizeof(long) + sizeof(ushort) + sizeof(byte) + sizeof(long);
 
     /// <summary>
-    /// 从Socket异步读取指定数量的字节，确保读取到完整的字节数
+    ///     TCP单包最大大小，避免异常或恶意长度字段导致过大内存分配
+    /// </summary>
+    public static int MaxTcpPacketSize { get; set; } = 64 * 1024 * 1024;
+
+    /// <summary>
+    ///     从Socket异步读取指定数量的字节，确保读取到完整的字节数
     /// </summary>
     /// <param name="socket">Socket对象</param>
     /// <param name="buffer">目标缓冲区</param>
@@ -53,7 +53,7 @@ public static partial class SerializeHelper
     }
 
     /// <summary>
-    /// 异步从Socket读取数据包</param>
+    ///     异步从Socket读取数据包</param>
     /// </summary>
     /// <param name="socket">Socket对象</param>
     /// <param name="cancellationToken">取消令牌</param>
@@ -82,7 +82,7 @@ public static partial class SerializeHelper
         }
 
         var readIndex = 0;
-        var success = ReadHead(buffer, ref readIndex, out var netObject);
+        var success = buffer.ReadHead(ref readIndex, out var netObject);
         return success
             ? (true, buffer, netObject)
             : ReadPacketFailed();

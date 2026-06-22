@@ -1,8 +1,20 @@
-﻿using Avalonia.Controls.Notifications;
+﻿using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Collections.Specialized;
+using System.Diagnostics;
+using System.Linq;
+using System.Net;
+using System.Net.Sockets;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Timers;
+using Avalonia.Controls.Notifications;
 using Avalonia.Threading;
 using CodeWF.EventBus;
 using CodeWF.Log.Core;
 using CodeWF.NetWeaver;
+using CodeWF.NetWeaver.Base;
 using CodeWF.NetWrapper.Commands;
 using CodeWF.NetWrapper.Helpers;
 using CodeWF.NetWrapper.Models;
@@ -13,20 +25,9 @@ using SocketDto.AutoCommand;
 using SocketDto.Enums;
 using SocketDto.Requests;
 using SocketDto.Response;
-using SocketDto.Udp;
 using SocketTest.Server.Configuration;
 using SocketTest.Server.Features.Processes.Services;
 using SocketTest.Server.Shell.Messages;
-using System;
-using System.Collections.Generic;
-using System.Collections.ObjectModel;
-using System.Collections.Specialized;
-using System.Diagnostics;
-using System.Linq;
-using System.Net;
-using System.Net.Sockets;
-using System.Threading;
-using System.Threading.Tasks;
 using Notification = Avalonia.Controls.Notifications.Notification;
 using Timer = System.Timers.Timer;
 
@@ -47,19 +48,19 @@ public class MainWindowViewModel : ReactiveObject
 
     private readonly IProcessSnapshotProvider _processSnapshotProvider;
     private readonly object _processStructureChangeDebounceSyncRoot = new();
-    private readonly string _settingsFilePath;
     private readonly ServerRuntimeSettings _runtimeSettings = new();
+    private readonly string _settingsFilePath;
     private Task? _initialSnapshotWarmupTask;
     private CancellationTokenSource? _processStructureChangeDebounceCts;
-    private Timer? _snapshotRefreshTimer;
-    private Timer? _sendRealtimeDataTimer;
     private Timer? _sendGeneralDataTimer;
+    private Timer? _sendRealtimeDataTimer;
+    private Timer? _snapshotRefreshTimer;
 
     internal MainWindowViewModel(IProcessSnapshotProvider processSnapshotProvider)
     {
         _processSnapshotProvider = processSnapshotProvider;
         _settingsFilePath = AppContext.GetData("APP_CONFIG_FILE") as string
-            ?? "应用配置文件";
+                            ?? "应用配置文件";
 
         TcpHelper = new TcpSocketServer();
         UdpHelper = new UdpSocketServer();
@@ -80,9 +81,17 @@ public class MainWindowViewModel : ReactiveObject
 
     public ObservableCollection<KeyValuePair<string, Socket>> ConnectedClients { get; } = [];
 
-    public bool IsRunning { get; private set => this.RaiseAndSetIfChanged(ref field, value); }
+    public bool IsRunning
+    {
+        get;
+        private set => this.RaiseAndSetIfChanged(ref field, value);
+    }
 
-    public int CurrentProcessCount { get; private set => this.RaiseAndSetIfChanged(ref field, value); }
+    public int CurrentProcessCount
+    {
+        get;
+        private set => this.RaiseAndSetIfChanged(ref field, value);
+    }
 
     public int ClientCount => ConnectedClients.Count;
 
@@ -91,7 +100,7 @@ public class MainWindowViewModel : ReactiveObject
     public string ServiceStatusText => IsRunning ? "服务运行中" : "服务未启动";
 
     /// <summary>
-    /// 统一处理服务端启动与停止流程，并在启动后完成首轮真实进程快照采集。
+    ///     统一处理服务端启动与停止流程，并在启动后完成首轮真实进程快照采集。
     /// </summary>
     public async Task ToggleServerAsync()
     {
@@ -148,7 +157,7 @@ public class MainWindowViewModel : ReactiveObject
     }
 
     /// <summary>
-    /// 统一分发客户端发来的 TCP 控制对象，并把每个请求纳入可追踪的日志链路。
+    ///     统一分发客户端发来的 TCP 控制对象，并把每个请求纳入可追踪的日志链路。
     /// </summary>
     [EventHandler]
     private async Task ReceiveSocketMessageAsync(SocketCommand request)
@@ -373,7 +382,7 @@ public class MainWindowViewModel : ReactiveObject
         StopTimer(ref _sendGeneralDataTimer);
     }
 
-    private static Timer CreateTimer(double interval, System.Timers.ElapsedEventHandler handler)
+    private static Timer CreateTimer(double interval, ElapsedEventHandler handler)
     {
         var timer = new Timer(interval);
         timer.Elapsed += handler;
@@ -412,9 +421,10 @@ public class MainWindowViewModel : ReactiveObject
     }
 
     /// <summary>
-    /// 在后台线程刷新一次完整进程快照，避免首次启动采集阻塞 UI。
+    ///     在后台线程刷新一次完整进程快照，避免首次启动采集阻塞 UI。
     /// </summary>
-    private async Task<ProcessSnapshotRefreshResult> RefreshProcessSnapshotAsync(CancellationToken cancellationToken = default)
+    private async Task<ProcessSnapshotRefreshResult> RefreshProcessSnapshotAsync(
+        CancellationToken cancellationToken = default)
     {
         var result = await Task.Run(_processSnapshotProvider.RefreshSnapshot, cancellationToken);
         CurrentProcessCount = result.ProcessCount;
@@ -445,7 +455,7 @@ public class MainWindowViewModel : ReactiveObject
         }
     }
 
-    private async void SnapshotRefreshTimerOnElapsed(object? sender, System.Timers.ElapsedEventArgs e)
+    private async void SnapshotRefreshTimerOnElapsed(object? sender, ElapsedEventArgs e)
     {
         if (!TcpHelper.IsRunning)
         {
@@ -468,7 +478,7 @@ public class MainWindowViewModel : ReactiveObject
         }
     }
 
-    private async void SendRealtimeDataTimerOnElapsed(object? sender, System.Timers.ElapsedEventArgs e)
+    private async void SendRealtimeDataTimerOnElapsed(object? sender, ElapsedEventArgs e)
     {
         await PushUdpSnapshotAsync(
             _processSnapshotProvider.CalculateRealtimeUdpPage,
@@ -476,7 +486,7 @@ public class MainWindowViewModel : ReactiveObject
             "推送实时进程 UDP 数据失败。");
     }
 
-    private async void SendGeneralDataTimerOnElapsed(object? sender, System.Timers.ElapsedEventArgs e)
+    private async void SendGeneralDataTimerOnElapsed(object? sender, ElapsedEventArgs e)
     {
         await PushUdpSnapshotAsync(
             _processSnapshotProvider.CalculateGeneralUdpPage,
@@ -611,6 +621,7 @@ public class MainWindowViewModel : ReactiveObject
         socket.Bind(new IPEndPoint(IPAddress.Loopback, 0));
         return ((IPEndPoint)socket.LocalEndPoint!).Port;
     }
+
     private async Task<bool> TryHandleSocketCommandAsync<TCommand>(
         SocketCommand request,
         Func<Socket, TCommand, Task> handler)
@@ -630,14 +641,14 @@ public class MainWindowViewModel : ReactiveObject
         return true;
     }
 
-    private Task SendResponseAsync(Socket client, CodeWF.NetWeaver.Base.INetObject response)
+    private Task SendResponseAsync(Socket client, INetObject response)
     {
         Logger.Info($"服务端 -> 客户端 TCP：{response}");
         return TcpHelper.SendCommandAsync(client, response);
     }
 
     /// <summary>
-    /// 将完整进程树按页返回给客户端，避免单次响应包过大。
+    ///     将完整进程树按页返回给客户端，避免单次响应包过大。
     /// </summary>
     private async Task SendProcessPagesAsync(Socket client, int taskId)
     {
@@ -662,11 +673,11 @@ public class MainWindowViewModel : ReactiveObject
     }
 
     /// <summary>
-    /// 周期性将快照压缩为 UDP 增量页发送给客户端，用于高频更新实时指标。
+    ///     周期性将快照压缩为 UDP 增量页发送给客户端，用于高频更新实时指标。
     /// </summary>
     private async Task PushUdpSnapshotAsync(
         UdpPageCalculator calculatePage,
-        Func<int, int, CodeWF.NetWeaver.Base.INetObject> buildPage,
+        Func<int, int, INetObject> buildPage,
         string errorMessage)
     {
         if (!UdpHelper.IsRunning || !_processSnapshotProvider.IsInitialized)
@@ -700,12 +711,11 @@ public class MainWindowViewModel : ReactiveObject
         }
     }
 
-    private delegate void UdpPageCalculator(int maxPacketSize, out int pageSize, out int pageCount);
-
     private void PublishServerStatusChanged() =>
         _ = EventBus.Default.PublishAsync(new ServerShellStatusChangedMessage(
             ServiceStatusText,
             CurrentProcessCount,
             ClientCount));
 
+    private delegate void UdpPageCalculator(int maxPacketSize, out int pageSize, out int pageCount);
 }

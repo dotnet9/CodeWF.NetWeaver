@@ -1,7 +1,7 @@
-using Avalonia.Data;
-using Avalonia.Data.Converters;
 using System;
 using System.Globalization;
+using Avalonia.Data;
+using Avalonia.Data.Converters;
 
 namespace SocketTest.Client.Converters;
 
@@ -13,6 +13,7 @@ public class BoolToDirectoryConverter : IValueConverter
         {
             return isDirectory ? "目录" : "文件";
         }
+
         return "未知";
     }
 

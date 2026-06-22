@@ -1,10 +1,3 @@
-using CodeWF.Log.Core;
-using CodeWF.NetWeaver;
-using CodeWF.NetWeaver.Base;
-using CodeWF.NetWrapper.Commands;
-using CodeWF.NetWrapper.Models;
-using CodeWF.NetWrapper.Requests;
-using CodeWF.NetWrapper.Response;
 using System;
 using System.Collections.Concurrent;
 using System.Linq;
@@ -13,59 +6,65 @@ using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
+using CodeWF.Log.Core;
+using CodeWF.NetWeaver;
+using CodeWF.NetWeaver.Base;
+using CodeWF.NetWrapper.Commands;
+using CodeWF.NetWrapper.Requests;
+using CodeWF.NetWrapper.Response;
 
 namespace CodeWF.NetWrapper.Helpers;
 
 /// <summary>
-/// TCP Socket 服务端类，用于接受 TCP 客户端连接并进行通信，支持文件传输和命令收发
+///     TCP Socket 服务端类，用于接受 TCP 客户端连接并进行通信，支持文件传输和命令收发
 /// </summary>
 public partial class TcpSocketServer
 {
     /// <summary>
-    /// 客户端会话字典，键为客户端标识，值为 TCP 会话对象
+    ///     客户端会话字典，键为客户端标识，值为 TCP 会话对象
     /// </summary>
     public readonly ConcurrentDictionary<string, TcpSession> Clients = new();
-
-    private Channel<(string ClientKey, SocketCommand Command)> _requests =
-        Channel.CreateUnbounded<(string, SocketCommand)>();
 
     private PeriodicTimer? _detectionTimer;
     private CancellationTokenSource? _listenTokenSource;
 
+    private Channel<(string ClientKey, SocketCommand Command)> _requests =
+        Channel.CreateUnbounded<(string, SocketCommand)>();
+
     #region 公开属性
 
     /// <summary>
-    /// 服务器 Socket 对象
+    ///     服务器 Socket 对象
     /// </summary>
     public Socket? Server { get; private set; }
 
     /// <summary>
-    /// 系统ID，用于标识服务端身份
+    ///     系统ID，用于标识服务端身份
     /// </summary>
     public long SystemId { get; set; } = DateTime.Now.Ticks;
 
     /// <summary>
-    /// 服务标识，用以区分多个服务
+    ///     服务标识，用以区分多个服务
     /// </summary>
     public string? ServerMark { get; private set; }
 
     /// <summary>
-    /// 服务器IP地址
+    ///     服务器IP地址
     /// </summary>
     public string? ServerIP { get; private set; }
 
     /// <summary>
-    /// 服务器端口号
+    ///     服务器端口号
     /// </summary>
     public int ServerPort { get; private set; }
 
     /// <summary>
-    /// 客户端超时时间（秒）
+    ///     客户端超时时间（秒）
     /// </summary>
     public int TimeOut { get; private set; }
 
     /// <summary>
-    /// 是否正在运行
+    ///     是否正在运行
     /// </summary>
     public bool IsRunning { get; set; }
 
@@ -74,7 +73,7 @@ public partial class TcpSocketServer
     #region 公开接口方法
 
     /// <summary>
-    /// 启动 TCP 服务器
+    ///     启动 TCP 服务器
     /// </summary>
     /// <param name="serverMark">服务器标识</param>
     /// <param name="serverIP">服务器IP地址</param>
@@ -112,13 +111,13 @@ public partial class TcpSocketServer
         catch (Exception ex)
         {
             Logger.Error($"{ServerMark} 启动失败，服务地址是：{ServerIP}:{ServerPort}", ex,
-                uiContent: $"{ServerMark} 启动失败，服务地址是：{ServerIP}:{ServerPort}，详细日志查看日志文件");
+                $"{ServerMark} 启动失败，服务地址是：{ServerIP}:{ServerPort}，详细日志查看日志文件");
             return (IsSuccess: false, ErrorMessage: $"{ServerMark} 启动失败，异常信息：{ex.Message}");
         }
     }
 
     /// <summary>
-    /// 停止 TCP 服务器
+    ///     停止 TCP 服务器
     /// </summary>
     public async Task StopAsync()
     {
@@ -144,7 +143,7 @@ public partial class TcpSocketServer
     }
 
     /// <summary>
-    /// 向所有已连接的客户端发送命令
+    ///     向所有已连接的客户端发送命令
     /// </summary>
     /// <param name="command">要发送的网络对象命令</param>
     public async Task SendCommandAsync(INetObject command)
@@ -173,14 +172,14 @@ public partial class TcpSocketServer
             catch (SocketException ex)
             {
                 Logger.Error($"{ServerMark} 发送命令到客户端({clientKey})异常，将移除该客户端", ex,
-                    uiContent: $"{ServerMark} 发送命令到客户端({clientKey})异常，将移除该客户端，详细信息请查看日志文件");
+                    $"{ServerMark} 发送命令到客户端({clientKey})异常，将移除该客户端，详细信息请查看日志文件");
                 await RemoveClientAsync(clientKey);
             }
         }
     }
 
     /// <summary>
-    /// 向指定客户端发送命令
+    ///     向指定客户端发送命令
     /// </summary>
     /// <param name="client">客户端 Socket 对象</param>
     /// <param name="command">要发送的网络对象命令</param>
@@ -195,7 +194,7 @@ public partial class TcpSocketServer
     #region 接收客户端命令
 
     /// <summary>
-    /// 移除客户端连接（内部方法，通过 Socket 对象）
+    ///     移除客户端连接（内部方法，通过 Socket 对象）
     /// </summary>
     /// <param name="tcpClient">客户端 Socket 对象</param>
     private async Task RemoveClientAsync(Socket tcpClient)
@@ -204,7 +203,7 @@ public partial class TcpSocketServer
     }
 
     /// <summary>
-    /// 移除客户端连接（内部方法，通过客户端键）
+    ///     移除客户端连接（内部方法，通过客户端键）
     /// </summary>
     /// <param name="key">客户端标识键</param>
     private async Task RemoveClientAsync(string key)
@@ -224,7 +223,7 @@ public partial class TcpSocketServer
     }
 
     /// <summary>
-    /// 监听客户端连接请求（内部方法）
+    ///     监听客户端连接请求（内部方法）
     /// </summary>
     private async Task ListenForClientsAsync(CancellationTokenSource listenTokenSource,
         ChannelWriter<(string ClientKey, SocketCommand Command)> requests)
@@ -249,27 +248,31 @@ public partial class TcpSocketServer
             {
                 if (IsRunning && ReferenceEquals(_listenTokenSource, listenTokenSource))
                 {
-                    Logger.Error($"{ServerMark} 处理客户端连接上线异常", ex, uiContent: $"{ServerMark} 处理客户端连接上线异常，详细信息请查看日志文件");
+                    Logger.Error($"{ServerMark} 处理客户端连接上线异常", ex, $"{ServerMark} 处理客户端连接上线异常，详细信息请查看日志文件");
                 }
             }
         }
     }
 
     /// <summary>
-    /// 处理客户端数据接收（内部方法）
+    ///     处理客户端数据接收（内部方法）
     /// </summary>
     /// <param name="client">TCP 会话对象</param>
     private async Task HandleClientAsync(TcpSession client, CancellationTokenSource listenTokenSource,
         ChannelWriter<(string ClientKey, SocketCommand Command)> requests)
     {
         var tcpClientKey = client.TcpSocket?.RemoteEndPoint?.ToString() ?? string.Empty;
+        using var receiveTokenSource = client.TokenSource == null
+            ? CancellationTokenSource.CreateLinkedTokenSource(listenTokenSource.Token)
+            : CancellationTokenSource.CreateLinkedTokenSource(listenTokenSource.Token, client.TokenSource.Token);
+
         while (IsRunning && ReferenceEquals(_listenTokenSource, listenTokenSource) &&
                !listenTokenSource.IsCancellationRequested &&
                client.TokenSource?.IsCancellationRequested != true)
         {
             try
             {
-                var (success, buffer, headInfo) = await client.TcpSocket!.ReadPacketAsync();
+                var (success, buffer, headInfo) = await client.TcpSocket!.ReadPacketAsync(receiveTokenSource.Token);
                 if (!success || buffer == null || headInfo == null)
                 {
                     Logger.Warn($"{ServerMark} 客户端({tcpClientKey})连接已断开，将移除该客户端");
@@ -279,19 +282,42 @@ public partial class TcpSocketServer
 
                 await requests.WriteAsync((tcpClientKey, new SocketCommand(headInfo, buffer, client.TcpSocket)));
             }
+            catch (OperationCanceledException) when (IsClientReceiveStopped(client, listenTokenSource))
+            {
+                break;
+            }
+            catch (SocketException ex) when (IsClientReceiveStopped(client, listenTokenSource) ||
+                                             IsSocketOperationAborted(ex))
+            {
+                Logger.Debug($"{ServerMark} 客户端({tcpClientKey})接收已取消，结束接收循环");
+                break;
+            }
             catch (SocketException ex)
             {
                 Logger.Error($"{ServerMark} 远程主机({tcpClientKey})异常，将移除该客户端", ex,
-                    uiContent: $"{ServerMark} 远程主机({tcpClientKey})异常，将移除该客户端，详细信息请查看日志文件");
+                    $"{ServerMark} 远程主机({tcpClientKey})异常，将移除该客户端，详细信息请查看日志文件");
                 await RemoveClientAsync(tcpClientKey);
                 break;
             }
             catch (Exception ex)
             {
-                Logger.Error($"{ServerMark} 接收数据异常", ex, uiContent: $"{ServerMark} 接收数据异常，详细信息请查看日志文件");
+                Logger.Error($"{ServerMark} 接收数据异常", ex, $"{ServerMark} 接收数据异常，详细信息请查看日志文件");
                 await Task.Delay(TimeSpan.FromMilliseconds(100));
             }
         }
+    }
+
+    private bool IsClientReceiveStopped(TcpSession client, CancellationTokenSource listenTokenSource)
+    {
+        return !IsRunning
+               || !ReferenceEquals(_listenTokenSource, listenTokenSource)
+               || listenTokenSource.IsCancellationRequested
+               || client.TokenSource?.IsCancellationRequested == true;
+    }
+
+    private static bool IsSocketOperationAborted(SocketException ex)
+    {
+        return ex.SocketErrorCode is SocketError.OperationAborted or SocketError.Interrupted;
     }
 
     #endregion
@@ -299,7 +325,7 @@ public partial class TcpSocketServer
     #region 处理客户端请求
 
     /// <summary>
-    /// 处理客户端请求（内部方法）
+    ///     处理客户端请求（内部方法）
     /// </summary>
     private async Task ProcessingRequestsAsync(ChannelReader<(string ClientKey, SocketCommand Command)> requests,
         ChannelWriter<(string ClientKey, SocketCommand Command)> fileTransferRequests)
@@ -334,7 +360,7 @@ public partial class TcpSocketServer
             catch (Exception ex)
             {
                 Logger.Error($"{ServerMark} 处理客户端请求异常", ex,
-                    uiContent: $"{ServerMark} 处理客户端请求异常，详细信息请查看日志文件");
+                    $"{ServerMark} 处理客户端请求异常，详细信息请查看日志文件");
             }
         }
     }
@@ -354,7 +380,7 @@ public partial class TcpSocketServer
     }
 
     /// <summary>
-    /// 缓存客户端会话（内部方法）
+    ///     缓存客户端会话（内部方法）
     /// </summary>
     /// <param name="socket">客户端 Socket 对象</param>
     /// <returns>TCP 会话对象</returns>
@@ -382,12 +408,14 @@ public partial class TcpSocketServer
     }
 
     /// <summary>
-    /// 定时检测客户端连接状态（内部方法）
+    ///     定时检测客户端连接状态（内部方法）
     /// </summary>
     private async Task DetectionClientsAsync(CancellationTokenSource listenTokenSource)
     {
         if (!ReferenceEquals(_listenTokenSource, listenTokenSource))
+        {
             return;
+        }
 
         _detectionTimer = new PeriodicTimer(TimeSpan.FromSeconds(5));
         try
@@ -416,12 +444,12 @@ public partial class TcpSocketServer
         }
         catch (Exception ex)
         {
-            Logger.Error($"{ServerMark} 心跳检测异常", ex, uiContent: $"{ServerMark} 客户端心跳检测异常，详细信息请查看日志文件");
+            Logger.Error($"{ServerMark} 心跳检测异常", ex, $"{ServerMark} 客户端心跳检测异常，详细信息请查看日志文件");
         }
     }
 
     /// <summary>
-    /// 更新客户端最后活动时间（内部方法）
+    ///     更新客户端最后活动时间（内部方法）
     /// </summary>
     /// <param name="clientKey">客户端标识键</param>
     private void ActiveClient(string clientKey)

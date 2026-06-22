@@ -1,13 +1,12 @@
 ﻿using System.ComponentModel;
 
-namespace CodeWF.NetWeaver.Tests.Models
+namespace CodeWF.NetWeaver.Tests.Models;
+
+public enum ProcessStatus
 {
-    public enum ProcessStatus
-    {
-        [Description("New")] New,
-        [Description("Ready")] Ready,
-        [Description("Running")] Running,
-        [Description("Blocked")] Blocked,
-        [Description("Terminated")] Terminated
-    }
+    [Description("New")] New,
+    [Description("Ready")] Ready,
+    [Description("Running")] Running,
+    [Description("Blocked")] Blocked,
+    [Description("Terminated")] Terminated
 }

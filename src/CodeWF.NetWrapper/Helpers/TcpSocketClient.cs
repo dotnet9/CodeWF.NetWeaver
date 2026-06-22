@@ -1,62 +1,59 @@
+using System;
+using System.Net;
+using System.Net.Sockets;
+using System.Threading.Channels;
+using System.Threading.Tasks;
 using CodeWF.Log.Core;
 using CodeWF.NetWeaver;
 using CodeWF.NetWeaver.Base;
 using CodeWF.NetWrapper.Commands;
 using CodeWF.NetWrapper.Requests;
 using CodeWF.NetWrapper.Response;
-using System;
-using System.Collections.Concurrent;
-using System.IO;
-using System.Net;
-using System.Net.Sockets;
-using System.Threading;
-using System.Threading.Channels;
-using System.Threading.Tasks;
 
 namespace CodeWF.NetWrapper.Helpers;
 
 /// <summary>
-/// TCP Socket 客户端类，用于与 TCP 服务器建立连接并进行通信，支持文件传输和命令收发
+///     TCP Socket 客户端类，用于与 TCP 服务器建立连接并进行通信，支持文件传输和命令收发
 /// </summary>
 public partial class TcpSocketClient
 {
-    private Channel<SocketCommand> _responses = Channel.CreateUnbounded<SocketCommand>();
     private Socket? _client;
+    private Channel<SocketCommand> _responses = Channel.CreateUnbounded<SocketCommand>();
 
     #region 公开属性
 
     /// <summary>
-    /// 服务标识，用以区分多个服务
+    ///     服务标识，用以区分多个服务
     /// </summary>
     public string? ServerMark { get; private set; }
 
     /// <summary>
-    /// 系统ID，用于标识客户端身份
+    ///     系统ID，用于标识客户端身份
     /// </summary>
     public long SystemId { get; private set; }
 
     /// <summary>
-    /// 服务器IP地址
+    ///     服务器IP地址
     /// </summary>
     public string? ServerIP { get; private set; }
 
     /// <summary>
-    /// 服务器端口号
+    ///     服务器端口号
     /// </summary>
     public int ServerPort { get; private set; }
 
     /// <summary>
-    /// 是否正在运行
+    ///     是否正在运行
     /// </summary>
     public bool IsRunning { get; set; }
 
     /// <summary>
-    /// 本地端点地址
+    ///     本地端点地址
     /// </summary>
     public string? LocalEndPoint { get; set; }
 
     /// <summary>
-    /// 是否可以发送数据（需已连接且正在运行）
+    ///     是否可以发送数据（需已连接且正在运行）
     /// </summary>
     public bool CanSend => _client is { Connected: true } && IsRunning;
 
@@ -65,7 +62,7 @@ public partial class TcpSocketClient
     #region 公开接口
 
     /// <summary>
-    /// 连接到TCP服务器
+    ///     连接到TCP服务器
     /// </summary>
     /// <param name="serverMark">服务器标识</param>
     /// <param name="serverIP">服务器IP地址</param>
@@ -106,7 +103,7 @@ public partial class TcpSocketClient
     }
 
     /// <summary>
-    /// 断开连接并停止客户端
+    ///     断开连接并停止客户端
     /// </summary>
     public void Stop()
     {
@@ -115,14 +112,17 @@ public partial class TcpSocketClient
     }
 
     /// <summary>
-    /// 发送命令到服务器
+    ///     发送命令到服务器
     /// </summary>
     /// <param name="command">要发送的网络对象命令</param>
     /// <exception cref="Exception">未连接时抛出异常</exception>
     public async Task SendCommandAsync(INetObject command)
     {
         var netObjInfo = command.GetType().GetNetObjectHead();
-        if (!CanSend) throw new Exception($"{ServerMark} 未连接，无法发送命令【ID：{netObjInfo.Id}，Version：{netObjInfo.Version}】");
+        if (!CanSend)
+        {
+            throw new Exception($"{ServerMark} 未连接，无法发送命令【ID：{netObjInfo.Id}，Version：{netObjInfo.Version}】");
+        }
 
         var buffer = command.Serialize(SystemId);
         await _client!.SendAsync(buffer);
@@ -133,7 +133,7 @@ public partial class TcpSocketClient
     #region 连接TCP、接收数据
 
     /// <summary>
-    /// 监听服务器消息（内部方法）
+    ///     监听服务器消息（内部方法）
     /// </summary>
     private async Task ListenForServerAsync(ChannelWriter<SocketCommand> responses,
         ChannelWriter<SocketCommand> fileTransferResponses)
@@ -224,7 +224,7 @@ public partial class TcpSocketClient
     }
 
     /// <summary>
-    /// 检查响应队列并发布事件（内部方法）
+    ///     检查响应队列并发布事件（内部方法）
     /// </summary>
     private async Task CheckResponseAsync(ChannelReader<SocketCommand> responses,
         ChannelWriter<SocketCommand> fileTransferResponses)

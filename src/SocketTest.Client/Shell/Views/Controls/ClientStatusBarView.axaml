@@ -15,7 +15,8 @@
             CornerRadius="8">
         <Grid>
             <controls:ProcessMonitorStatusView IsVisible="{Binding #Root.DataContext.IsProcessMonitorTabSelected}" />
-            <controls:RemoteFileExplorerStatusView IsVisible="{Binding #Root.DataContext.IsRemoteFileExplorerTabSelected}" />
+            <controls:RemoteFileExplorerStatusView
+                IsVisible="{Binding #Root.DataContext.IsRemoteFileExplorerTabSelected}" />
             <controls:FileTransferStatusView IsVisible="{Binding #Root.DataContext.IsFileTransferTabSelected}" />
         </Grid>
     </Border>

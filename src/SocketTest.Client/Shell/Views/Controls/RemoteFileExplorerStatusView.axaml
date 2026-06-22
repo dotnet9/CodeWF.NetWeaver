@@ -10,7 +10,8 @@
              x:DataType="vm:RemoteFileExplorerStatusViewModel">
     <Grid ColumnDefinitions="Auto,*,Auto,*,Auto,*" ColumnSpacing="8">
         <TextBlock Foreground="#9CA3AF" Text="当前目录" />
-        <TextBlock Grid.Column="1" Foreground="White" TextTrimming="CharacterEllipsis" Text="{Binding CurrentDirectoryPath}" />
+        <TextBlock Grid.Column="1" Foreground="White" TextTrimming="CharacterEllipsis"
+                   Text="{Binding CurrentDirectoryPath}" />
         <TextBlock Grid.Column="2" Foreground="#9CA3AF" Text="浏览概览" />
         <TextBlock Grid.Column="3" Foreground="White" TextTrimming="CharacterEllipsis" Text="{Binding ExplorerSummary}" />
         <TextBlock Grid.Column="4" Foreground="#9CA3AF" Text="当前状态" />

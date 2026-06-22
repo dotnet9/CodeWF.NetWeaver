@@ -91,16 +91,18 @@
                         <DataGridTemplateColumn Width="110" Header="状态">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate x:DataType="models:ProcessItemModel">
-                                    <TextBlock Foreground="{Binding Status, Converter={StaticResource ProcessStatusToForegroundConverter}}"
-                                               Text="{Binding Status, Converter={StaticResource EnumToDescriptionConverter}}" />
+                                    <TextBlock
+                                        Foreground="{Binding Status, Converter={StaticResource ProcessStatusToForegroundConverter}}"
+                                        Text="{Binding Status, Converter={StaticResource EnumToDescriptionConverter}}" />
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellTemplate>
                         </DataGridTemplateColumn>
                         <DataGridTemplateColumn Width="110" Header="告警">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate x:DataType="models:ProcessItemModel">
-                                    <TextBlock Foreground="{Binding AlarmStatus, Converter={StaticResource AlarmStatusToForegroundConverter}}"
-                                               Text="{Binding AlarmStatus, Converter={StaticResource EnumToDescriptionConverter}}" />
+                                    <TextBlock
+                                        Foreground="{Binding AlarmStatus, Converter={StaticResource AlarmStatusToForegroundConverter}}"
+                                        Text="{Binding AlarmStatus, Converter={StaticResource EnumToDescriptionConverter}}" />
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellTemplate>
                         </DataGridTemplateColumn>
@@ -109,40 +111,45 @@
                         <DataGridTemplateColumn Width="90" Header="CPU">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate x:DataType="models:ProcessItemModel">
-                                    <TextBlock Foreground="{Binding Cpu, Converter={StaticResource UsageToForegroundConverter}}"
-                                               Text="{Binding Cpu, Converter={StaticResource UsageToFormatConverter}}" />
+                                    <TextBlock
+                                        Foreground="{Binding Cpu, Converter={StaticResource UsageToForegroundConverter}}"
+                                        Text="{Binding Cpu, Converter={StaticResource UsageToFormatConverter}}" />
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellTemplate>
                         </DataGridTemplateColumn>
                         <DataGridTemplateColumn Width="90" Header="内存">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate x:DataType="models:ProcessItemModel">
-                                    <TextBlock Foreground="{Binding Memory, Converter={StaticResource UsageToForegroundConverter}}"
-                                               Text="{Binding Memory, Converter={StaticResource UsageToFormatConverter}}" />
+                                    <TextBlock
+                                        Foreground="{Binding Memory, Converter={StaticResource UsageToForegroundConverter}}"
+                                        Text="{Binding Memory, Converter={StaticResource UsageToFormatConverter}}" />
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellTemplate>
                         </DataGridTemplateColumn>
                         <DataGridTemplateColumn Width="90" Header="磁盘">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate x:DataType="models:ProcessItemModel">
-                                    <TextBlock Foreground="{Binding Disk, Converter={StaticResource UsageToForegroundConverter}}"
-                                               Text="{Binding Disk, Converter={StaticResource UsageToFormatConverter}}" />
+                                    <TextBlock
+                                        Foreground="{Binding Disk, Converter={StaticResource UsageToForegroundConverter}}"
+                                        Text="{Binding Disk, Converter={StaticResource UsageToFormatConverter}}" />
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellTemplate>
                         </DataGridTemplateColumn>
                         <DataGridTemplateColumn Width="90" Header="网络">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate x:DataType="models:ProcessItemModel">
-                                    <TextBlock Foreground="{Binding Network, Converter={StaticResource UsageToForegroundConverter}}"
-                                               Text="{Binding Network, Converter={StaticResource UsageToFormatConverter}}" />
+                                    <TextBlock
+                                        Foreground="{Binding Network, Converter={StaticResource UsageToForegroundConverter}}"
+                                        Text="{Binding Network, Converter={StaticResource UsageToFormatConverter}}" />
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellTemplate>
                         </DataGridTemplateColumn>
                         <DataGridTemplateColumn Width="80" Header="GPU">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate x:DataType="models:ProcessItemModel">
-                                    <TextBlock Foreground="{Binding Gpu, Converter={StaticResource UsageToForegroundConverter}}"
-                                               Text="{Binding Gpu, Converter={StaticResource UsageToFormatConverter}}" />
+                                    <TextBlock
+                                        Foreground="{Binding Gpu, Converter={StaticResource UsageToForegroundConverter}}"
+                                        Text="{Binding Gpu, Converter={StaticResource UsageToFormatConverter}}" />
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellTemplate>
                         </DataGridTemplateColumn>
@@ -152,21 +159,27 @@
                         <DataGridTemplateColumn Width="150" Header="电源使用">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate x:DataType="models:ProcessItemModel">
-                                    <TextBlock Foreground="{Binding PowerUsage, Converter={StaticResource ProcessPowerUsageToForegroundConverter}}"
-                                               Text="{Binding PowerUsage, Converter={StaticResource EnumToDescriptionConverter}}" />
+                                    <TextBlock
+                                        Foreground="{Binding PowerUsage, Converter={StaticResource ProcessPowerUsageToForegroundConverter}}"
+                                        Text="{Binding PowerUsage, Converter={StaticResource EnumToDescriptionConverter}}" />
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellTemplate>
                         </DataGridTemplateColumn>
                         <DataGridTemplateColumn Width="150" Header="电源趋势">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate x:DataType="models:ProcessItemModel">
-                                    <TextBlock Foreground="{Binding PowerUsageTrend, Converter={StaticResource ProcessPowerUsageToForegroundConverter}}"
-                                               Text="{Binding PowerUsageTrend, Converter={StaticResource EnumToDescriptionConverter}}" />
+                                    <TextBlock
+                                        Foreground="{Binding PowerUsageTrend, Converter={StaticResource ProcessPowerUsageToForegroundConverter}}"
+                                        Text="{Binding PowerUsageTrend, Converter={StaticResource EnumToDescriptionConverter}}" />
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellTemplate>
                         </DataGridTemplateColumn>
-                        <DataGridTextColumn Width="180" Binding="{Binding LastUpdateTime, StringFormat=yyyy-MM-dd HH:mm:ss}" Header="上次刷新时间" />
-                        <DataGridTextColumn Width="180" Binding="{Binding UpdateTime, StringFormat=yyyy-MM-dd HH:mm:ss}" Header="最新更新时间" />
+                        <DataGridTextColumn Width="180"
+                                            Binding="{Binding LastUpdateTime, StringFormat=yyyy-MM-dd HH:mm:ss}"
+                                            Header="上次刷新时间" />
+                        <DataGridTextColumn Width="180"
+                                            Binding="{Binding UpdateTime, StringFormat=yyyy-MM-dd HH:mm:ss}"
+                                            Header="最新更新时间" />
                     </DataGrid.Columns>
                 </DataGrid>
             </Grid>

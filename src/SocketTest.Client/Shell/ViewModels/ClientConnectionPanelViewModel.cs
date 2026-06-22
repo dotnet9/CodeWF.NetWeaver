@@ -1,5 +1,11 @@
+using System;
+using System.Collections.Concurrent;
+using System.Diagnostics;
+using System.Net;
+using System.Threading.Tasks;
 using CodeWF.EventBus;
 using CodeWF.Log.Core;
+using CodeWF.NetWeaver.Base;
 using CodeWF.NetWrapper.Commands;
 using CodeWF.NetWrapper.Helpers;
 using ReactiveUI;
@@ -8,23 +14,18 @@ using SocketDto.Requests;
 using SocketDto.Response;
 using SocketTest.Client.Shell.Messages;
 using SocketTest.Client.Shell.Services;
-using System;
-using System.Collections.Concurrent;
-using System.Diagnostics;
-using System.Net;
-using System.Threading.Tasks;
 
 namespace SocketTest.Client.Shell.ViewModels;
 
 public sealed class ClientConnectionPanelViewModel : ReactiveObject
 {
     private readonly ClientApplicationStateService _appState;
+    private readonly ConcurrentDictionary<int, PendingRequestInfo> _pendingRequests = new();
     private readonly TcpSocketClient _tcpHelper;
     private readonly UdpSocketClient _udpHelper;
-    private readonly ConcurrentDictionary<int, PendingRequestInfo> _pendingRequests = new();
+    private bool _hasPublishedBootstrapCompleted;
     private bool _hasReceivedServiceInfo;
     private bool _hasReceivedUdpAddress;
-    private bool _hasPublishedBootstrapCompleted;
     private int _timestampStartYear = 2020;
 
     public ClientConnectionPanelViewModel(
@@ -260,7 +261,7 @@ public sealed class ClientConnectionPanelViewModel : ReactiveObject
         await EventBus.Default.PublishAsync(new ClientConnectionBootstrapCompletedMessage(_timestampStartYear));
     }
 
-    private async Task SendTcpCommandAsync(CodeWF.NetWeaver.Base.INetObject command)
+    private async Task SendTcpCommandAsync(INetObject command)
     {
         TrackPendingRequest(command);
         Logger.Info($"客户端 -> 服务端 TCP：{command}");
@@ -297,18 +298,21 @@ public sealed class ClientConnectionPanelViewModel : ReactiveObject
         _appState.UdpSummary = UdpSummary;
     }
 
-    private void TrackPendingRequest(CodeWF.NetWeaver.Base.INetObject command)
+    private void TrackPendingRequest(INetObject command)
     {
         switch (command)
         {
             case RequestTargetType request:
-                _pendingRequests[request.TaskId] = new PendingRequestInfo(nameof(RequestTargetType), Stopwatch.GetTimestamp());
+                _pendingRequests[request.TaskId] =
+                    new PendingRequestInfo(nameof(RequestTargetType), Stopwatch.GetTimestamp());
                 break;
             case RequestServiceInfo request:
-                _pendingRequests[request.TaskId] = new PendingRequestInfo(nameof(RequestServiceInfo), Stopwatch.GetTimestamp());
+                _pendingRequests[request.TaskId] =
+                    new PendingRequestInfo(nameof(RequestServiceInfo), Stopwatch.GetTimestamp());
                 break;
             case RequestUdpAddress request:
-                _pendingRequests[request.TaskId] = new PendingRequestInfo(nameof(RequestUdpAddress), Stopwatch.GetTimestamp());
+                _pendingRequests[request.TaskId] =
+                    new PendingRequestInfo(nameof(RequestUdpAddress), Stopwatch.GetTimestamp());
                 break;
         }
     }

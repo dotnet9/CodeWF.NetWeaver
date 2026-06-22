@@ -4,7 +4,7 @@ using System.IO;
 namespace CodeWF.NetWrapper.Abstractions;
 
 /// <summary>
-/// 文件系统条目抽象对象。
+///     文件系统条目抽象对象。
 /// </summary>
 public sealed class ManagedFileSystemEntry
 {

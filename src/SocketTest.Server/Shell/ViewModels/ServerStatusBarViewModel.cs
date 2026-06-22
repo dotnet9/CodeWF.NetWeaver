@@ -11,11 +11,23 @@ public sealed class ServerStatusBarViewModel : ReactiveObject
         EventBus.Default.Subscribe(this);
     }
 
-    public string ServiceStatusText { get; private set => this.RaiseAndSetIfChanged(ref field, value); } = "服务未启动";
+    public string ServiceStatusText
+    {
+        get;
+        private set => this.RaiseAndSetIfChanged(ref field, value);
+    } = "服务未启动";
 
-    public int CurrentProcessCount { get; private set => this.RaiseAndSetIfChanged(ref field, value); }
+    public int CurrentProcessCount
+    {
+        get;
+        private set => this.RaiseAndSetIfChanged(ref field, value);
+    }
 
-    public int ClientCount { get; private set => this.RaiseAndSetIfChanged(ref field, value); }
+    public int ClientCount
+    {
+        get;
+        private set => this.RaiseAndSetIfChanged(ref field, value);
+    }
 
     [EventHandler]
     private void ReceiveServerShellStatusChanged(ServerShellStatusChangedMessage message)

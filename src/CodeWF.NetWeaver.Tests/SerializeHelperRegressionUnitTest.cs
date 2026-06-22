@@ -1,12 +1,11 @@
-using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
 using CodeWF.NetWeaver.Base;
+using Xunit;
 using DuplicateNameOne = CodeWF.NetWeaver.Tests.CacheCases.One.DuplicateName;
 using DuplicateNameTwo = CodeWF.NetWeaver.Tests.CacheCases.Two.DuplicateName;
 using BitFieldDuplicateNameOne = CodeWF.NetWeaver.Tests.BitFieldCacheCases.One.DuplicateName;
 using BitFieldDuplicateNameTwo = CodeWF.NetWeaver.Tests.BitFieldCacheCases.Two.DuplicateName;
-using Xunit;
 
 namespace CodeWF.NetWeaver.Tests
 {
@@ -23,7 +22,7 @@ namespace CodeWF.NetWeaver.Tests
                 UnsignedValue = ulong.MaxValue - 9
             };
 
-            var buffer = SerializeHelper.SerializeObject(obj);
+            var buffer = obj.SerializeObject();
             var newObj = buffer.DeserializeObject<SupportedScalarTypes>();
 
             Assert.Equal(obj.Flag, newObj.Flag);
@@ -45,7 +44,7 @@ namespace CodeWF.NetWeaver.Tests
                 }
             };
 
-            var buffer = SerializeHelper.SerializeObject(obj);
+            var buffer = obj.SerializeObject();
             var newObj = buffer.DeserializeObject<InterfaceCollectionHolder>();
 
             Assert.NotNull(newObj.Values);
@@ -63,7 +62,7 @@ namespace CodeWF.NetWeaver.Tests
                 Values = new CustomIntList { 2, 4, 8 }
             };
 
-            var buffer = SerializeHelper.SerializeObject(obj);
+            var buffer = obj.SerializeObject();
             var newObj = buffer.DeserializeObject<ConcreteCollectionHolder>();
 
             Assert.NotNull(newObj.Values);
@@ -162,8 +161,8 @@ namespace CodeWF.NetWeaver.Tests
                 Enabled = true
             };
 
-            var firstBuffer = SerializeHelper.SerializeObject(first);
-            var secondBuffer = SerializeHelper.SerializeObject(second);
+            var firstBuffer = first.SerializeObject();
+            var secondBuffer = second.SerializeObject();
 
             var firstResult = firstBuffer.DeserializeObject<DuplicateNameOne>();
             var secondResult = secondBuffer.DeserializeObject<DuplicateNameTwo>();
@@ -228,8 +227,7 @@ namespace CodeWF.NetWeaver.Tests.BitFieldCacheCases.One
 {
     public class DuplicateName
     {
-        [NetFieldOffset(0, 4)]
-        public byte Value { get; set; }
+        [NetFieldOffset(0, 4)] public byte Value { get; set; }
     }
 }
 
@@ -237,7 +235,6 @@ namespace CodeWF.NetWeaver.Tests.BitFieldCacheCases.Two
 {
     public class DuplicateName
     {
-        [NetFieldOffset(0, 12)]
-        public ushort Value { get; set; }
+        [NetFieldOffset(0, 12)] public ushort Value { get; set; }
     }
 }

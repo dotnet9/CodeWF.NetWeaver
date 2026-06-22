@@ -1,19 +1,19 @@
-using Avalonia.Data;
-using Avalonia.Data.Converters;
-using SocketDto.Enums;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using Avalonia.Data;
+using Avalonia.Data.Converters;
+using SocketDto.Enums;
 
 namespace SocketTest.Client.Converters;
 
 /// <summary>
-/// 枚举转描述信息转换器，将枚举值转换为其描述文本
+///     枚举转描述信息转换器，将枚举值转换为其描述文本
 /// </summary>
 public class EnumToDescriptionConverter : IValueConverter
 {
     /// <summary>
-    /// 将枚举值转换为其描述文本
+    ///     将枚举值转换为其描述文本
     /// </summary>
     /// <param name="value">枚举值</param>
     /// <param name="targetType">目标类型</param>
@@ -22,13 +22,16 @@ public class EnumToDescriptionConverter : IValueConverter
     /// <returns>枚举的描述文本</returns>
     public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
     {
-        if (value is not Enum enumValue) return value;
+        if (value is not Enum enumValue)
+        {
+            return value;
+        }
 
         return GetDescription(enumValue);
     }
 
     /// <summary>
-    /// 反向转换（未实现）
+    ///     反向转换（未实现）
     /// </summary>
     public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
     {

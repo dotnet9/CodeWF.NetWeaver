@@ -4,16 +4,16 @@ using CodeWF.NetWrapper.Helpers;
 using Prism.DryIoc;
 using Prism.Ioc;
 using Prism.Mvvm;
-using SocketTest.Client.Features.Processes.Views;
-using SocketTest.Client.Shell.Views;
-using SocketTest.Client.Shell.Views.Controls;
 using SocketTest.Client.Features.Processes.ViewModels;
+using SocketTest.Client.Features.Processes.Views;
 using SocketTest.Client.Features.RemoteFiles.ViewModels;
 using SocketTest.Client.Features.RemoteFiles.Views;
 using SocketTest.Client.Features.Transfers.ViewModels;
 using SocketTest.Client.Features.Transfers.Views;
 using SocketTest.Client.Shell.Services;
 using SocketTest.Client.Shell.ViewModels;
+using SocketTest.Client.Shell.Views;
+using SocketTest.Client.Shell.Views.Controls;
 
 namespace SocketTest.Client;
 

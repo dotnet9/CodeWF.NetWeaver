@@ -1,58 +1,58 @@
-using CodeWF.Log.Core;
-using CodeWF.NetWeaver;
-using CodeWF.NetWrapper.Commands;
 using System;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading.Channels;
 using System.Threading.Tasks;
+using CodeWF.Log.Core;
+using CodeWF.NetWeaver;
+using CodeWF.NetWrapper.Commands;
 
 namespace CodeWF.NetWrapper.Helpers;
 
 /// <summary>
-/// UDP Socket 客户端类，用于与 UDP 服务端建立连接并进行通信。
+///     UDP Socket 客户端类，用于与 UDP 服务端建立连接并进行通信。
 /// </summary>
 public class UdpSocketClient
 {
     /// <summary>
-    /// 接收缓冲区通道。
-    /// </summary>
-    private Channel<SocketCommand> _receivedBuffers = Channel.CreateUnbounded<SocketCommand>();
-
-    /// <summary>
-    /// UDP 客户端对象。
+    ///     UDP 客户端对象。
     /// </summary>
     private UdpClient? _client;
+
+    /// <summary>
+    ///     接收缓冲区通道。
+    /// </summary>
+    private Channel<SocketCommand> _receivedBuffers = Channel.CreateUnbounded<SocketCommand>();
 
     #region 公开属性
 
     /// <summary>
-    /// 服务标识，用于区分多个服务。
+    ///     服务标识，用于区分多个服务。
     /// </summary>
     public string? ServerMark { get; private set; }
 
     /// <summary>
-    /// 服务端 IP 地址。
+    ///     服务端 IP 地址。
     /// </summary>
     public string? ServerIP { get; private set; }
 
     /// <summary>
-    /// 服务端端口号。
+    ///     服务端端口号。
     /// </summary>
     public int ServerPort { get; private set; }
 
     /// <summary>
-    /// 是否正在运行 UDP 组播订阅。
+    ///     是否正在运行 UDP 组播订阅。
     /// </summary>
     public bool IsRunning { get; set; }
 
     /// <summary>
-    /// 新数据通知事件。
+    ///     新数据通知事件。
     /// </summary>
     public EventHandler<SocketCommand>? Received;
 
     /// <summary>
-    /// 系统 ID，用于标识客户端身份。
+    ///     系统 ID，用于标识客户端身份。
     /// </summary>
     public long SystemId { get; private set; }
 
@@ -61,7 +61,7 @@ public class UdpSocketClient
     #region 公开接口
 
     /// <summary>
-    /// 连接到 UDP 服务端。
+    ///     连接到 UDP 服务端。
     /// </summary>
     /// <param name="serverMark">服务端标识。</param>
     /// <param name="serverIP">服务端 IP 地址。</param>
@@ -121,12 +121,12 @@ public class UdpSocketClient
             Logger.Error(
                 $"{ServerMark} 连接异常",
                 ex,
-                uiContent: $"{ServerMark} 连接异常：{ex.Message}，详细信息请查看日志文件");
+                $"{ServerMark} 连接异常：{ex.Message}，详细信息请查看日志文件");
         }
     }
 
     /// <summary>
-    /// 停止 UDP 客户端。
+    ///     停止 UDP 客户端。
     /// </summary>
     /// <returns>是否成功停止。</returns>
     public bool Stop()
@@ -152,7 +152,7 @@ public class UdpSocketClient
     #region 接收处理数据
 
     /// <summary>
-    /// 接收数据。
+    ///     接收数据。
     /// </summary>
     private async Task ReceiveDataAsync(UdpClient client, ChannelWriter<SocketCommand> receivedBuffers)
     {
@@ -203,7 +203,7 @@ public class UdpSocketClient
     }
 
     /// <summary>
-    /// 检查消息通道。
+    ///     检查消息通道。
     /// </summary>
     private async Task CheckCommandMeAsync(ChannelReader<SocketCommand> receivedBuffers)
     {

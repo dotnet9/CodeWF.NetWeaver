@@ -1,7 +1,7 @@
-using ReactiveUI;
 using System;
 using System.IO;
 using System.Threading;
+using ReactiveUI;
 
 namespace SocketTest.Client.Features.Transfers.Models;
 
@@ -27,7 +27,11 @@ public class FileTransferItem : ReactiveObject
 
     public CancellationTokenSource? CancellationSource { get; set; }
 
-    public bool IsSelected { get; set => this.RaiseAndSetIfChanged(ref field, value); }
+    public bool IsSelected
+    {
+        get;
+        set => this.RaiseAndSetIfChanged(ref field, value);
+    }
 
     public double Progress
     {
@@ -106,7 +110,8 @@ public class FileTransferItem : ReactiveObject
         ? $"{FormatBytes(TransferredBytes)} / {FormatBytes(TotalBytes)}"
         : FormatBytes(TransferredBytes);
 
-    public string SourceName => Path.GetFileName(SourcePath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+    public string SourceName =>
+        Path.GetFileName(SourcePath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
 
     public bool CanRemove => State != FileTransferState.Running;
 

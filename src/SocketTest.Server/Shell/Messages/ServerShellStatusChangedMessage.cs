@@ -2,7 +2,8 @@ using CodeWF.EventBus;
 
 namespace SocketTest.Server.Shell.Messages;
 
-public sealed class ServerShellStatusChangedMessage(string serviceStatusText, int currentProcessCount, int clientCount) : Command
+public sealed class ServerShellStatusChangedMessage(string serviceStatusText, int currentProcessCount, int clientCount)
+    : Command
 {
     public string ServiceStatusText { get; } = serviceStatusText;
 
