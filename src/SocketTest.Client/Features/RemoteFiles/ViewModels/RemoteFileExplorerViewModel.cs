@@ -1060,7 +1060,8 @@ public class RemoteFileExplorerViewModel : ReactiveObject
         return false;
     }
 
-    private bool TryGetWritableTargetDirectory(RemoteFileEntry? targetDirectory, out string remoteDirectory)
+    private bool TryGetWritableTargetDirectory(RemoteFileEntry? targetDirectory,
+        [NotNullWhen(true)] out string? remoteDirectory)
     {
         remoteDirectory = targetDirectory?.IsDirectory == true
             ? targetDirectory.FullPath

@@ -1020,8 +1020,8 @@ public partial class TcpSocketServer
     private static string GetTransferKey(string clientKey, string remoteFilePath, int taskId) =>
         $"{clientKey}|{taskId}|{remoteFilePath}";
 
-    private bool TryResolveServerPath(string requestedPath, bool treatEmptyAsRoot, out string resolvedPath,
-        out string errorMessage)
+    private bool TryResolveServerPath(string requestedPath, bool treatEmptyAsRoot,
+        [NotNullWhen(true)] out string? resolvedPath, out string errorMessage)
     {
         resolvedPath = string.Empty;
         errorMessage = string.Empty;

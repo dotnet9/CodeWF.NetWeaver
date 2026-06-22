@@ -209,10 +209,11 @@ public partial class RemoteFileExplorerView : UserControl
 
     private RemoteFileExplorerViewModel? GetViewModel() => DataContext as RemoteFileExplorerViewModel;
 
-    private bool TryGetViewModelAndTopLevel(out RemoteFileExplorerViewModel viewModel, out TopLevel topLevel)
+    private bool TryGetViewModelAndTopLevel([NotNullWhen(true)] out RemoteFileExplorerViewModel? viewModel,
+        [NotNullWhen(true)] out TopLevel? topLevel)
     {
-        viewModel = GetViewModel()!;
-        topLevel = TopLevel.GetTopLevel(this)!;
+        viewModel = GetViewModel();
+        topLevel = TopLevel.GetTopLevel(this);
         return viewModel != null && topLevel != null;
     }
 

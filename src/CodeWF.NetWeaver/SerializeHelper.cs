@@ -66,7 +66,8 @@ public partial class SerializeHelper
     /// <summary>
     ///     判断类型是否为支持的集合类型，并返回集合泛型参数
     /// </summary>
-    private static bool TryGetCollectionMetadata(Type type, out Type[] genericArguments, out bool isDictionary)
+    private static bool TryGetCollectionMetadata(Type type, [NotNullWhen(true)] out Type[]? genericArguments,
+        out bool isDictionary)
     {
         static bool IsListDefinition(Type definition)
         {
@@ -187,7 +188,8 @@ public partial class SerializeHelper
     /// <param name="readIndex">读取起始索引</param>
     /// <param name="netObjectHeadInfo">输出的网络对象头部信息</param>
     /// <returns>是否成功读取头部信息</returns>
-    public static bool ReadHead(this byte[] buffer, ref int readIndex, out NetHeadInfo netObjectHeadInfo)
+    public static bool ReadHead(this byte[] buffer, ref int readIndex,
+        [NotNullWhen(true)] out NetHeadInfo? netObjectHeadInfo)
     {
         if (buffer.AsSpan(readIndex).ReadHead(out netObjectHeadInfo, out var bytesConsumed))
         {
@@ -205,9 +207,10 @@ public partial class SerializeHelper
     /// <param name="netObjectHeadInfo">输出的网络对象头部信息</param>
     /// <param name="bytesConsumed">消耗的字节数</param>
     /// <returns>是否成功读取头部信息</returns>
-    public static bool ReadHead(this Span<byte> span, out NetHeadInfo netObjectHeadInfo, out int bytesConsumed)
+    public static bool ReadHead(this Span<byte> span, [NotNullWhen(true)] out NetHeadInfo? netObjectHeadInfo,
+        out int bytesConsumed)
     {
-        netObjectHeadInfo = null!;
+        netObjectHeadInfo = default;
         bytesConsumed = 0;
         // 检查缓冲区长度是否足够
         if (span.Length < PacketHeadLen)
