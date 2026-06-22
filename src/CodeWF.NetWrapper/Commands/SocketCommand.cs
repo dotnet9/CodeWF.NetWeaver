@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace CodeWF.NetWrapper.Commands;
 
 /// <summary>
@@ -40,6 +42,18 @@ public class SocketCommand(NetHeadInfo netHeadInfo, byte[] buffer, Socket? clien
     /// <typeparam name="T">命令类型</typeparam>
     /// <returns>命令对象</returns>
     public T GetCommand<T>() where T : new() => Buffer.Deserialize<T>();
+
+    public bool TryGetCommand<T>([NotNullWhen(true)] out T? command) where T : new()
+    {
+        if (!IsCommand<T>())
+        {
+            command = default;
+            return false;
+        }
+
+        command = GetCommand<T>()!;
+        return true;
+    }
 
     /// <summary>
     ///     返回命令的字符串表示
