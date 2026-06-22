@@ -1,8 +1,3 @@
-using System.Collections;
-using CodeWF.NetWeaver.AOTTest.Dto;
-using CodeWF.NetWeaver.AOTTest.Models;
-using CodeWF.Tools.Extensions;
-
 namespace CodeWF.NetWeaver.AOTTest;
 
 public static class Test

@@ -1,5 +1,3 @@
-using CodeWF.EventBus;
-
 namespace SocketTest.Server.Shell.Messages;
 
 public sealed class ServerShellStatusChangedMessage(string serviceStatusText, int currentProcessCount, int clientCount)

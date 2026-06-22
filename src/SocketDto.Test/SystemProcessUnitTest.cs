@@ -1,5 +1,3 @@
-using CodeWF.NetWeaver;
-using CodeWF.NetWeaver.Base;
 using Xunit.Abstractions;
 
 namespace SocketDto.Test;

@@ -1,5 +1,3 @@
-using ReactiveUI;
-
 namespace SocketTest.Client.Shell.Services;
 
 public sealed class ClientApplicationStateService : ReactiveObject

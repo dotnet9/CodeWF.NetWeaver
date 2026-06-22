@@ -1,5 +1,3 @@
-using System;
-
 namespace CodeWF.NetWeaver.Base;
 
 /// <summary>

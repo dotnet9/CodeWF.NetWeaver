@@ -1,6 +1,4 @@
-﻿using System.ComponentModel;
-
-namespace CodeWF.NetWeaver.Tests.Models;
+﻿namespace CodeWF.NetWeaver.Tests.Models;
 
 public enum PowerUsage
 {

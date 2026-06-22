@@ -1,7 +1,4 @@
-﻿using System.ComponentModel;
-using System.Reflection;
-
-namespace CodeWF.NetWeaver.Tests.Extensions;
+﻿namespace CodeWF.NetWeaver.Tests.Extensions;
 
 public static class EnumExtensions
 {

@@ -1,7 +1,3 @@
-using System.ComponentModel;
-using ReactiveUI;
-using SocketTest.Client.Shell.Services;
-
 namespace SocketTest.Client.Shell.ViewModels;
 
 public sealed class FileTransferStatusViewModel : ReactiveObject

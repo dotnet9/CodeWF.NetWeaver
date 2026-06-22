@@ -1,6 +1,4 @@
-﻿using System;
-using Avalonia;
-using CodeWF.Log.Core;
+﻿using Avalonia;
 using ReactiveUI.Avalonia;
 
 namespace SocketTest.Client;

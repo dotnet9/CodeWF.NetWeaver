@@ -1,8 +1,4 @@
-﻿using System;
-using CodeWF.Tools.Extensions;
-using ReactiveUI;
-using SocketDto.Enums;
-using SocketDto.Response;
+﻿using CodeWF.Tools.Extensions;
 
 namespace SocketTest.Client.Features.Processes.Models;
 

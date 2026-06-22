@@ -1,7 +1,4 @@
-﻿using System.Diagnostics.CodeAnalysis;
-using CodeWF.NetWeaver.AOTTest.Dto;
-
-namespace CodeWF.NetWeaver.AOTTest;
+﻿namespace CodeWF.NetWeaver.AOTTest;
 
 internal class Program
 {

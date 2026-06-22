@@ -1,7 +1,3 @@
-using System.Net;
-using System.Net.Sockets;
-using CodeWF.NetWeaver.Base;
-using Xunit;
 using DuplicateNameOne = CodeWF.NetWeaver.Tests.CacheCases.One.DuplicateName;
 using DuplicateNameTwo = CodeWF.NetWeaver.Tests.CacheCases.Two.DuplicateName;
 using BitFieldDuplicateNameOne = CodeWF.NetWeaver.Tests.BitFieldCacheCases.One.DuplicateName;

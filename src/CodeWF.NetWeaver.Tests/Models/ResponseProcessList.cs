@@ -1,6 +1,4 @@
-﻿using CodeWF.NetWeaver.Base;
-
-namespace CodeWF.NetWeaver.Tests.Models;
+﻿namespace CodeWF.NetWeaver.Tests.Models;
 
 [NetHead(10, 1)]
 public class ResponseProcessList : INetObject

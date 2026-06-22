@@ -1,8 +1,4 @@
-﻿using CodeWF.NetWeaver.Tests.Models;
-using CodeWF.Tools.Extensions;
-using Xunit;
-
-namespace CodeWF.NetWeaver.Tests;
+﻿namespace CodeWF.NetWeaver.Tests;
 
 public class ResponseProcessListUnitTest
 {

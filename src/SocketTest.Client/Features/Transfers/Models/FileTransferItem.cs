@@ -1,8 +1,3 @@
-using System;
-using System.IO;
-using System.Threading;
-using ReactiveUI;
-
 namespace SocketTest.Client.Features.Transfers.Models;
 
 public class FileTransferItem : ReactiveObject

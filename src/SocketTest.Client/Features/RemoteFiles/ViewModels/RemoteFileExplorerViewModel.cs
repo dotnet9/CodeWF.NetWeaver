@@ -1,24 +1,7 @@
-﻿using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Collections.ObjectModel;
-using System.IO;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
-using Avalonia.Threading;
-using CodeWF.EventBus;
-using CodeWF.Log.Core;
-using CodeWF.NetWeaver.Base;
-using CodeWF.NetWrapper.Commands;
-using CodeWF.NetWrapper.Helpers;
-using CodeWF.NetWrapper.Requests;
+﻿using CodeWF.NetWrapper.Requests;
 using CodeWF.NetWrapper.Response;
-using ReactiveUI;
 using SocketTest.Client.Features.RemoteFiles.Models;
 using SocketTest.Client.Features.Transfers.Messages;
-using SocketTest.Client.Shell.Messages;
-using SocketTest.Client.Shell.Services;
 
 namespace SocketTest.Client.Features.RemoteFiles.ViewModels;
 

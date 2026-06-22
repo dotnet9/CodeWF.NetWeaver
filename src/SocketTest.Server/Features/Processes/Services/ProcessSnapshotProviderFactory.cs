@@ -1,5 +1,3 @@
-using System;
-
 namespace SocketTest.Server.Features.Processes.Services;
 
 /// <summary>

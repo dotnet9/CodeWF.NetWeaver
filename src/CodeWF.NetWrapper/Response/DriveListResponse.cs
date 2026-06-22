@@ -1,6 +1,3 @@
-using System.Collections.Generic;
-using CodeWF.NetWeaver.Base;
-
 namespace CodeWF.NetWrapper.Response;
 
 /// <summary>

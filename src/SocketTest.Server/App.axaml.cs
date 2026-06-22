@@ -1,10 +1,7 @@
-using Avalonia;
 using Avalonia.Markup.Xaml;
 using Prism.DryIoc;
 using Prism.Ioc;
 using Prism.Mvvm;
-using SocketTest.Server.Features.Processes.Services;
-using SocketTest.Server.Shell.ViewModels;
 using SocketTest.Server.Shell.Views;
 using SocketTest.Server.Shell.Views.Controls;
 

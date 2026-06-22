@@ -1,21 +1,7 @@
-using System;
-using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.Collections.Specialized;
-using System.ComponentModel;
-using System.IO;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
-using Avalonia.Threading;
-using CodeWF.EventBus;
-using CodeWF.Log.Core;
-using CodeWF.NetWrapper.Helpers;
 using CodeWF.NetWrapper.Models;
-using ReactiveUI;
 using SocketTest.Client.Features.Transfers.Messages;
 using SocketTest.Client.Features.Transfers.Models;
-using SocketTest.Client.Shell.Services;
 using Timer = System.Timers.Timer;
 
 namespace SocketTest.Client.Features.Transfers.ViewModels;

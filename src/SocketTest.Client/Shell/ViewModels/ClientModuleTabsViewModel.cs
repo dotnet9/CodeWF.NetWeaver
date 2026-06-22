@@ -1,7 +1,3 @@
-using CodeWF.EventBus;
-using ReactiveUI;
-using SocketTest.Client.Shell.Messages;
-
 namespace SocketTest.Client.Shell.ViewModels;
 
 public sealed class ClientModuleTabsViewModel : ReactiveObject
