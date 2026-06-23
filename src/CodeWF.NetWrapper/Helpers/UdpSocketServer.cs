@@ -82,7 +82,7 @@ public class UdpSocketServer
 
         try
         {
-            var localNic = IPAddress.Parse(localIP);
+            var localNic = NormalizeMulticastLocalAddress(IPAddress.Parse(localIP));
             _client = new UdpClient();
 
             // 允许复用端口（可选）
@@ -105,7 +105,7 @@ public class UdpSocketServer
 
             IsRunning = true;
 
-            Logger.Info($"{ServerMark} {ServerIP} 组播启动成功，组播地址：{ServerIP}:{ServerPort}");
+            Logger.Info($"{ServerMark} {ServerIP} 组播启动成功，组播地址：{ServerIP}:{ServerPort}，本地接口：{localNic}");
             return (IsSuccess: true, ErrorMessage: null);
         }
         catch (Exception ex)
@@ -116,6 +116,26 @@ public class UdpSocketServer
             return (IsSuccess: false,
                 ErrorMessage: $"{ServerMark} {ServerIP} 组播启动失败，组播地址：{ServerIP}:{ServerPort}，异常信息：{ex.Message}");
         }
+    }
+
+    /// <summary>
+    ///     规范化 UDP 组播发送使用的本地 IPv4 接口。
+    ///     回环地址不能直接作为 Windows 组播发送接口，否则可能在 SendAsync 时触发 NetworkUnreachable(10051)，
+    ///     因此将 IPv4 映射地址转为 IPv4，并将回环地址退回到 Any，让系统选择可用接口。
+    /// </summary>
+    private static IPAddress NormalizeMulticastLocalAddress(IPAddress localAddress)
+    {
+        if (localAddress.AddressFamily == AddressFamily.InterNetworkV6 && localAddress.IsIPv4MappedToIPv6)
+        {
+            localAddress = localAddress.MapToIPv4();
+        }
+
+        if (localAddress.AddressFamily != AddressFamily.InterNetwork)
+        {
+            throw new InvalidOperationException($"UDP 组播发送仅支持 IPv4 本地地址：{localAddress}");
+        }
+
+        return IPAddress.IsLoopback(localAddress) ? IPAddress.Any : localAddress;
     }
 
     /// <summary>

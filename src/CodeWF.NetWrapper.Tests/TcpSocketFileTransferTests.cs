@@ -215,6 +215,25 @@ public sealed class TcpSocketFileTransferTests : IAsyncLifetime
         Assert.False(client.IsRunning);
     }
 
+    [Fact]
+    public async Task UdpSocketServer_StartWithLoopbackLocalIp_CanSendMulticast()
+    {
+        var port = GetFreeUdpPort();
+        var server = new UdpSocketServer();
+
+        var result = server.Start("UdpTestServer", 1, "239.0.0.1", port, IPAddress.Loopback.ToString());
+        Assert.True(result.IsSuccess, result.ErrorMessage);
+
+        try
+        {
+            await server.SendCommandAsync(new Heartbeat { TaskId = 1 }, DateTimeOffset.UtcNow);
+        }
+        finally
+        {
+            server.Stop();
+        }
+    }
+
     private string CreateDirectory(string name)
     {
         var path = Path.Combine(_workspaceRoot, name);
@@ -251,6 +270,12 @@ public sealed class TcpSocketFileTransferTests : IAsyncLifetime
         var port = ((IPEndPoint)listener.LocalEndpoint).Port;
         listener.Stop();
         return port;
+    }
+
+    private static int GetFreeUdpPort()
+    {
+        using var client = new UdpClient(new IPEndPoint(IPAddress.Loopback, 0));
+        return ((IPEndPoint)client.Client.LocalEndPoint!).Port;
     }
 
     private static async Task WaitForConditionAsync(Func<bool> condition, int timeoutMs = 8000, int pollMs = 100)
