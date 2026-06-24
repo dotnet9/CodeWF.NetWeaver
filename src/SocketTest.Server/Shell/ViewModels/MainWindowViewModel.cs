@@ -47,6 +47,7 @@ public class MainWindowViewModel : ReactiveObject
                             ?? "应用配置文件";
 
         TcpHelper = new TcpSocketServer();
+        TcpHelper.UseFileSystem();
         UdpHelper = new UdpSocketServer();
         ConnectedClients.CollectionChanged += ConnectedClientsOnCollectionChanged;
 

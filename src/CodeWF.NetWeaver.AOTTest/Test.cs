@@ -28,7 +28,11 @@ public static class Test
         Console.WriteLine($"after deserialize List<double> values are: {string.Join(',', obj1.Records)}");
 
         readIndex = 0;
-        buffer2.ReadHead(ref readIndex, out var header2);
+        if (!buffer2.ReadHead(ref readIndex, out var header2))
+        {
+            throw new InvalidDataException("Cannot read serialized packet header.");
+        }
+
         var obj2 = buffer2.Deserialize<ResponseProcessList>();
         var dt = header2.UnixTimeMilliseconds.FromUnixTimeMilliseconds();
         Console.WriteLine(

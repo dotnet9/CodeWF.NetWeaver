@@ -15,7 +15,8 @@ public partial class SerializeHelper
     /// </summary>
     /// <typeparam name="T">对象类型</typeparam>
     /// <returns>位字段属性信息列表</returns>
-    private static BitFieldPropertyInfo[] GetBitFieldProperties<T>()
+    private static BitFieldPropertyInfo[] GetBitFieldProperties<
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties)] T>()
     {
         var type = typeof(T);
         if (BitFieldPropertiesCache.TryGetValue(type, out var cached))
@@ -54,7 +55,8 @@ public partial class SerializeHelper
     /// <typeparam name="T">对象类型</typeparam>
     /// <param name="obj">要序列化的对象</param>
     /// <returns>包含位字段数据的字节数组</returns>
-    public static byte[] FieldObjectBuffer<T>(this T obj) where T : class
+    public static byte[] FieldObjectBuffer<
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties)] T>(this T obj) where T : class
     {
         var bitFieldProperties = GetBitFieldProperties<T>();
         var totalSize = 0;
@@ -87,7 +89,9 @@ public partial class SerializeHelper
     /// <typeparam name="T">对象类型</typeparam>
     /// <param name="buffer">包含位字段数据的字节数组</param>
     /// <returns>反序列化后的对象</returns>
-    public static T ToFieldObject<T>(this byte[] buffer) where T : class, new()
+    public static T ToFieldObject<
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties)] T>(this byte[] buffer)
+        where T : class, new()
     {
         var obj = new T();
         var bitFieldProperties = GetBitFieldProperties<T>();

@@ -14,6 +14,7 @@
   <Folder Name="/src/">
     <Project Path="src/CodeWF.NetWeaver/CodeWF.NetWeaver.csproj">
     </Project>
+    <Project Path="src/CodeWF.NetWrapper.FileSystem/CodeWF.NetWrapper.FileSystem.csproj" />
     <Project Path="src/CodeWF.NetWrapper/CodeWF.NetWrapper.csproj" />
   </Folder>
   <Folder Name="/test/">

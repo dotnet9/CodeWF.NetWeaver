@@ -3,7 +3,7 @@ namespace CodeWF.NetWrapper.Response;
 /// <summary>
 ///     浏览服务端文件系统的响应对象。
 /// </summary>
-[NetHead(SocketConstants.BrowseFileSystemResponseObjectId, 1)]
+[NetHead(FileSystemSocketConstants.BrowseFileSystemResponseObjectId, 1)]
 public class BrowseFileSystemResponse : INetObject
 {
     /// <summary>

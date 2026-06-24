@@ -246,6 +246,8 @@ public sealed class TcpSocketFileTransferTests : IAsyncLifetime
         var port = GetFreePort();
         var server = new TcpSocketServer();
         var client = new TcpSocketClient();
+        server.UseFileSystem();
+        client.UseFileSystem();
 
         var serverResult = await server.StartAsync("TestServer", IPAddress.Loopback.ToString(), port);
         Assert.True(serverResult.IsSuccess, serverResult.ErrorMessage);

@@ -3,7 +3,7 @@ namespace CodeWF.NetWrapper.Response;
 /// <summary>
 ///     文件分块数据对象。
 /// </summary>
-[NetHead(SocketConstants.FileChunkDataObjectId, 2)]
+[NetHead(FileSystemSocketConstants.FileChunkDataObjectId, 2)]
 public class FileChunkData : INetObject
 {
     /// <summary>

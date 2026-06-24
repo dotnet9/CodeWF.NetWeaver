@@ -1,11 +1,12 @@
 namespace CodeWF.NetWrapper.Helpers;
 
 /// <summary>
-///     TCP Socket 客户端类，用于与 TCP 服务器建立连接并进行通信，支持文件传输和命令收发
+///     TCP Socket 客户端类，用于与 TCP 服务器建立连接并进行通信。
 /// </summary>
 public partial class TcpSocketClient
 {
     private Socket? _client;
+    private readonly ConcurrentDictionary<Guid, Func<SocketCommand, Task<bool>>> _commandHandlers = new();
     private Channel<SocketCommand> _responses = Channel.CreateUnbounded<SocketCommand>();
 
     #region 公开属性
@@ -65,7 +66,7 @@ public partial class TcpSocketClient
 
         try
         {
-            var (responses, fileTransferResponses) = ResetResponseChannels();
+            var responses = ResetResponseChannels();
 
             var ipEndPoint = new IPEndPoint(IPAddress.Parse(ServerIP), ServerPort);
             _client = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
@@ -74,9 +75,8 @@ public partial class TcpSocketClient
             IsRunning = true;
             Logger.Info($"{ServerMark} 连接成功，服务地址是： {ServerIP}:{ServerPort}，当前客户端地址：{_client.LocalEndPoint}");
 
-            _ = Task.Run(async () => await ListenForServerAsync(responses.Writer, fileTransferResponses.Writer));
-            _ = Task.Run(async () => await CheckResponseAsync(responses.Reader, fileTransferResponses.Writer));
-            _ = Task.Run(async () => await ProcessingFileTransferResponsesAsync(fileTransferResponses.Reader));
+            _ = Task.Run(async () => await ListenForServerAsync(responses.Writer));
+            _ = Task.Run(async () => await CheckResponseAsync(responses.Reader));
 
             LocalEndPoint = _client.LocalEndPoint?.ToString();
             return (IsSuccess: true, ErrorMessage: null);
@@ -116,6 +116,18 @@ public partial class TcpSocketClient
         await _client!.SendAsync(buffer);
     }
 
+    /// <summary>
+    ///     注册客户端收到命令后的扩展处理器。处理器返回 true 表示命令已被消费。
+    /// </summary>
+    public IDisposable RegisterCommandHandler(Func<SocketCommand, Task<bool>> handler)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+
+        var id = Guid.NewGuid();
+        _commandHandlers[id] = handler;
+        return new CommandHandlerRegistration(() => _commandHandlers.TryRemove(id, out _));
+    }
+
     #endregion
 
     #region 连接TCP、接收数据
@@ -123,8 +135,7 @@ public partial class TcpSocketClient
     /// <summary>
     ///     监听服务器消息（内部方法）
     /// </summary>
-    private async Task ListenForServerAsync(ChannelWriter<SocketCommand> responses,
-        ChannelWriter<SocketCommand> fileTransferResponses)
+    private async Task ListenForServerAsync(ChannelWriter<SocketCommand> responses)
     {
         var socket = _client;
         var localEndPoint = socket?.LocalEndPoint?.ToString();
@@ -135,7 +146,7 @@ public partial class TcpSocketClient
                 var (success, buffer, headInfo) = await socket.ReadPacketAsync();
                 if (!success || buffer == null || headInfo == null)
                 {
-                    await HandleServerReceiveStoppedAsync(socket, responses, fileTransferResponses, localEndPoint);
+                    await HandleServerReceiveStoppedAsync(socket, responses, localEndPoint);
                     break;
                 }
 
@@ -144,14 +155,14 @@ public partial class TcpSocketClient
             }
             catch (Exception ex)
             {
-                await HandleServerReceiveStoppedAsync(socket, responses, fileTransferResponses, localEndPoint, ex);
+                await HandleServerReceiveStoppedAsync(socket, responses, localEndPoint, ex);
                 break;
             }
         }
     }
 
     private async Task HandleServerReceiveStoppedAsync(Socket? socket, ChannelWriter<SocketCommand> responses,
-        ChannelWriter<SocketCommand> fileTransferResponses, string? localEndPoint, Exception? exception = null)
+        string? localEndPoint, Exception? exception = null)
     {
         var shouldPublish = IsRunning && ReferenceEquals(_client, socket);
         var msg = exception == null
@@ -159,7 +170,7 @@ public partial class TcpSocketClient
             : $"{ServerMark} 处理接收数据异常，当前客户端地址：{localEndPoint}";
 
         CloseConnection(socket);
-        CompleteResponseChannels(responses, fileTransferResponses);
+        CompleteResponseChannels(responses);
 
         if (!shouldPublish)
         {
@@ -192,47 +203,49 @@ public partial class TcpSocketClient
         socket?.CloseSocket();
     }
 
-    private (Channel<SocketCommand> Responses, Channel<SocketCommand> FileTransferResponses) ResetResponseChannels()
+    private Channel<SocketCommand> ResetResponseChannels()
     {
         _responses = Channel.CreateUnbounded<SocketCommand>();
-        _fileTransferResponses = Channel.CreateUnbounded<SocketCommand>();
-        return (_responses, _fileTransferResponses);
+        return _responses;
     }
 
     private void CompleteResponseChannels()
     {
-        CompleteResponseChannels(_responses.Writer, _fileTransferResponses.Writer);
+        CompleteResponseChannels(_responses.Writer);
     }
 
-    private static void CompleteResponseChannels(ChannelWriter<SocketCommand> responses,
-        ChannelWriter<SocketCommand> fileTransferResponses)
+    private static void CompleteResponseChannels(ChannelWriter<SocketCommand> responses)
     {
         responses.TryComplete();
-        fileTransferResponses.TryComplete();
     }
 
     /// <summary>
     ///     检查响应队列并发布事件（内部方法）
     /// </summary>
-    private async Task CheckResponseAsync(ChannelReader<SocketCommand> responses,
-        ChannelWriter<SocketCommand> fileTransferResponses)
+    private async Task CheckResponseAsync(ChannelReader<SocketCommand> responses)
     {
         await foreach (var command in responses.ReadAllAsync())
         {
-            if (command.IsCommand<FileUploadResponse>() ||
-                command.IsCommand<FileDownloadResponse>() ||
-                command.IsCommand<FileChunkData>() ||
-                command.IsCommand<FileChunkAck>() ||
-                command.IsCommand<FileTransferReject>() ||
-                command.IsCommand<FileDownloadRequest>())
+            if (await TryHandleCommandAsync(command))
             {
-                await fileTransferResponses.WriteAsync(command);
+                continue;
             }
-            else
+
+            await EventBus.EventBus.Default.PublishAsync(command);
+        }
+    }
+
+    private async Task<bool> TryHandleCommandAsync(SocketCommand command)
+    {
+        foreach (var handler in _commandHandlers.Values)
+        {
+            if (await handler(command))
             {
-                await EventBus.EventBus.Default.PublishAsync(command);
+                return true;
             }
         }
+
+        return false;
     }
 
     #endregion

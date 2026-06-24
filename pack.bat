@@ -22,6 +22,7 @@ echo [3/3] Packing libraries...
 for %%P in (
     "src\CodeWF.NetWeaver\CodeWF.NetWeaver.csproj"
     "src\CodeWF.NetWrapper\CodeWF.NetWrapper.csproj"
+    "src\CodeWF.NetWrapper.FileSystem\CodeWF.NetWrapper.FileSystem.csproj"
 ) do (
     dotnet pack %%~P -c %CONFIGURATION% -o "%PACKAGES_DIR%"
     if errorlevel 1 goto :error

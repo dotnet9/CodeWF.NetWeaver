@@ -28,6 +28,109 @@ namespace CodeWF.NetWeaver.Tests
         }
 
         [Fact]
+        public void Test_SerializeExtendedScalarTypes_Success()
+        {
+            var obj = new ExtendedScalarTypes
+            {
+                HalfValue = (Half)1.5,
+                NativeInt = new IntPtr(1234567890),
+                NativeUInt = new UIntPtr(1234567890UL),
+                Signed128 = ((Int128)long.MaxValue) + 42,
+                Unsigned128 = ((UInt128)ulong.MaxValue) + 42,
+                Date = new DateOnly(2026, 6, 24),
+                Time = new TimeOnly(10, 39, 23).Add(TimeSpan.FromTicks(4567)),
+                Duration = TimeSpan.FromDays(1) + TimeSpan.FromMilliseconds(234),
+                Id = Guid.Parse("f8de2f8a-86df-4485-b1ad-7c9f4c88d638")
+            };
+
+            var buffer = obj.SerializeObject();
+            var newObj = buffer.DeserializeObject<ExtendedScalarTypes>();
+
+            Assert.Equal(obj.HalfValue, newObj.HalfValue);
+            Assert.Equal(obj.NativeInt, newObj.NativeInt);
+            Assert.Equal(obj.NativeUInt, newObj.NativeUInt);
+            Assert.Equal(obj.Signed128, newObj.Signed128);
+            Assert.Equal(obj.Unsigned128, newObj.Unsigned128);
+            Assert.Equal(obj.Date, newObj.Date);
+            Assert.Equal(obj.Time, newObj.Time);
+            Assert.Equal(obj.Duration, newObj.Duration);
+            Assert.Equal(obj.Id, newObj.Id);
+        }
+
+        [Fact]
+        public void Test_SerializeNullableScalarTypes_Success()
+        {
+            var empty = new NullableScalarTypes();
+            var emptyBuffer = empty.SerializeObject();
+            var emptyResult = emptyBuffer.DeserializeObject<NullableScalarTypes>();
+
+            Assert.Null(emptyResult.RemainingSeconds);
+            Assert.Null(emptyResult.Count);
+            Assert.Null(emptyResult.SnapshotTime);
+            Assert.Null(emptyResult.SendTime);
+            Assert.Null(emptyResult.HalfValue);
+            Assert.Null(emptyResult.NativeInt);
+            Assert.Null(emptyResult.NativeUInt);
+            Assert.Null(emptyResult.Signed128);
+            Assert.Null(emptyResult.Unsigned128);
+            Assert.Null(emptyResult.Date);
+            Assert.Null(emptyResult.Time);
+            Assert.Null(emptyResult.Duration);
+            Assert.Null(emptyResult.Id);
+
+            var obj = new NullableScalarTypes
+            {
+                RemainingSeconds = 12.5,
+                Count = 3,
+                SnapshotTime = new DateTime(2026, 6, 24, 10, 39, 23, DateTimeKind.Utc),
+                SendTime = new DateTimeOffset(2026, 6, 24, 18, 39, 23, TimeSpan.FromHours(8)),
+                HalfValue = (Half)2.25,
+                NativeInt = new IntPtr(-3),
+                NativeUInt = new UIntPtr(4UL),
+                Signed128 = Int128.MinValue + 42,
+                Unsigned128 = UInt128.MaxValue - 42,
+                Date = new DateOnly(2026, 6, 24),
+                Time = new TimeOnly(10, 39, 23),
+                Duration = TimeSpan.FromSeconds(45),
+                Id = Guid.Parse("53b74d95-8732-4d12-86ff-8f100bf9100c")
+            };
+            var buffer = obj.SerializeObject();
+            var newObj = buffer.DeserializeObject<NullableScalarTypes>();
+
+            Assert.Equal(obj.RemainingSeconds, newObj.RemainingSeconds);
+            Assert.Equal(obj.Count, newObj.Count);
+            Assert.Equal(obj.SnapshotTime, newObj.SnapshotTime);
+            Assert.Equal(obj.SendTime, newObj.SendTime);
+            Assert.Equal(obj.HalfValue, newObj.HalfValue);
+            Assert.Equal(obj.NativeInt, newObj.NativeInt);
+            Assert.Equal(obj.NativeUInt, newObj.NativeUInt);
+            Assert.Equal(obj.Signed128, newObj.Signed128);
+            Assert.Equal(obj.Unsigned128, newObj.Unsigned128);
+            Assert.Equal(obj.Date, newObj.Date);
+            Assert.Equal(obj.Time, newObj.Time);
+            Assert.Equal(obj.Duration, newObj.Duration);
+            Assert.Equal(obj.Id, newObj.Id);
+        }
+
+        [Fact]
+        public void Test_NullableScalarTypes_AddOneBytePresenceFlag()
+        {
+            var scalarBuffer = new DoubleSizeHolder
+            {
+                Value = 12.5
+            }.SerializeObject();
+            var nullNullableBuffer = new NullableDoubleSizeHolder().SerializeObject();
+            var valuedNullableBuffer = new NullableDoubleSizeHolder
+            {
+                Value = 12.5
+            }.SerializeObject();
+
+            Assert.Equal(sizeof(double), scalarBuffer.Length);
+            Assert.Single(nullNullableBuffer);
+            Assert.Equal(sizeof(bool) + sizeof(double), valuedNullableBuffer.Length);
+        }
+
+        [Fact]
         public void Test_SerializeInterfaceCollections_Success()
         {
             var obj = new InterfaceCollectionHolder
@@ -63,6 +166,22 @@ namespace CodeWF.NetWeaver.Tests
 
             Assert.NotNull(newObj.Values);
             Assert.Equal([2, 4, 8], newObj.Values);
+        }
+
+        [Fact]
+        public void Test_SerializeNetObjectThroughInterface_UsesRuntimeType()
+        {
+            INetObject packet = new TestPacket
+            {
+                TaskId = 19,
+                Message = "runtime"
+            };
+
+            var buffer = packet.Serialize(123);
+            var newPacket = buffer.Deserialize<TestPacket>();
+
+            Assert.Equal(19, newPacket.TaskId);
+            Assert.Equal("runtime", newPacket.Message);
         }
 
         [Fact]
@@ -176,6 +295,46 @@ namespace CodeWF.NetWeaver.Tests
         public char Marker { get; set; }
         public sbyte SignedValue { get; set; }
         public ulong UnsignedValue { get; set; }
+    }
+
+    public class ExtendedScalarTypes
+    {
+        public Half HalfValue { get; set; }
+        public IntPtr NativeInt { get; set; }
+        public UIntPtr NativeUInt { get; set; }
+        public Int128 Signed128 { get; set; }
+        public UInt128 Unsigned128 { get; set; }
+        public DateOnly Date { get; set; }
+        public TimeOnly Time { get; set; }
+        public TimeSpan Duration { get; set; }
+        public Guid Id { get; set; }
+    }
+
+    public class NullableScalarTypes
+    {
+        public double? RemainingSeconds { get; set; }
+        public int? Count { get; set; }
+        public DateTime? SnapshotTime { get; set; }
+        public DateTimeOffset? SendTime { get; set; }
+        public Half? HalfValue { get; set; }
+        public IntPtr? NativeInt { get; set; }
+        public UIntPtr? NativeUInt { get; set; }
+        public Int128? Signed128 { get; set; }
+        public UInt128? Unsigned128 { get; set; }
+        public DateOnly? Date { get; set; }
+        public TimeOnly? Time { get; set; }
+        public TimeSpan? Duration { get; set; }
+        public Guid? Id { get; set; }
+    }
+
+    public class DoubleSizeHolder
+    {
+        public double Value { get; set; }
+    }
+
+    public class NullableDoubleSizeHolder
+    {
+        public double? Value { get; set; }
     }
 
     public class InterfaceCollectionHolder

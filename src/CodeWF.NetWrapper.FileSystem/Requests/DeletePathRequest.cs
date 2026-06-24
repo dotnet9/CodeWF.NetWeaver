@@ -3,7 +3,7 @@ namespace CodeWF.NetWrapper.Requests;
 /// <summary>
 ///     删除服务端文件或目录的请求对象。
 /// </summary>
-[NetHead(SocketConstants.DeletePathRequestObjectId, 1)]
+[NetHead(FileSystemSocketConstants.DeletePathRequestObjectId, 1)]
 public class DeletePathRequest : INetObject
 {
     /// <summary>

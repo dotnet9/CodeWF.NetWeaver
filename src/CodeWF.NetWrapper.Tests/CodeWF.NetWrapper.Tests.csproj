@@ -19,6 +19,7 @@
     </PackageReference>
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\CodeWF.NetWrapper.FileSystem\CodeWF.NetWrapper.FileSystem.csproj" />
     <ProjectReference Include="..\CodeWF.NetWrapper\CodeWF.NetWrapper.csproj" />
   </ItemGroup>
 </Project>

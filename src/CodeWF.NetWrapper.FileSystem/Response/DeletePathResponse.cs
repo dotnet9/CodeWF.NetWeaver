@@ -3,7 +3,7 @@ namespace CodeWF.NetWrapper.Response;
 /// <summary>
 ///     删除服务端文件或目录的响应对象。
 /// </summary>
-[NetHead(SocketConstants.DeletePathResponseObjectId, 1)]
+[NetHead(FileSystemSocketConstants.DeletePathResponseObjectId, 1)]
 public class DeletePathResponse : INetObject
 {
     /// <summary>

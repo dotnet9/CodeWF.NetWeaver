@@ -3,7 +3,7 @@ namespace CodeWF.NetWrapper.Response;
 /// <summary>
 ///     文件传输被拒绝时的响应对象。
 /// </summary>
-[NetHead(SocketConstants.FileTransferRejectObjectId, 1)]
+[NetHead(FileSystemSocketConstants.FileTransferRejectObjectId, 1)]
 public class FileTransferReject : INetObject
 {
     /// <summary>

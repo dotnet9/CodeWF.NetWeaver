@@ -18,18 +18,32 @@ public partial class SerializeHelper
         typeof(bool),
         typeof(byte),
         typeof(char),
+        typeof(DateTime),
+        typeof(DateTimeOffset),
+        typeof(DateOnly),
         typeof(decimal),
         typeof(double),
         typeof(float),
+        typeof(Guid),
+        typeof(Half),
         typeof(int),
+        typeof(Int128),
+        typeof(IntPtr),
         typeof(long),
         typeof(sbyte),
         typeof(short),
         typeof(string),
+        typeof(TimeOnly),
+        typeof(TimeSpan),
         typeof(uint),
+        typeof(UInt128),
+        typeof(UIntPtr),
         typeof(ulong),
         typeof(ushort)
     ];
+
+    private const int Int128ByteCount = 16;
+    private const int GuidByteCount = 16;
 
     /// <summary>
     ///     默认编码，用于字符串的序列化和反序列化
@@ -41,6 +55,9 @@ public partial class SerializeHelper
     /// </summary>
     /// <param name="type">要获取属性的类型</param>
     /// <returns>属性信息列表</returns>
+    [UnconditionalSuppressMessage("Trimming", "IL2070",
+        Justification =
+            "NetWeaver is a reflection-based DTO serializer; trimmed applications must preserve serialized DTO public properties.")]
     private static PropertyInfo[] GetProperties(Type type)
     {
         if (ObjectPropertyInfos.TryGetValue(type, out var propertyInfos))
@@ -64,8 +81,20 @@ public partial class SerializeHelper
     }
 
     /// <summary>
+    ///     判断类型是否为可空值类型，并返回底层值类型
+    /// </summary>
+    private static bool TryGetNullableValueType(Type type, [NotNullWhen(true)] out Type? valueType)
+    {
+        valueType = Nullable.GetUnderlyingType(type);
+        return valueType != null;
+    }
+
+    /// <summary>
     ///     判断类型是否为支持的集合类型，并返回集合泛型参数
     /// </summary>
+    [UnconditionalSuppressMessage("Trimming", "IL2070",
+        Justification =
+            "NetWeaver inspects collection interfaces by contract; trimmed applications must preserve serialized DTO collection metadata.")]
     private static bool TryGetCollectionMetadata(Type type, [NotNullWhen(true)] out Type[]? genericArguments,
         out bool isDictionary)
     {
@@ -138,6 +167,9 @@ public partial class SerializeHelper
     /// <summary>
     ///     创建集合实例，优先使用目标类型本身，其次回退到 List/Dictionary
     /// </summary>
+    [UnconditionalSuppressMessage("Trimming", "IL2067",
+        Justification =
+            "Concrete collection DTO types must preserve their public parameterless constructor when trimming.")]
     private static object CreateCollectionInstance(Type type, Type[] genericArguments, bool isDictionary)
     {
         // 只有“非接口、非抽象类”才能直接 Activator.CreateInstance(type)。
@@ -147,12 +179,37 @@ public partial class SerializeHelper
         }
 
         // 如果属性类型是接口或抽象类型，就回退到一个可实例化的默认实现。
+        if (!RuntimeFeature.IsDynamicCodeSupported)
+        {
+            throw new NotSupportedException(
+                $"Creating a fallback collection for {type.FullName} requires runtime generic construction. " +
+                "Use a concrete List<T> or Dictionary<TKey,TValue> property type in Native AOT scenarios.");
+        }
+
         var fallbackType = isDictionary
             ? typeof(Dictionary<,>).MakeGenericType(genericArguments)
             : typeof(List<>).MakeGenericType(genericArguments[0]);
 
         return Activator.CreateInstance(fallbackType)
                ?? throw new InvalidOperationException($"Cannot create collection instance for {type.FullName}.");
+    }
+
+    /// <summary>
+    ///     从 BinaryReader 精确读取固定长度数据
+    /// </summary>
+    private static void ReadExactly(BinaryReader reader, Span<byte> buffer)
+    {
+        var totalRead = 0;
+        while (totalRead < buffer.Length)
+        {
+            var read = reader.Read(buffer[totalRead..]);
+            if (read == 0)
+            {
+                throw new EndOfStreamException("Unexpected end of stream while reading fixed-size value.");
+            }
+
+            totalRead += read;
+        }
     }
 
     /// <summary>

@@ -1,7 +1,7 @@
 namespace CodeWF.NetWrapper.Helpers;
 
 /// <summary>
-///     TCP Socket 服务端类，用于接受 TCP 客户端连接并进行通信，支持文件传输和命令收发
+///     TCP Socket 服务端类，用于接受 TCP 客户端连接并进行通信。
 /// </summary>
 public partial class TcpSocketServer
 {
@@ -12,6 +12,8 @@ public partial class TcpSocketServer
 
     private PeriodicTimer? _detectionTimer;
     private CancellationTokenSource? _listenTokenSource;
+    private readonly ConcurrentDictionary<Guid, Func<string, TcpSession, SocketCommand, Task<bool>>> _commandHandlers =
+        new();
 
     private Channel<(string ClientKey, SocketCommand Command)> _requests =
         Channel.CreateUnbounded<(string, SocketCommand)>();
@@ -84,11 +86,10 @@ public partial class TcpSocketServer
             Logger.Info($"{ServerMark} 启动成功，服务地址是：{ServerIP}:{ServerPort}");
 
             _listenTokenSource = new CancellationTokenSource();
-            var (requests, fileTransferRequests) = ResetRequestChannels();
+            var requests = ResetRequestChannels();
 
             _ = Task.Run(async () => await ListenForClientsAsync(_listenTokenSource, requests.Writer));
-            _ = Task.Run(async () => await ProcessingRequestsAsync(requests.Reader, fileTransferRequests.Writer));
-            _ = Task.Run(async () => await ProcessingFileTransferRequestsAsync(fileTransferRequests.Reader));
+            _ = Task.Run(async () => await ProcessingRequestsAsync(requests.Reader));
             _ = Task.Run(async () => await DetectionClientsAsync(_listenTokenSource));
 
             return (IsSuccess: true, ErrorMessage: null);
@@ -119,8 +120,6 @@ public partial class TcpSocketServer
         }
 
         CompleteRequestChannels();
-        _uploadContexts.Clear();
-        _downloadContexts.Clear();
         Server?.Close(0);
         Server = null;
         _listenTokenSource = null;
@@ -172,6 +171,18 @@ public partial class TcpSocketServer
     {
         var buffer = command.Serialize(SystemId);
         await client.SendAsync(buffer);
+    }
+
+    /// <summary>
+    ///     注册服务端收到客户端命令后的扩展处理器。处理器返回 true 表示命令已被消费。
+    /// </summary>
+    public IDisposable RegisterCommandHandler(Func<string, TcpSession, SocketCommand, Task<bool>> handler)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+
+        var id = Guid.NewGuid();
+        _commandHandlers[id] = handler;
+        return new CommandHandlerRegistration(() => _commandHandlers.TryRemove(id, out _));
     }
 
     #endregion
@@ -312,8 +323,7 @@ public partial class TcpSocketServer
     /// <summary>
     ///     处理客户端请求（内部方法）
     /// </summary>
-    private async Task ProcessingRequestsAsync(ChannelReader<(string ClientKey, SocketCommand Command)> requests,
-        ChannelWriter<(string ClientKey, SocketCommand Command)> fileTransferRequests)
+    private async Task ProcessingRequestsAsync(ChannelReader<(string ClientKey, SocketCommand Command)> requests)
     {
         await foreach (var (clientKey, command) in requests.ReadAllAsync())
         {
@@ -326,21 +336,12 @@ public partial class TcpSocketServer
             {
                 ActiveClient(clientKey);
 
-                if (command.IsCommand<FileUploadRequest>() ||
-                    command.IsCommand<FileDownloadRequest>() ||
-                    command.IsCommand<FileChunkData>() ||
-                    command.IsCommand<FileChunkAck>() ||
-                    command.IsCommand<FileTransferReject>() ||
-                    command.IsCommand<BrowseFileSystemRequest>() ||
-                    command.IsCommand<CreateDirectoryRequest>() ||
-                    command.IsCommand<DeletePathRequest>())
+                if (await TryHandleCommandAsync(clientKey, client, command))
                 {
-                    await fileTransferRequests.WriteAsync((clientKey, command));
+                    continue;
                 }
-                else
-                {
-                    await EventBus.EventBus.Default.PublishAsync(command);
-                }
+
+                await EventBus.EventBus.Default.PublishAsync(command);
             }
             catch (Exception ex)
             {
@@ -350,18 +351,28 @@ public partial class TcpSocketServer
         }
     }
 
-    private (Channel<(string ClientKey, SocketCommand Command)> Requests,
-        Channel<(string ClientKey, SocketCommand Command)> FileTransferRequests) ResetRequestChannels()
+    private Channel<(string ClientKey, SocketCommand Command)> ResetRequestChannels()
     {
         _requests = Channel.CreateUnbounded<(string, SocketCommand)>();
-        _fileTransferRequests = Channel.CreateUnbounded<(string, SocketCommand)>();
-        return (_requests, _fileTransferRequests);
+        return _requests;
     }
 
     private void CompleteRequestChannels()
     {
         _requests.Writer.TryComplete();
-        _fileTransferRequests.Writer.TryComplete();
+    }
+
+    private async Task<bool> TryHandleCommandAsync(string clientKey, TcpSession client, SocketCommand command)
+    {
+        foreach (var handler in _commandHandlers.Values)
+        {
+            if (await handler(clientKey, client, command))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /// <summary>

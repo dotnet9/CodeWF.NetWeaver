@@ -3,7 +3,7 @@ namespace CodeWF.NetWrapper.Requests;
 /// <summary>
 ///     在服务端创建目录的请求对象。
 /// </summary>
-[NetHead(SocketConstants.CreateDirectoryRequestObjectId, 1)]
+[NetHead(FileSystemSocketConstants.CreateDirectoryRequestObjectId, 1)]
 public class CreateDirectoryRequest : INetObject
 {
     /// <summary>

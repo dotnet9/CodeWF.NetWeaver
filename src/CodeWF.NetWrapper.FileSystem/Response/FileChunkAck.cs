@@ -3,7 +3,7 @@ namespace CodeWF.NetWrapper.Response;
 /// <summary>
 ///     文件分块确认对象。
 /// </summary>
-[NetHead(SocketConstants.FileChunkAckObjectId, 2)]
+[NetHead(FileSystemSocketConstants.FileChunkAckObjectId, 2)]
 public class FileChunkAck : INetObject
 {
     /// <summary>

@@ -3,7 +3,7 @@ namespace CodeWF.NetWrapper.Response;
 /// <summary>
 ///     文件上传请求的响应对象。
 /// </summary>
-[NetHead(SocketConstants.FileUploadResponseObjectId, 1)]
+[NetHead(FileSystemSocketConstants.FileUploadResponseObjectId, 1)]
 public class FileUploadResponse : INetObject
 {
     /// <summary>

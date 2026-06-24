@@ -1,10 +1,10 @@
 namespace CodeWF.NetWrapper.Requests;
 
 /// <summary>
-///     从服务端发起文件下载的请求对象。
+///     向服务端发起文件上传的请求对象。
 /// </summary>
-[NetHead(SocketConstants.FileDownloadRequestObjectId, 1)]
-public class FileDownloadRequest : INetObject
+[NetHead(FileSystemSocketConstants.FileUploadRequestObjectId, 1)]
+public class FileUploadRequest : INetObject
 {
     /// <summary>
     ///     请求任务 ID，用于把响应与当前请求对应起来。
@@ -32,10 +32,10 @@ public class FileDownloadRequest : INetObject
     public long AlreadyTransferredBytes { get; set; }
 
     /// <summary>
-    ///     服务端文件路径。
+    ///     服务端保存的目标路径。
     /// </summary>
     public string RemoteFilePath { get; set; } = string.Empty;
 
     public override string ToString() =>
-        $"请求下载文件(TaskId={TaskId},文件名={FileName},大小={FileSize},远程路径={RemoteFilePath},已传输={AlreadyTransferredBytes})";
+        $"请求上传文件(TaskId={TaskId},文件名={FileName},大小={FileSize},远程路径={RemoteFilePath},已传输={AlreadyTransferredBytes})";
 }

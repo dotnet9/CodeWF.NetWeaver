@@ -3,7 +3,7 @@ namespace CodeWF.NetWrapper.Response;
 /// <summary>
 ///     返回服务端磁盘列表的响应对象。
 /// </summary>
-[NetHead(SocketConstants.DriveListResponseObjectId, 1)]
+[NetHead(FileSystemSocketConstants.DriveListResponseObjectId, 1)]
 public class DriveListResponse : INetObject
 {
     /// <summary>

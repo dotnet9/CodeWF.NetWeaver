@@ -1,5 +1,18 @@
 # 更新日志
 
+## 3.0.0 (2026-06-24)
+
+- 😄[新增]-新增 `CodeWF.NetWrapper.FileSystem` NuGet 包，依赖 `CodeWF.NetWrapper`，承载远程文件系统管理、文件上传/下载、断点续传、文件协议 DTO、`IManagedFileSystem` 与默认物理文件系统实现。
+- 🔨[优化]-`CodeWF.NetWrapper` 收敛为通用 TCP/UDP Socket 封装，新增客户端/服务端命令处理器注册入口，扩展包可优先消费特定协议对象，未处理命令继续发布到 `CodeWF.EventBus`。
+- 🔨[优化]-文件协议对象 ID、字段顺序和 `NetHead` 版本保持不变，拆包不改变网络数据包大小；变化仅在 NuGet 包、程序集边界和文件能力挂接方式。
+- 🐛[修复]-修复通过 `INetObject` 接口变量发送命令时正文按接口类型序列化为空的问题，改为按运行时 DTO 类型写入正文。
+
+## 2.2.0 (2026-06-24)
+
+- 😄[新增]-`SerializeHelper` 支持 `Nullable<T>` / `T?` 可空值类型，正文中使用 1 字节 `HasValue` 标记保留空值语义。
+- 😄[新增]-补充 .NET 基础值类型支持：`Half`、`nint` / `nuint`、`Int128` / `UInt128`、`DateTime`、`DateTimeOffset`、`DateOnly`、`TimeOnly`、`TimeSpan`、`Guid`。
+- 🔨[优化]-明确基础类型包体大小规则、可空字段包体影响、AOT / trimming 场景下 DTO 元数据保留边界，并避免 Native AOT 下接口集合回退触发运行时泛型构造。
+
 ## 2.1.2.3 (2026-06-08)
 
 - 🔨[优化]-补齐根目录 logo.svg、logo.png、logo.ico 三件套，子工程通过 MSBuild Link 引用根 logo，避免维护多份图标副本。

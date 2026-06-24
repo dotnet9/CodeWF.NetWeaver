@@ -23,7 +23,7 @@ public partial class SerializeHelper
         }
 
         var netObjectInfo = data.GetType().GetNetObjectHead();
-        var bodyBuffer = data.SerializeObject();
+        var bodyBuffer = data.SerializeObject(data.GetType());
         using var stream = new MemoryStream();
         using var writer = new BinaryWriter(stream, DefaultEncoding);
         writer.Write(PacketHeadLen + bodyBuffer.Length);
@@ -83,14 +83,14 @@ public partial class SerializeHelper
     /// <typeparam name="T">对象类型</typeparam>
     /// <param name="writer">BinaryWriter 实例</param>
     /// <param name="data">要序列化的对象</param>
-    private static void SerializeProperties<T>(BinaryWriter writer, T data)
+    private static void SerializeProperties(BinaryWriter writer, object data, Type objectType)
     {
         if (data == null)
         {
             throw new ArgumentNullException(nameof(data));
         }
 
-        var properties = GetProperties(data.GetType())
+        var properties = GetProperties(objectType)
             .Where(p => p.GetCustomAttribute(typeof(NetIgnoreMemberAttribute)) == null);
         foreach (var property in properties)
         {
@@ -121,7 +121,11 @@ public partial class SerializeHelper
     /// <param name="valueType">值的类型</param>
     private static void SerializeValue(BinaryWriter writer, object? value, Type valueType)
     {
-        if (IsScalarType(valueType))
+        if (TryGetNullableValueType(valueType, out var nullableValueType))
+        {
+            SerializeNullableValue(writer, value, nullableValueType);
+        }
+        else if (IsScalarType(valueType))
         {
             SerializeBaseValue(writer, value, valueType);
         }
@@ -136,12 +140,28 @@ public partial class SerializeHelper
         }
         else if (value != null)
         {
-            SerializeProperties(writer, value);
+            SerializeProperties(writer, value, valueType);
         }
         else
         {
             throw new InvalidOperationException(
                 $"Reference type {valueType.FullName} is null. Non-collection reference types do not support null serialization.");
+        }
+    }
+
+    /// <summary>
+    ///     序列化可空值类型，先写入 HasValue，再写入底层值
+    /// </summary>
+    /// <param name="writer">BinaryWriter 实例</param>
+    /// <param name="value">要序列化的值</param>
+    /// <param name="valueType">可空类型的底层值类型</param>
+    private static void SerializeNullableValue(BinaryWriter writer, object? value, Type valueType)
+    {
+        var hasValue = value != null;
+        writer.Write(hasValue);
+        if (hasValue)
+        {
+            SerializeValue(writer, value, valueType);
         }
     }
 
@@ -190,9 +210,33 @@ public partial class SerializeHelper
         {
             writer.Write(value == null ? 0L : (long)value);
         }
+        else if (valueType == typeof(IntPtr))
+        {
+            writer.Write(value == null ? 0L : ((IntPtr)value).ToInt64());
+        }
         else if (valueType == typeof(ulong))
         {
             writer.Write(value == null ? 0UL : (ulong)value);
+        }
+        else if (valueType == typeof(UIntPtr))
+        {
+            writer.Write(value == null ? 0UL : ((UIntPtr)value).ToUInt64());
+        }
+        else if (valueType == typeof(Int128))
+        {
+            Span<byte> buffer = stackalloc byte[Int128ByteCount];
+            BinaryPrimitives.WriteInt128LittleEndian(buffer, value == null ? default : (Int128)value);
+            writer.Write(buffer);
+        }
+        else if (valueType == typeof(UInt128))
+        {
+            Span<byte> buffer = stackalloc byte[Int128ByteCount];
+            BinaryPrimitives.WriteUInt128LittleEndian(buffer, value == null ? default : (UInt128)value);
+            writer.Write(buffer);
+        }
+        else if (valueType == typeof(Half))
+        {
+            writer.Write(value == null ? (Half)0 : (Half)value);
         }
         else if (valueType == typeof(float))
         {
@@ -205,6 +249,38 @@ public partial class SerializeHelper
         else if (valueType == typeof(decimal))
         {
             writer.Write(value == null ? 0m : (decimal)value);
+        }
+        else if (valueType == typeof(DateTime))
+        {
+            writer.Write(value == null ? default : ((DateTime)value).ToBinary());
+        }
+        else if (valueType == typeof(DateTimeOffset))
+        {
+            var dateTimeOffset = value == null ? default : (DateTimeOffset)value;
+            writer.Write(dateTimeOffset.Ticks);
+            writer.Write(dateTimeOffset.Offset.Ticks);
+        }
+        else if (valueType == typeof(DateOnly))
+        {
+            writer.Write(value == null ? 0 : ((DateOnly)value).DayNumber);
+        }
+        else if (valueType == typeof(TimeOnly))
+        {
+            writer.Write(value == null ? 0L : ((TimeOnly)value).Ticks);
+        }
+        else if (valueType == typeof(TimeSpan))
+        {
+            writer.Write(value == null ? 0L : ((TimeSpan)value).Ticks);
+        }
+        else if (valueType == typeof(Guid))
+        {
+            Span<byte> buffer = stackalloc byte[GuidByteCount];
+            if (value != null)
+            {
+                ((Guid)value).TryWriteBytes(buffer);
+            }
+
+            writer.Write(buffer);
         }
         else if (valueType == typeof(string))
         {

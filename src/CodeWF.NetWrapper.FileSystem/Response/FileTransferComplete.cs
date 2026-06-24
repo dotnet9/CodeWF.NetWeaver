@@ -3,7 +3,7 @@ namespace CodeWF.NetWrapper.Response;
 /// <summary>
 ///     文件传输完成对象。
 /// </summary>
-[NetHead(SocketConstants.FileTransferCompleteObjectId, 1)]
+[NetHead(FileSystemSocketConstants.FileTransferCompleteObjectId, 1)]
 public class FileTransferComplete : INetObject
 {
     /// <summary>

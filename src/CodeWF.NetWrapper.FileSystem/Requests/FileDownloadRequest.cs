@@ -1,25 +1,20 @@
-namespace CodeWF.NetWrapper.Response;
+namespace CodeWF.NetWrapper.Requests;
 
 /// <summary>
-///     文件下载请求的响应对象。
+///     从服务端发起文件下载的请求对象。
 /// </summary>
-[NetHead(SocketConstants.FileDownloadResponseObjectId, 1)]
-public class FileDownloadResponse : INetObject
+[NetHead(FileSystemSocketConstants.FileDownloadRequestObjectId, 1)]
+public class FileDownloadRequest : INetObject
 {
     /// <summary>
-    ///     请求任务 ID，用于把响应与原请求对应起来。
+    ///     请求任务 ID，用于把响应与当前请求对应起来。
     /// </summary>
     public int TaskId { get; set; }
 
     /// <summary>
-    ///     标记服务端是否接受本次下载。
+    ///     文件名。
     /// </summary>
-    public bool Accept { get; set; }
-
-    /// <summary>
-    ///     响应消息。
-    /// </summary>
-    public string Message { get; set; } = string.Empty;
+    public string FileName { get; set; } = string.Empty;
 
     /// <summary>
     ///     文件总大小，单位为字节。
@@ -32,7 +27,7 @@ public class FileDownloadResponse : INetObject
     public string FileHash { get; set; } = string.Empty;
 
     /// <summary>
-    ///     已经确认传输完成的字节数。
+    ///     已经传输完成的字节数，用于断点续传。
     /// </summary>
     public long AlreadyTransferredBytes { get; set; }
 
@@ -42,5 +37,5 @@ public class FileDownloadResponse : INetObject
     public string RemoteFilePath { get; set; } = string.Empty;
 
     public override string ToString() =>
-        $"返回下载文件结果(TaskId={TaskId},接受={Accept},远程路径={RemoteFilePath},已传输={AlreadyTransferredBytes},消息={Message})";
+        $"请求下载文件(TaskId={TaskId},文件名={FileName},大小={FileSize},远程路径={RemoteFilePath},已传输={AlreadyTransferredBytes})";
 }

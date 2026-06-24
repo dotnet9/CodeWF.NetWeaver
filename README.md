@@ -5,7 +5,8 @@
 [![License](https://img.shields.io/github/license/dotnet9/CodeWF.NetWeaver)](LICENSE)
 
 `CodeWF.NetWeaver` 是网络数据包二进制序列化与反序列化核心库。
-`CodeWF.NetWrapper` 构建在它之上，提供 TCP/UDP 帮助类、命令分发、远程文件系统管理、文件上传/下载和断点续传能力。
+`CodeWF.NetWrapper` 构建在它之上，提供通用 TCP/UDP 帮助类和命令分发能力。
+`CodeWF.NetWrapper.FileSystem` 是依赖 `CodeWF.NetWrapper` 的文件系统扩展包，提供远程文件系统管理、文件上传/下载和断点续传能力。
 
 ## 文档职责
 
@@ -16,7 +17,7 @@
 
 ## 仓库规范
 
-- 当前版本：`2.1.2.3`，版本号统一维护在根目录 `Directory.Build.props` 的 `<Version>` 节点。
+- 当前版本：`3.0.0`，版本号统一维护在根目录 `Directory.Build.props` 的 `<Version>` 节点。
 - NuGet 包项目支持 `net8.0;net10.0`；示例、测试与内部应用项目使用 `net11.0` / `net11.0-windows`。
 - 根目录 `logo.svg`、`logo.png`、`logo.ico` 是唯一图标源，子工程通过 MSBuild `Link` 引用。
 - 使用 `Directory.Packages.props` 做中央包管理，并启用传递包 pin。
@@ -26,7 +27,8 @@
 | 项目 | 说明 |
 | --- | --- |
 | `CodeWF.NetWeaver` | 核心数据包序列化 / 反序列化库。 |
-| `CodeWF.NetWrapper` | 基于 `CodeWF.NetWeaver` 的 TCP/UDP Socket、命令、文件管理和文件传输封装库。 |
+| `CodeWF.NetWrapper` | 基于 `CodeWF.NetWeaver` 的通用 TCP/UDP Socket 与命令分发封装库。 |
+| `CodeWF.NetWrapper.FileSystem` | 依赖 `CodeWF.NetWrapper` 的远程文件管理与文件传输扩展库。 |
 | `SocketDto` | 示例协议 DTO 与对象 ID 常量。 |
 | `SocketTest.Client` | Avalonia 示例客户端。 |
 | `SocketTest.Server` | Avalonia 示例服务端。 |
@@ -39,16 +41,24 @@
 dotnet add package CodeWF.NetWeaver
 ```
 
-需要 TCP/UDP 命令分发、文件传输或远程文件管理时，再安装封装层：
+需要 TCP/UDP 命令分发时，再安装通用封装层：
 
 ```bash
 dotnet add package CodeWF.NetWrapper
+```
+
+需要远程文件管理或文件上传/下载时，安装文件系统扩展包：
+
+```bash
+dotnet add package CodeWF.NetWrapper.FileSystem
 ```
 
 Package Manager Console：
 
 ```powershell
 NuGet\Install-Package CodeWF.NetWeaver
+NuGet\Install-Package CodeWF.NetWrapper
+NuGet\Install-Package CodeWF.NetWrapper.FileSystem
 ```
 
 ## 构建与测试
@@ -144,11 +154,25 @@ var deserialized = buffer.Deserialize<ResponseProcessList>();
 Console.WriteLine($"Process count: {deserialized.Processes?.Count ?? 0}");
 ```
 
-`SerializeHelper` 支持标量、字符串、枚举、数组、`List<T>` / 集合接口、`Dictionary<TKey,TValue>` / 字典接口和嵌套对象。需要跳过字段时使用 `NetIgnoreMemberAttribute`。
+`SerializeHelper` 支持基础值类型、可空值类型、字符串、枚举、数组、`List<T>` / 集合接口、`Dictionary<TKey,TValue>` / 字典接口和嵌套对象。需要跳过字段时使用 `NetIgnoreMemberAttribute`。
+
+基础类型支持：
+
+| 类别 | 类型 |
+| --- | --- |
+| 布尔与字符 | `bool`、`char` |
+| 整数 | `byte`、`sbyte`、`short`、`ushort`、`int`、`uint`、`long`、`ulong`、`nint` / `IntPtr`、`nuint` / `UIntPtr`、`Int128`、`UInt128` |
+| 浮点与数值 | `Half`、`float`、`double`、`decimal` |
+| 时间与标识 | `DateTime`、`DateTimeOffset`、`DateOnly`、`TimeOnly`、`TimeSpan`、`Guid` |
+| 其他 | `string`、`enum` |
+
+可空值类型 `Nullable<T>` / `T?` 使用 1 字节 `HasValue` 标记。空值只写入 1 字节；非空值写入 1 字节标记后再写入底层 `T` 的内容。因此已有非可空字段包体大小不变，新增或改用可空字段时需要双端使用相同包版本和 DTO 定义。
+
+Native AOT / trimming 场景下，基础类型读写不依赖动态代码生成。DTO 和嵌套对象仍按公开属性反射读写，目标应用需要保留参与序列化的 DTO 元数据；集合属性在 AOT 场景下建议声明为具体 `List<T>` / `Dictionary<TKey,TValue>`，避免接口集合回退实现需要运行时构造泛型集合。
 
 ## CodeWF.NetWrapper
 
-`CodeWF.NetWrapper` 负责 TCP/UDP 通信，并将原始数据包转换为强类型命令：
+`CodeWF.NetWrapper` 负责 TCP/UDP 通信，并将原始数据包转换为强类型命令。通用包只内置心跳、通用响应和 Socket 连接管理；文件系统等业务协议通过扩展包注册命令处理器：
 
 ```csharp
 using CodeWF.EventBus;
@@ -160,7 +184,7 @@ await server.StartAsync("Server", "0.0.0.0", 8888);
 
 EventBus.Default.Subscribe<SocketCommand>(async (sender, command) =>
 {
-    // 非内置文件管理命令可在这里处理。
+    // 未被扩展处理器消费的业务命令可在这里处理。
     await Task.CompletedTask;
 });
 ```
@@ -170,26 +194,31 @@ EventBus.Default.Subscribe<SocketCommand>(async (sender, command) =>
 客户端常用 API：
 
 ```csharp
-await client.BrowseFileSystemAsync(string.Empty);
-await client.BrowseFileSystemAsync(@"D:\ServerFiles");
-await client.CreateDirectoryAsync(@"D:\ServerFiles\uploads");
-await client.DeletePathAsync(@"D:\ServerFiles\uploads\old.bin", isDirectory: false);
-await client.UploadFileAsync(@"D:\local\demo.zip", @"D:\ServerFiles\uploads\demo.zip");
-await client.DownloadFileAsync(@"D:\ServerFiles\uploads\demo.zip", @"D:\downloads");
+using CodeWF.NetWrapper.Helpers;
+
+var fileClient = client.UseFileSystem();
+
+await fileClient.BrowseFileSystemAsync(string.Empty);
+await fileClient.BrowseFileSystemAsync(@"D:\ServerFiles");
+await fileClient.CreateDirectoryAsync(@"D:\ServerFiles\uploads");
+await fileClient.DeletePathAsync(@"D:\ServerFiles\uploads\old.bin", isDirectory: false);
+await fileClient.UploadFileAsync(@"D:\local\demo.zip", @"D:\ServerFiles\uploads\demo.zip");
+await fileClient.DownloadFileAsync(@"D:\ServerFiles\uploads\demo.zip", @"D:\downloads");
 ```
 
 服务端文件系统能力通过 `IManagedFileSystem` 抽象，默认使用物理文件系统：
 
 ```csharp
 var server = new TcpSocketServer();
+var fileServer = server.UseFileSystem();
 
-server.FileTransferProgress += (sender, args) =>
+fileServer.FileTransferProgress += (sender, args) =>
 {
     Console.WriteLine($"{args.FileName}: {args.Progress:F2}%");
 };
 ```
 
-当前实现要求服务端路径使用绝对路径；空路径用于浏览入口，服务端可返回磁盘列表。文件浏览响应按页返回目录条目，上传和下载都通过 `TaskId` 关联同一次传输流程。
+`UseFileSystem()` 会把文件系统扩展注册到通用 Socket 命令管线。扩展包迁出不改变现有文件协议 DTO 的字段布局、对象 ID 或对象版本，因此数据包大小不受拆包影响；变化的是 NuGet 包和程序集边界。当前实现要求服务端路径使用绝对路径；空路径用于浏览入口，服务端可返回磁盘列表。文件浏览响应按页返回目录条目，上传和下载都通过 `TaskId` 关联同一次传输流程。
 
 传输行为：
 

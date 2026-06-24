@@ -3,7 +3,7 @@ namespace CodeWF.NetWrapper.Response;
 /// <summary>
 ///     创建服务端目录的响应对象。
 /// </summary>
-[NetHead(SocketConstants.CreateDirectoryResponseObjectId, 1)]
+[NetHead(FileSystemSocketConstants.CreateDirectoryResponseObjectId, 1)]
 public class CreateDirectoryResponse : INetObject
 {
     /// <summary>

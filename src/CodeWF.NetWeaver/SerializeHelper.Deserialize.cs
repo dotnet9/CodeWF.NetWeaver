@@ -28,7 +28,7 @@ public partial class SerializeHelper
         using var stream = new MemoryStream(buffer, readIndex, buffer.Length - readIndex);
         using var reader = new BinaryReader(stream);
         var data = new T();
-        DeserializeProperties(reader, data);
+        DeserializeProperties(reader, data, typeof(T));
         return data;
     }
 
@@ -68,14 +68,14 @@ public partial class SerializeHelper
     /// <typeparam name="T">对象类型</typeparam>
     /// <param name="reader">BinaryReader 实例</param>
     /// <param name="data">要反序列化的对象</param>
-    private static void DeserializeProperties<T>(BinaryReader reader, T data)
+    private static void DeserializeProperties(BinaryReader reader, object data, Type objectType)
     {
         if (data == null)
         {
             throw new ArgumentNullException(nameof(data));
         }
 
-        var properties = GetProperties(data.GetType());
+        var properties = GetProperties(objectType);
         foreach (var property in properties)
         {
             if (property.GetCustomAttribute(typeof(NetIgnoreMemberAttribute)) is NetIgnoreMemberAttribute _)
@@ -106,7 +106,11 @@ public partial class SerializeHelper
         object? value;
 
         // IsArray 用来判断是否为数组类型，例如 int[]、string[]。
-        if (IsScalarType(propertyType))
+        if (TryGetNullableValueType(propertyType, out var nullableValueType))
+        {
+            value = DeserializeNullableValue(reader, nullableValueType);
+        }
+        else if (IsScalarType(propertyType))
         {
             value = DeserializeBaseValue(reader, propertyType);
         }
@@ -124,6 +128,17 @@ public partial class SerializeHelper
         }
 
         return value;
+    }
+
+    /// <summary>
+    ///     反序列化可空值类型
+    /// </summary>
+    /// <param name="reader">BinaryReader 实例</param>
+    /// <param name="valueType">可空类型的底层值类型</param>
+    /// <returns>反序列化后的值，或 null</returns>
+    private static object? DeserializeNullableValue(BinaryReader reader, Type valueType)
+    {
+        return reader.ReadBoolean() ? DeserializeValue(reader, valueType) : null;
     }
 
     /// <summary>
@@ -182,9 +197,38 @@ public partial class SerializeHelper
             return reader.ReadInt64();
         }
 
+        if (propertyType == typeof(IntPtr))
+        {
+            return new IntPtr(reader.ReadInt64());
+        }
+
         if (propertyType == typeof(ulong))
         {
             return reader.ReadUInt64();
+        }
+
+        if (propertyType == typeof(UIntPtr))
+        {
+            return new UIntPtr(reader.ReadUInt64());
+        }
+
+        if (propertyType == typeof(Int128))
+        {
+            Span<byte> buffer = stackalloc byte[Int128ByteCount];
+            ReadExactly(reader, buffer);
+            return BinaryPrimitives.ReadInt128LittleEndian(buffer);
+        }
+
+        if (propertyType == typeof(UInt128))
+        {
+            Span<byte> buffer = stackalloc byte[Int128ByteCount];
+            ReadExactly(reader, buffer);
+            return BinaryPrimitives.ReadUInt128LittleEndian(buffer);
+        }
+
+        if (propertyType == typeof(Half))
+        {
+            return reader.ReadHalf();
         }
 
         if (propertyType == typeof(float))
@@ -200,6 +244,40 @@ public partial class SerializeHelper
         if (propertyType == typeof(decimal))
         {
             return reader.ReadDecimal();
+        }
+
+        if (propertyType == typeof(DateTime))
+        {
+            return DateTime.FromBinary(reader.ReadInt64());
+        }
+
+        if (propertyType == typeof(DateTimeOffset))
+        {
+            var ticks = reader.ReadInt64();
+            var offsetTicks = reader.ReadInt64();
+            return new DateTimeOffset(ticks, TimeSpan.FromTicks(offsetTicks));
+        }
+
+        if (propertyType == typeof(DateOnly))
+        {
+            return DateOnly.FromDayNumber(reader.ReadInt32());
+        }
+
+        if (propertyType == typeof(TimeOnly))
+        {
+            return new TimeOnly(reader.ReadInt64());
+        }
+
+        if (propertyType == typeof(TimeSpan))
+        {
+            return new TimeSpan(reader.ReadInt64());
+        }
+
+        if (propertyType == typeof(Guid))
+        {
+            Span<byte> buffer = stackalloc byte[GuidByteCount];
+            ReadExactly(reader, buffer);
+            return new Guid(buffer);
         }
 
         if (propertyType == typeof(string))
@@ -265,6 +343,8 @@ public partial class SerializeHelper
     /// <param name="reader">BinaryReader 实例</param>
     /// <param name="propertyType">数组类型</param>
     /// <returns>反序列化后的数组</returns>
+    [UnconditionalSuppressMessage("AOT", "IL3050",
+        Justification = "Array element types are read from DTO property metadata. AOT targets must root serialized DTO metadata.")]
     private static object? DeserializeArrayValue(BinaryReader reader, Type propertyType)
     {
         var length = reader.ReadInt32();
@@ -297,13 +377,15 @@ public partial class SerializeHelper
     /// <param name="reader">BinaryReader 实例</param>
     /// <param name="type">对象类型</param>
     /// <returns>反序列化后的对象</returns>
+    [UnconditionalSuppressMessage("Trimming", "IL2067",
+        Justification = "Nested DTO types must preserve their public parameterless constructor when trimming.")]
     private static object? DeserializeObject(BinaryReader reader, Type type)
     {
         // Activator.CreateInstance(type) 会按运行时类型动态创建实例，
         // 适合这里这种“编译期不知道具体 DTO 类型”的反射场景。
         var data = Activator.CreateInstance(type)
                    ?? throw new InvalidOperationException($"Cannot create instance of {type.FullName}.");
-        DeserializeProperties(reader, data);
+        DeserializeProperties(reader, data, type);
         return data;
     }
 }

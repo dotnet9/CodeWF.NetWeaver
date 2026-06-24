@@ -3,7 +3,7 @@ namespace CodeWF.NetWrapper.Requests;
 /// <summary>
 ///     浏览服务端文件系统的请求对象。
 /// </summary>
-[NetHead(SocketConstants.BrowseFileSystemRequestObjectId, 1)]
+[NetHead(FileSystemSocketConstants.BrowseFileSystemRequestObjectId, 1)]
 public class BrowseFileSystemRequest : INetObject
 {
     /// <summary>

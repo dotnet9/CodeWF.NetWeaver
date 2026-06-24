@@ -34,6 +34,7 @@
     <PackageReference Include="Prism.DryIoc.Avalonia" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\CodeWF.NetWrapper.FileSystem\CodeWF.NetWrapper.FileSystem.csproj" />
     <ProjectReference Include="..\SocketDto\SocketDto.csproj" />
   </ItemGroup>
 </Project>
