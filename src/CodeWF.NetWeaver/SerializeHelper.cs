@@ -65,9 +65,7 @@ public partial class SerializeHelper
             return propertyInfos;
         }
 
-        propertyInfos = type.GetProperties()
-            .OrderBy(property => property.MetadataToken)
-            .ToArray();
+        propertyInfos = type.GetProperties();
         ObjectPropertyInfos[type] = propertyInfos;
         return propertyInfos;
     }

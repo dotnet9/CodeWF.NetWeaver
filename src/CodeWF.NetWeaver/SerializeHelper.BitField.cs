@@ -24,8 +24,7 @@ public partial class SerializeHelper
             return cached;
         }
 
-        var properties = type.GetProperties()
-            .OrderBy(property => property.MetadataToken);
+        var properties = type.GetProperties();
         var bitFieldProperties = new List<BitFieldPropertyInfo>();
 
         foreach (var property in properties)
