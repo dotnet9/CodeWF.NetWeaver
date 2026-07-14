@@ -172,6 +172,16 @@ public class FileTransferViewModel : ReactiveObject
 
     public void ToggleTransfer(FileTransferItem item) => ToggleTransferState(item);
 
+    public void ToggleTransferCommand(object? commandParameter)
+    {
+        // Avalonia 12.1 的方法命令只接受 object 参数，类型转换集中在命令入口，
+        // 不把弱类型参数扩散到传输状态机和队列处理代码。
+        if (commandParameter is FileTransferItem item)
+        {
+            ToggleTransferState(item);
+        }
+    }
+
     public void RemoveTransfer(FileTransferItem item)
     {
         if (item.State == FileTransferState.Running)
@@ -186,6 +196,14 @@ public class FileTransferViewModel : ReactiveObject
     }
 
     public void RemoveTransferItem(FileTransferItem item) => RemoveTransfer(item);
+
+    public void RemoveTransferCommand(object? commandParameter)
+    {
+        if (commandParameter is FileTransferItem item)
+        {
+            RemoveTransfer(item);
+        }
+    }
 
     [EventHandler]
     private void ReceiveFileTransferEnqueueUploads(FileTransferEnqueueUploadsMessage message)

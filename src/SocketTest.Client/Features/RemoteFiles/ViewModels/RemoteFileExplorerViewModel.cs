@@ -199,7 +199,14 @@ public class RemoteFileExplorerViewModel : ReactiveObject
 
     public Task EnterParentDirectoryCommand() => EnterParentDirectoryAsync();
 
-    public Task OpenEntryCommand(RemoteFileEntry entry) => OpenEntryAsync(entry);
+    public Task OpenEntryCommand(object? commandParameter)
+    {
+        // Avalonia 12.1 的方法命令要求参数类型为 object；在 UI 边界完成类型收窄，
+        // 业务方法 OpenEntryAsync 继续保持强类型，便于后续重构和人工调用时获得编译期检查。
+        return commandParameter is RemoteFileEntry entry
+            ? OpenEntryAsync(entry)
+            : Task.CompletedTask;
+    }
 
     public Task StartSearchCommand() => StartSearchAsync();
 
