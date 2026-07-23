@@ -1,6 +1,7 @@
 ﻿using ReactiveUI.Avalonia;
 
 using System.IO;
+using Microsoft.Extensions.Logging;
 
 namespace SocketTest.Server;
 
@@ -14,7 +15,7 @@ internal sealed class Program
     {
         Logger.Initialize(new LoggerOptions
         {
-            MinimumLevel = LogType.Debug,
+            MinimumLevel = LogLevel.Debug,
             EnableConsole = false,
             File = new FileLogOptions
             {

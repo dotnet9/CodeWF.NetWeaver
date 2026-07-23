@@ -8,6 +8,7 @@ using CodeWF.NetWrapper.Commands;
 using CodeWF.NetWrapper.Helpers;
 using CodeWF.NetWrapper.Models;
 using CodeWF.Tools.Helpers;
+using Microsoft.Extensions.Logging;
 using SocketDto;
 using SocketDto.AutoCommand;
 using SocketDto.Requests;
@@ -197,14 +198,14 @@ public class MainWindowViewModel : ReactiveObject
         RegeneratePorts();
         Logger.Warn(
             $"检测到端口冲突，已重新生成端口。TCP={_runtimeSettings.TcpPort}，UDP={_runtimeSettings.UdpPort}。");
-        await Log("检测到端口被占用，已自动重新生成端口并重试一次。", LogType.Warn, false);
+        await Log("检测到端口被占用，已自动重新生成端口并重试一次。", LogLevel.Warning, false);
 
         if (await TryStartServerCoreAsync())
         {
             return true;
         }
 
-        await Log("服务端启动失败，请检查网络环境或配置文件。", LogType.Error);
+        await Log("服务端启动失败，请检查网络环境或配置文件。", LogLevel.Error);
         return false;
     }
 
@@ -567,14 +568,15 @@ public class MainWindowViewModel : ReactiveObject
         await Dispatcher.UIThread.InvokeAsync(action.Invoke);
     }
 
-    private async Task Log(string message, LogType type = LogType.Info, bool showNotification = true)
+    private async Task Log(string message, LogLevel level = LogLevel.Information, bool showNotification = true)
     {
-        switch (type)
+        switch (level)
         {
-            case LogType.Warn:
+            case LogLevel.Warning:
                 Logger.Warn(message);
                 break;
-            case LogType.Error:
+            case LogLevel.Error:
+            case LogLevel.Critical:
                 Logger.Error(message);
                 break;
             default:
@@ -587,10 +589,10 @@ public class MainWindowViewModel : ReactiveObject
             return;
         }
 
-        var notificationType = type switch
+        var notificationType = level switch
         {
-            LogType.Warn => NotificationType.Warning,
-            LogType.Error => NotificationType.Error,
+            LogLevel.Warning => NotificationType.Warning,
+            LogLevel.Error or LogLevel.Critical => NotificationType.Error,
             _ => NotificationType.Information
         };
 
