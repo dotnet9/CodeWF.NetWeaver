@@ -1,5 +1,9 @@
 # 更新日志
 
+## 3.0.5 (2026-07-23)
+
+- 🐛[修复]-升级 `CodeWF.Log.Core` 编译依赖，避免网络组件在应用升级日志组件后仍调用已移除的旧版可选参数方法。
+
 ## 3.0.0 (2026-06-24)
 
 - 😄[新增]-新增 `CodeWF.NetWrapper.FileSystem` NuGet 包，依赖 `CodeWF.NetWrapper`，承载远程文件系统管理、文件上传/下载、断点续传、文件协议 DTO、`IManagedFileSystem` 与默认物理文件系统实现。

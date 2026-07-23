@@ -1,6 +1,8 @@
 ﻿using Avalonia;
 using ReactiveUI.Avalonia;
 
+using System.IO;
+
 namespace SocketTest.Client;
 
 internal sealed class Program
@@ -11,9 +13,25 @@ internal sealed class Program
     [STAThread]
     public static void Main(string[] args)
     {
-        Logger.TimeFormat = "yyyy-MM-dd HH:mm:ss.fff";
-        BuildAvaloniaApp()
-            .StartWithClassicDesktopLifetime(args);
+        Logger.Initialize(new LoggerOptions
+        {
+            MinimumLevel = LogType.Debug,
+            EnableConsole = false,
+            File = new FileLogOptions
+            {
+                DirectoryPath = Path.Combine(Environment.CurrentDirectory, "Log"),
+                TimestampFormat = "yyyy-MM-dd HH:mm:ss.fff"
+            }
+        });
+
+        try
+        {
+            BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+        }
+        finally
+        {
+            Logger.ShutdownAsync().GetAwaiter().GetResult();
+        }
     }
 
     // Avalonia configuration, don't remove; also used by visual designer.
