@@ -1,5 +1,6 @@
 namespace CodeWF.NetWrapper.Tests;
 
+[Collection(LoggingCollection.Name)]
 public sealed class TcpSocketFileTransferTests : IAsyncLifetime
 {
     private readonly string _workspaceRoot =
