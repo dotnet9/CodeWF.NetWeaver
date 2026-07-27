@@ -8,7 +8,7 @@
     <BaseIntermediateOutputPath>$(MSBuildThisFileDirectory).vs\$(SolutionName)\Intermediate\$(MSBuildProjectName)\</BaseIntermediateOutputPath>
     <OutputPath>$(MSBuildThisFileDirectory)Output\</OutputPath>
     <AppendTargetFrameworkToOutputPath>true</AppendTargetFrameworkToOutputPath>
-    <Version>3.0.7</Version>
+    <Version>3.0.8</Version>
     <Company>https://codewf.com</Company>
     <Authors>CodeWF</Authors>
     <Owners>https://codewf.com</Owners>
