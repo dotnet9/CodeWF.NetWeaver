@@ -24,14 +24,14 @@
     <PackageVersion Include="ProDataGrid" Version="12.1.0.4" />
     <PackageVersion Include="ReactiveUI.Avalonia" Version="12.1.2" />
     <PackageVersion Include="Semi.Avalonia" Version="12.1.0.1" />
-    <PackageVersion Include="System.Configuration.ConfigurationManager" Version="10.0.11" />
-    <PackageVersion Include="System.Drawing.Common" Version="10.0.11" />
-    <PackageVersion Include="System.Security.Cryptography.ProtectedData" Version="10.0.11" />
-    <PackageVersion Include="System.Security.Permissions" Version="10.0.11" />
-    <PackageVersion Include="System.Windows.Extensions" Version="10.0.11" />
+    <PackageVersion Include="System.Configuration.ConfigurationManager" Version="10.0.12" />
+    <PackageVersion Include="System.Drawing.Common" Version="10.0.12" />
+    <PackageVersion Include="System.Security.Cryptography.ProtectedData" Version="10.0.12" />
+    <PackageVersion Include="System.Security.Permissions" Version="10.0.12" />
+    <PackageVersion Include="System.Windows.Extensions" Version="10.0.12" />
     <PackageVersion Include="Tmds.DBus.Protocol" Version="0.95.1" />
     <PackageVersion Include="xunit" Version="2.9.3" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="4.0.0" />
-    <PackageVersion Include="Microsoft.SourceLink.GitHub" Version="10.0.400" />
+    <PackageVersion Include="Microsoft.SourceLink.GitHub" Version="10.0.401" />
   </ItemGroup>
 </Project>

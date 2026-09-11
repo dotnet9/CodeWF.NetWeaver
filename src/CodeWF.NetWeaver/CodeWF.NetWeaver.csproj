@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <TargetFrameworks>net8.0;net11.0</TargetFrameworks>
     <Nullable>enable</Nullable>
     <LangVersion>latest</LangVersion>
     <Description>CodeWF.NetWeaver is an AOT-friendly C# packet serialization library for TCP and UDP protocols. CodeWF.NetWeaver 是一个面向 TCP/UDP 协议的 AOT 友好型数据包序列化库。</Description>
