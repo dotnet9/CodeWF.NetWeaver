@@ -17,7 +17,7 @@
 
 ## 仓库规范
 
-- 当前版本：`4.0.0.7`，版本号统一维护在根目录 `Directory.Build.props` 的 `<Version>` 节点。
+- 当前版本：`4.0.0.8`，版本号统一维护在根目录 `Directory.Build.props` 的 `<Version>` 节点。
 - NuGet 包项目支持 `net8.0;net10.0;net11.0`；示例、测试与内部应用项目使用 `net11.0` / `net11.0-windows`。
 - 根目录 `logo.svg`、`logo.png`、`logo.ico` 是唯一图标源，子工程通过 MSBuild `Link` 引用。
 - 使用 `Directory.Packages.props` 做中央包管理，并启用传递包 pin。
@@ -285,12 +285,12 @@ dotnet test src\CodeWF.NetWrapper.Tests\CodeWF.NetWrapper.Tests.csproj
 
 | 包 | 协议 | 源码/项目地址 | 结论 |
 | --- | --- | --- | --- |
-| `Avalonia` / `Avalonia.Desktop` / `Avalonia.Fonts.Inter` / `Avalonia.Markup.Xaml.Loader` | MIT | https://github.com/AvaloniaUI/Avalonia | 通过，当前使用 `12.0.4` |
+| `Avalonia` / `Avalonia.Desktop` / `Avalonia.Fonts.Inter` / `Avalonia.Markup.Xaml.Loader` | MIT | https://github.com/AvaloniaUI/Avalonia | 通过，当前使用 `12.1.2` |
 | `CodeWF.EventBus` / `CodeWF.Log.Core` / `CodeWF.LogViewer.Avalonia` / `CodeWF.AvaloniaControls.ProDataGrid.Themes` / `CodeWF.Tools.Core` / `CodeWF.Tools.Files` | MIT | CodeWF 自研仓库 | 通过 |
 | `Lorem.Universal.Net` | MIT | https://github.com/trichards57/Lorem.Universal.NET | 示例依赖，通过 |
 | `Microsoft.NET.Test.Sdk` | MIT | https://github.com/microsoft/vstest | 测试依赖，通过 |
 | `Prism.DryIoc.Avalonia` | MIT | https://github.com/AvaloniaCommunity/Prism.Avalonia | 通过，固定到 `8.1.97.11073` |
-| `ProDataGrid` | MIT | https://github.com/wieslawsoltes/ProDataGrid | 通过 |
+| `ProDataGrid` | MIT | https://github.com/wieslawsoltes/ProDataGrid | 通过，当前使用 `12.1.0.4` |
 | `ReactiveUI.Avalonia` | MIT | https://github.com/reactiveui/reactiveui | 通过 |
 | `Semi.Avalonia` | MIT | https://github.com/irihitech/Semi.Avalonia | 通过，仅使用开源主体包 |
 | `System.Configuration.ConfigurationManager` / `System.Drawing.Common` / `System.Security.Cryptography.ProtectedData` / `System.Security.Permissions` / `System.Windows.Extensions` | MIT | https://github.com/dotnet/dotnet | 通过，固定到 `10.0.8` |
