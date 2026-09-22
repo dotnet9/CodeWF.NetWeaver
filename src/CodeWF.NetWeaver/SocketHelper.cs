@@ -15,7 +15,22 @@ public static partial class SerializeHelper
     /// <summary>
     ///     TCP单包最大大小，避免异常或恶意长度字段导致过大内存分配
     /// </summary>
-    public static int MaxTcpPacketSize { get; set; } = 64 * 1024 * 1024;
+    private static int _maxTcpPacketSize = 64 * 1024 * 1024;
+
+    public static int MaxTcpPacketSize
+    {
+        get => Volatile.Read(ref _maxTcpPacketSize);
+        set
+        {
+            if (value < PacketHeadLen)
+            {
+                throw new ArgumentOutOfRangeException(nameof(value), value,
+                    $"TCP packet size must be at least {PacketHeadLen} bytes.");
+            }
+
+            Volatile.Write(ref _maxTcpPacketSize, value);
+        }
+    }
 
     /// <summary>
     ///     从Socket异步读取指定数量的字节，确保读取到完整的字节数
@@ -44,6 +59,28 @@ public static partial class SerializeHelper
         }
 
         return true;
+    }
+
+    /// <summary>
+    ///     Asynchronously sends the complete buffer over a stream socket.
+    /// </summary>
+    public static async Task SendExactAsync(this Socket socket, ReadOnlyMemory<byte> buffer,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(socket);
+
+        var totalBytesSent = 0;
+        while (totalBytesSent < buffer.Length)
+        {
+            var bytesSent = await socket.SendAsync(
+                buffer[totalBytesSent..], SocketFlags.None, cancellationToken);
+            if (bytesSent == 0)
+            {
+                throw new SocketException((int)SocketError.ConnectionReset);
+            }
+
+            totalBytesSent += bytesSent;
+        }
     }
 
     /// <summary>
@@ -82,10 +119,14 @@ public static partial class SerializeHelper
             : ReadPacketFailed();
     }
 
-    private static bool IsValidTcpPacketLength(int bufferLen)
+    public static bool IsValidTcpPacketLength(int bufferLen)
     {
-        var maxPacketSize = Math.Max(MaxTcpPacketSize, PacketHeadLen);
-        return bufferLen >= PacketHeadLen && bufferLen <= maxPacketSize;
+        return bufferLen >= PacketHeadLen && bufferLen <= MaxTcpPacketSize;
+    }
+
+    public static bool IsValidUdpPacketLength(int bufferLen)
+    {
+        return bufferLen >= PacketHeadLen && bufferLen <= MaxUdpPacketSize;
     }
 
     private static (bool Success, byte[]? Buffer, NetHeadInfo? NetObject) ReadPacketFailed()

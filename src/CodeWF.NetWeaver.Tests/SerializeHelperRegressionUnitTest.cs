@@ -263,6 +263,37 @@ namespace CodeWF.NetWeaver.Tests
         }
 
         [Fact]
+        public async Task Test_SendExactAsync_SendsEntireBuffer()
+        {
+            var listener = new TcpListener(IPAddress.Loopback, 0);
+            listener.Start();
+            try
+            {
+                using var client = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+                var acceptTask = listener.AcceptSocketAsync();
+                await client.ConnectAsync((IPEndPoint)listener.LocalEndpoint);
+                using var server = await acceptTask;
+
+                var payload = new byte[2 * 1024 * 1024];
+                Random.Shared.NextBytes(payload);
+                var receiveTask = Task.Run(async () =>
+                {
+                    var received = new byte[payload.Length];
+                    Assert.True(await server.ReceiveExactAsync(received, 0, received.Length));
+                    return received;
+                });
+
+                await client.SendExactAsync(payload);
+
+                Assert.Equal(payload, await receiveTask);
+            }
+            finally
+            {
+                listener.Stop();
+            }
+        }
+
+        [Fact]
         public void Test_SerializeTypesWithSameName_DoNotConflict()
         {
             var first = new DuplicateNameOne

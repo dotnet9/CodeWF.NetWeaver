@@ -161,14 +161,10 @@ public class UdpSocketClient
                 var data = result.Buffer;
                 var readIndex = 0;
                 if (!data.ReadHead(ref readIndex, out var headInfo)
-                    || headInfo.SystemId != SystemId)
+                    || headInfo.SystemId != SystemId
+                    || !SerializeHelper.IsValidUdpPacketLength(headInfo.BufferLen)
+                    || data.Length != headInfo.BufferLen)
                 {
-                    continue;
-                }
-
-                if (data.Length < headInfo.BufferLen)
-                {
-                    Logger.Warn($"{ServerMark} 接收到不完整 UDP 包，接收大小 {data.Length}，错误 UDP 包基本信息：{headInfo}");
                     continue;
                 }
 

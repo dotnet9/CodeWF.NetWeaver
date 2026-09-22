@@ -14,6 +14,7 @@ public partial class TcpSocketServer
     private CancellationTokenSource? _listenTokenSource;
     private readonly ConcurrentDictionary<Guid, Func<string, TcpSession, SocketCommand, Task<bool>>> _commandHandlers =
         new();
+    private readonly SemaphoreSlim _sendLock = new(1, 1);
 
     private Channel<(string ClientKey, SocketCommand Command)> _requests =
         Channel.CreateUnbounded<(string, SocketCommand)>();
@@ -130,7 +131,7 @@ public partial class TcpSocketServer
     ///     向所有已连接的客户端发送命令
     /// </summary>
     /// <param name="command">要发送的网络对象命令</param>
-    public async Task SendCommandAsync(INetObject command)
+    public async Task SendCommandAsync(INetObject command, CancellationToken cancellationToken = default)
     {
         if (Clients.IsEmpty)
         {
@@ -151,7 +152,7 @@ public partial class TcpSocketServer
 
             try
             {
-                await SendCommandAsync(socket, command);
+                await SendCommandAsync(socket, command, cancellationToken);
             }
             catch (SocketException ex)
             {
@@ -167,10 +168,21 @@ public partial class TcpSocketServer
     /// </summary>
     /// <param name="client">客户端 Socket 对象</param>
     /// <param name="command">要发送的网络对象命令</param>
-    public async Task SendCommandAsync(Socket client, INetObject command)
+    public async Task SendCommandAsync(Socket client, INetObject command,
+        CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(client);
+        ArgumentNullException.ThrowIfNull(command);
         var buffer = command.Serialize(SystemId);
-        await client.SendAsync(buffer);
+        await _sendLock.WaitAsync(cancellationToken);
+        try
+        {
+            await client.SendExactAsync(buffer, cancellationToken);
+        }
+        finally
+        {
+            _sendLock.Release();
+        }
     }
 
     /// <summary>

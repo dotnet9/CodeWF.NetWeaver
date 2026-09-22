@@ -6,6 +6,7 @@ namespace CodeWF.NetWrapper.Helpers;
 public partial class TcpSocketClient
 {
     private Socket? _client;
+    private readonly SemaphoreSlim _sendLock = new(1, 1);
     private readonly ConcurrentDictionary<Guid, Func<SocketCommand, Task<bool>>> _commandHandlers = new();
     private Channel<SocketCommand> _responses = Channel.CreateUnbounded<SocketCommand>();
 
@@ -104,8 +105,9 @@ public partial class TcpSocketClient
     /// </summary>
     /// <param name="command">要发送的网络对象命令</param>
     /// <exception cref="Exception">未连接时抛出异常</exception>
-    public async Task SendCommandAsync(INetObject command)
+    public async Task SendCommandAsync(INetObject command, CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(command);
         var netObjInfo = command.GetType().GetNetObjectHead();
         if (!CanSend)
         {
@@ -113,7 +115,15 @@ public partial class TcpSocketClient
         }
 
         var buffer = command.Serialize(SystemId);
-        await _client!.SendAsync(buffer);
+        await _sendLock.WaitAsync(cancellationToken);
+        try
+        {
+            await _client!.SendExactAsync(buffer, cancellationToken);
+        }
+        finally
+        {
+            _sendLock.Release();
+        }
     }
 
     /// <summary>
