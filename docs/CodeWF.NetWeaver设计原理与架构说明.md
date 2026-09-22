@@ -128,6 +128,7 @@ var flags = buffer.ToFieldObject<Flags>();
 `CodeWF.NetWrapper` 使用 `System.Threading.Channels` 解耦 Socket 接收和业务处理：
 
 - TCP 服务端维护 `ConcurrentDictionary<string, TcpSession>`，按客户端地址管理会话。
+- TCP 服务端将请求按客户端标识分片到固定数量的有界队列，同一客户端保持顺序，不同客户端可以并行处理。
 - TCP 客户端和服务端收到完整包后解析 `NetHeadInfo`，包装为 `SocketCommand`。
 - TCP 客户端和服务端都提供 `RegisterCommandHandler(...)`，扩展包可优先消费特定协议对象。
 - 未被扩展处理器消费的命令通过 `CodeWF.EventBus` 发布，应用层可自行订阅处理。

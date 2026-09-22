@@ -17,7 +17,7 @@
 
 ## 仓库规范
 
-- 当前版本：`4.0.0.5`，版本号统一维护在根目录 `Directory.Build.props` 的 `<Version>` 节点。
+- 当前版本：`4.0.0.6`，版本号统一维护在根目录 `Directory.Build.props` 的 `<Version>` 节点。
 - NuGet 包项目支持 `net8.0;net10.0;net11.0`；示例、测试与内部应用项目使用 `net11.0` / `net11.0-windows`。
 - 根目录 `logo.svg`、`logo.png`、`logo.ico` 是唯一图标源，子工程通过 MSBuild `Link` 引用。
 - 使用 `Directory.Packages.props` 做中央包管理，并启用传递包 pin。

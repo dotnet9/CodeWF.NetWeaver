@@ -16,12 +16,13 @@ public partial class TcpSocketServer
         new();
     private readonly SemaphoreSlim _sendLock = new(1, 1);
     private const int MaxPendingRequests = 4096;
+    private const int RequestWorkerCount = 4;
     private readonly ConcurrentDictionary<string, Task> _clientTasks = new();
     private Task? _listenTask;
-    private Task? _processingTask;
+    private Task[] _processingTasks = [];
     private Task? _detectionTask;
 
-    private Channel<(string ClientKey, SocketCommand Command)> _requests = CreateRequestChannel();
+    private Channel<(string ClientKey, SocketCommand Command)>[] _requestChannels = CreateRequestChannels();
 
     #region 公开属性
 
@@ -96,10 +97,12 @@ public partial class TcpSocketServer
             Logger.Info($"{ServerMark} 启动成功，服务地址是：{ServerIP}:{ServerPort}");
 
             _listenTokenSource = new CancellationTokenSource();
-            var requests = ResetRequestChannels();
+            var requestChannels = ResetRequestChannels();
 
-            _listenTask = ListenForClientsAsync(_listenTokenSource, requests.Writer);
-            _processingTask = ProcessingRequestsAsync(requests.Reader);
+            _listenTask = ListenForClientsAsync(_listenTokenSource, requestChannels);
+            _processingTasks = requestChannels
+                .Select(requestChannel => ProcessingRequestsAsync(requestChannel.Reader))
+                .ToArray();
             _detectionTask = DetectionClientsAsync(_listenTokenSource);
 
             return (IsSuccess: true, ErrorMessage: null);
@@ -138,21 +141,17 @@ public partial class TcpSocketServer
             backgroundTasks.Add(_listenTask);
         }
 
-        if (_processingTask != null)
-        {
-            backgroundTasks.Add(_processingTask);
-        }
-
         if (_detectionTask != null)
         {
             backgroundTasks.Add(_detectionTask);
         }
 
+        backgroundTasks.AddRange(_processingTasks);
         backgroundTasks.AddRange(_clientTasks.Values);
         await IgnoreBackgroundTasksAsync(backgroundTasks);
         _clientTasks.Clear();
         _listenTask = null;
-        _processingTask = null;
+        _processingTasks = [];
         _detectionTask = null;
         _listenTokenSource = null;
         _detectionTimer = null;
@@ -265,7 +264,7 @@ public partial class TcpSocketServer
     ///     监听客户端连接请求（内部方法）
     /// </summary>
     private async Task ListenForClientsAsync(CancellationTokenSource listenTokenSource,
-        ChannelWriter<(string ClientKey, SocketCommand Command)> requests)
+        Channel<(string ClientKey, SocketCommand Command)>[] requestChannels)
     {
         var server = Server;
         while (IsRunning && ReferenceEquals(_listenTokenSource, listenTokenSource) &&
@@ -281,7 +280,7 @@ public partial class TcpSocketServer
 
                 Logger.Info($"{ServerMark} 客户端({socketClientKey})连接上线");
 
-                var clientTask = HandleClientAsync(session, listenTokenSource, requests);
+                var clientTask = HandleClientAsync(session, listenTokenSource, requestChannels);
                 _clientTasks[socketClientKey] = clientTask;
                 _ = ObserveClientTaskAsync(socketClientKey, clientTask);
             }
@@ -300,9 +299,10 @@ public partial class TcpSocketServer
     /// </summary>
     /// <param name="client">TCP 会话对象</param>
     private async Task HandleClientAsync(TcpSession client, CancellationTokenSource listenTokenSource,
-        ChannelWriter<(string ClientKey, SocketCommand Command)> requests)
+        Channel<(string ClientKey, SocketCommand Command)>[] requestChannels)
     {
         var tcpClientKey = client.TcpSocket?.RemoteEndPoint?.ToString() ?? string.Empty;
+        var requests = GetRequestChannel(requestChannels, tcpClientKey).Writer;
         using var receiveTokenSource = client.TokenSource == null
             ? CancellationTokenSource.CreateLinkedTokenSource(listenTokenSource.Token)
             : CancellationTokenSource.CreateLinkedTokenSource(listenTokenSource.Token, client.TokenSource.Token);
@@ -401,10 +401,24 @@ public partial class TcpSocketServer
         }
     }
 
-    private Channel<(string ClientKey, SocketCommand Command)> ResetRequestChannels()
+    private static Channel<(string ClientKey, SocketCommand Command)>[] CreateRequestChannels()
     {
-        _requests = CreateRequestChannel();
-        return _requests;
+        return Enumerable.Range(0, RequestWorkerCount)
+            .Select(_ => CreateRequestChannel())
+            .ToArray();
+    }
+
+    private Channel<(string ClientKey, SocketCommand Command)>[] ResetRequestChannels()
+    {
+        _requestChannels = CreateRequestChannels();
+        return _requestChannels;
+    }
+
+    private static Channel<(string ClientKey, SocketCommand Command)> GetRequestChannel(
+        Channel<(string ClientKey, SocketCommand Command)>[] requestChannels, string clientKey)
+    {
+        var index = (int)((uint)clientKey.GetHashCode() % (uint)requestChannels.Length);
+        return requestChannels[index];
     }
 
     private static Channel<(string ClientKey, SocketCommand Command)> CreateRequestChannel() =>
@@ -451,7 +465,10 @@ public partial class TcpSocketServer
 
     private void CompleteRequestChannels()
     {
-        _requests.Writer.TryComplete();
+        foreach (var requestChannel in _requestChannels)
+        {
+            requestChannel.Writer.TryComplete();
+        }
     }
 
     private async Task<bool> TryHandleCommandAsync(string clientKey, TcpSession client, SocketCommand command)
