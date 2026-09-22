@@ -32,6 +32,17 @@ public sealed class TcpSocketServerFileSystemFeature : IDisposable
     public IManagedFileSystem ManagedFileSystem { get; set; } = ManagedFileSystemFactory.CreateDefault();
 
     /// <summary>
+    ///     Restricts file-system operations to this directory and its descendants.
+    ///     Set to <c>null</c> only for explicitly trusted deployments that require full access.
+    /// </summary>
+    public string? RootDirectory { get; set; } = Directory.GetCurrentDirectory();
+
+    /// <summary>
+    ///     Optional authorization callback invoked after path normalization and sandbox checks.
+    /// </summary>
+    public Func<FileSystemOperation, string, bool>? PathAuthorization { get; set; }
+
+    /// <summary>
     ///     服务端文件传输进度事件。
     /// </summary>
     public event EventHandler<FileTransferProgressEventArgs>? FileTransferProgress;
@@ -132,7 +143,8 @@ public sealed class TcpSocketServerFileSystemFeature : IDisposable
             return;
         }
 
-        if (!TryResolveServerPath(requestedDirectoryPath, true, out var directoryPath,
+        if (!TryResolveServerPath(requestedDirectoryPath, true, FileSystemOperation.Browse,
+                out var directoryPath,
                 out var errorMessage))
         {
             await SendDirectoryAccessDeniedErrorAsync(client, taskId, requestedDirectoryPath, clientKey, errorMessage);
@@ -313,7 +325,8 @@ public sealed class TcpSocketServerFileSystemFeature : IDisposable
         var taskId = createInfo.TaskId;
         var requestedDirectoryPath = createInfo.DirectoryPath;
 
-        if (!TryResolveServerPath(requestedDirectoryPath, false, out var directoryPath,
+        if (!TryResolveServerPath(requestedDirectoryPath, false, FileSystemOperation.CreateDirectory,
+                out var directoryPath,
                 out var errorMessage))
         {
             var denyAck = new CreateDirectoryResponse
@@ -377,7 +390,8 @@ public sealed class TcpSocketServerFileSystemFeature : IDisposable
         var taskId = deleteInfo.TaskId;
         var requestedFilePath = deleteInfo.FilePath;
 
-        if (!TryResolveServerPath(requestedFilePath, false, out var filePath,
+        if (!TryResolveServerPath(requestedFilePath, false, FileSystemOperation.Delete,
+                out var filePath,
                 out var errorMessage))
         {
             var denyAck = new DeletePathResponse
@@ -386,6 +400,19 @@ public sealed class TcpSocketServerFileSystemFeature : IDisposable
                 Success = false,
                 FilePath = requestedFilePath,
                 Message = errorMessage
+            };
+            await _server.SendCommandAsync(client, denyAck);
+            return;
+        }
+
+        if (IsRootDirectory(filePath))
+        {
+            var denyAck = new DeletePathResponse
+            {
+                TaskId = taskId,
+                Success = false,
+                FilePath = requestedFilePath,
+                Message = "不允许删除服务端沙箱根目录"
             };
             await _server.SendCommandAsync(client, denyAck);
             return;
@@ -488,7 +515,8 @@ public sealed class TcpSocketServerFileSystemFeature : IDisposable
         var taskId = request.TaskId;
         var requestedRemoteFilePath = request.RemoteFilePath;
         var alreadyTransferredBytes = request.AlreadyTransferredBytes;
-        if (!TryResolveServerPath(requestedRemoteFilePath, false, out var remoteFilePath,
+        if (!TryResolveServerPath(requestedRemoteFilePath, false, FileSystemOperation.Upload,
+                out var remoteFilePath,
                 out var errorMessage))
         {
             var reject = new FileTransferReject
@@ -713,7 +741,8 @@ public sealed class TcpSocketServerFileSystemFeature : IDisposable
         var taskId = request.TaskId;
         var requestedRemoteFilePath = request.RemoteFilePath;
         var alreadyTransferredBytes = request.AlreadyTransferredBytes;
-        if (!TryResolveServerPath(requestedRemoteFilePath, false, out var remoteFilePath,
+        if (!TryResolveServerPath(requestedRemoteFilePath, false, FileSystemOperation.Download,
+                out var remoteFilePath,
                 out var errorMessage))
         {
             var reject = new FileTransferReject
@@ -1048,7 +1077,7 @@ public sealed class TcpSocketServerFileSystemFeature : IDisposable
     private static string GetTransferKey(string clientKey, string remoteFilePath, int taskId) =>
         $"{clientKey}|{taskId}|{remoteFilePath}";
 
-    private bool TryResolveServerPath(string requestedPath, bool treatEmptyAsRoot,
+    private bool TryResolveServerPath(string requestedPath, bool treatEmptyAsRoot, FileSystemOperation operation,
         [NotNullWhen(true)] out string? resolvedPath, out string errorMessage)
     {
         resolvedPath = string.Empty;
@@ -1056,8 +1085,13 @@ public sealed class TcpSocketServerFileSystemFeature : IDisposable
 
         if (treatEmptyAsRoot && string.IsNullOrWhiteSpace(requestedPath))
         {
-            resolvedPath = string.Empty;
-            return true;
+            if (string.IsNullOrWhiteSpace(RootDirectory))
+            {
+                resolvedPath = string.Empty;
+                return true;
+            }
+
+            requestedPath = RootDirectory;
         }
 
         if (string.IsNullOrWhiteSpace(requestedPath))
@@ -1066,14 +1100,81 @@ public sealed class TcpSocketServerFileSystemFeature : IDisposable
             return false;
         }
 
-        if (!ManagedFileSystem.PathIsRooted(requestedPath))
+        try
         {
-            errorMessage = "服务端路径必须是绝对路径";
+            if (treatEmptyAsRoot && !string.IsNullOrWhiteSpace(RootDirectory))
+            {
+                requestedPath = ManagedFileSystem.GetFullPath(RootDirectory);
+            }
+
+            if (!ManagedFileSystem.PathIsRooted(requestedPath))
+            {
+                errorMessage = "服务端路径必须是绝对路径";
+                return false;
+            }
+
+            resolvedPath = ManagedFileSystem.GetFullPath(requestedPath);
+            if (!string.IsNullOrWhiteSpace(RootDirectory))
+            {
+                var rootPath = ManagedFileSystem.GetFullPath(RootDirectory);
+                if (!IsPathWithinRoot(rootPath, resolvedPath))
+                {
+                    resolvedPath = null;
+                    errorMessage = "路径超出服务端沙箱根目录";
+                    return false;
+                }
+            }
+
+            if (PathAuthorization != null && !PathAuthorization(operation, resolvedPath))
+            {
+                resolvedPath = null;
+                errorMessage = "路径未通过服务端授权策略";
+                return false;
+            }
+
+            return true;
+        }
+        catch (Exception ex) when (ex is ArgumentException or IOException or NotSupportedException)
+        {
+            resolvedPath = null;
+            errorMessage = $"路径无效：{ex.Message}";
+            return false;
+        }
+    }
+
+    private bool IsRootDirectory(string path)
+    {
+        if (string.IsNullOrWhiteSpace(RootDirectory))
+        {
             return false;
         }
 
-        resolvedPath = ManagedFileSystem.GetFullPath(requestedPath);
-        return true;
+        var rootPath = ManagedFileSystem.GetFullPath(RootDirectory);
+        return string.Equals(rootPath, path,
+            OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
+    }
+
+    private static bool IsPathWithinRoot(string rootPath, string candidatePath)
+    {
+        var comparison = OperatingSystem.IsWindows()
+            ? StringComparison.OrdinalIgnoreCase
+            : StringComparison.Ordinal;
+        var normalizedRoot = rootPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var normalizedCandidate = candidatePath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        if (string.Equals(normalizedRoot, normalizedCandidate, comparison))
+        {
+            return true;
+        }
+
+        if (normalizedRoot.Length == 0)
+        {
+            return normalizedCandidate.StartsWith(Path.DirectorySeparatorChar.ToString(), comparison);
+        }
+
+        var rootPrefix = normalizedRoot + Path.DirectorySeparatorChar;
+        return normalizedCandidate.StartsWith(rootPrefix, comparison) ||
+               (Path.AltDirectorySeparatorChar != Path.DirectorySeparatorChar &&
+                normalizedCandidate.StartsWith(normalizedRoot + Path.AltDirectorySeparatorChar, comparison));
     }
 }
 

@@ -31,7 +31,7 @@ public sealed class TcpSocketFileTransferTests : IAsyncLifetime
         var serverFile = Path.Combine(serverRoot, "uploads", "upload.bin");
         await File.WriteAllBytesAsync(localFile, CreateTestBytes(180_000));
 
-        await using var harness = await CreateHarnessAsync();
+        await using var harness = await CreateHarnessAsync(serverRoot);
 
         await harness.Client.UploadFileAsync(localFile, serverFile);
 
@@ -50,7 +50,7 @@ public sealed class TcpSocketFileTransferTests : IAsyncLifetime
         Directory.CreateDirectory(Path.GetDirectoryName(serverFile)!);
         await File.WriteAllBytesAsync(serverFile, CreateTestBytes(220_000));
 
-        await using var harness = await CreateHarnessAsync();
+        await using var harness = await CreateHarnessAsync(serverRoot);
 
         await harness.Client.DownloadFileAsync(serverFile, localRoot);
 
@@ -70,7 +70,7 @@ public sealed class TcpSocketFileTransferTests : IAsyncLifetime
         Directory.CreateDirectory(managedDirectory);
         await File.WriteAllTextAsync(managedFile, "delete-me");
 
-        await using var harness = await CreateHarnessAsync();
+        await using var harness = await CreateHarnessAsync(serverRoot);
 
         await harness.Client.CreateDirectoryAsync(managedDirectory);
         await WaitForConditionAsync(() => Directory.Exists(managedDirectory));
@@ -80,6 +80,29 @@ public sealed class TcpSocketFileTransferTests : IAsyncLifetime
 
         await harness.Client.DeletePathAsync(managedDirectory, true);
         await WaitForConditionAsync(() => !Directory.Exists(managedDirectory));
+    }
+
+    [Fact]
+    public async Task FileOperations_RejectPathsOutsideServerRoot()
+    {
+        var serverRoot = CreateDirectory("server-sandbox-root");
+        var outsideRoot = CreateDirectory("outside-server-root");
+        var localRoot = CreateDirectory("client-sandbox-root");
+        var localFile = Path.Combine(localRoot, "blocked.bin");
+        var outsideTarget = Path.Combine(outsideRoot, "blocked.bin");
+        await File.WriteAllBytesAsync(localFile, CreateTestBytes(1024));
+
+        await using var harness = await CreateHarnessAsync(serverRoot);
+        var outcomeSource = new TaskCompletionSource<FileTransferOutcomeEventArgs>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var clientFeature = harness.Client.UseFileSystem();
+        clientFeature.FileTransferOutcome += (_, outcome) => outcomeSource.TrySetResult(outcome);
+
+        await clientFeature.UploadFileAsync(localFile, outsideTarget);
+
+        var outcomeResult = await outcomeSource.Task.WaitAsync(TimeSpan.FromSeconds(8));
+        Assert.False(outcomeResult.Success);
+        Assert.False(File.Exists(outsideTarget));
     }
 
     [Fact]
@@ -242,12 +265,12 @@ public sealed class TcpSocketFileTransferTests : IAsyncLifetime
         return path;
     }
 
-    private async Task<TestHarness> CreateHarnessAsync()
+    private async Task<TestHarness> CreateHarnessAsync(string serverRoot)
     {
         var port = GetFreePort();
         var server = new TcpSocketServer();
         var client = new TcpSocketClient();
-        server.UseFileSystem();
+        server.UseFileSystem(serverRoot);
         client.UseFileSystem();
 
         var serverResult = await server.StartAsync("TestServer", IPAddress.Loopback.ToString(), port);
