@@ -62,6 +62,30 @@ public sealed class TcpSocketFileTransferTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task EmptyFiles_CompleteUploadAndDownload()
+    {
+        var serverRoot = CreateDirectory("server-empty-root");
+        var localRoot = CreateDirectory("client-empty-root");
+        var localFile = Path.Combine(localRoot, "empty-upload.bin");
+        var uploadedFile = Path.Combine(serverRoot, "empty-upload.bin");
+        var serverFile = Path.Combine(serverRoot, "empty-download.bin");
+        var downloadedFile = Path.Combine(localRoot, "empty-download.bin");
+        await File.WriteAllBytesAsync(localFile, []);
+        await File.WriteAllBytesAsync(serverFile, []);
+
+        await using var harness = await CreateHarnessAsync(serverRoot);
+
+        await harness.Client.UploadFileAsync(localFile, uploadedFile);
+        await WaitForConditionAsync(() => File.Exists(uploadedFile));
+        Assert.Equal(0, new FileInfo(uploadedFile).Length);
+
+        await harness.Client.DownloadFileAsync(serverFile, localRoot);
+        await WaitForConditionAsync(() => File.Exists(downloadedFile));
+        Assert.Equal(0, new FileInfo(downloadedFile).Length);
+        Assert.False(File.Exists(downloadedFile + ".part"));
+    }
+
+    [Fact]
     public async Task FileOperations_UseClientProvidedAbsolutePaths()
     {
         var serverRoot = CreateDirectory("server-managed-root");

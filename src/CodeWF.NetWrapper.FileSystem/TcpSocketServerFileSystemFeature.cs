@@ -531,83 +531,79 @@ public sealed class TcpSocketServerFileSystemFeature : IDisposable
             return;
         }
 
+        if (!IsValidTransferRange(request.FileSize, alreadyTransferredBytes, out var rangeError))
+        {
+            await SendTransferRejectAsync(client, taskId, FileTransferErrorCode.InvalidTransferRequest,
+                rangeError, requestedRemoteFilePath, request.FileName);
+            return;
+        }
+
         var contextKey = GetTransferKey(clientKey, requestedRemoteFilePath, taskId);
+        var actualTransferredBytes = ManagedFileSystem.FileExists(remoteFilePath)
+            ? ManagedFileSystem.GetEntry(remoteFilePath).Size
+            : 0;
 
-        if (!ManagedFileSystem.FileExists(remoteFilePath))
+        if (actualTransferredBytes > request.FileSize)
         {
-            _uploadContexts[contextKey] = new ServerUploadContext
-            {
-                TaskId = taskId,
-                ClientKey = clientKey,
-                RequestedRemoteFilePath = requestedRemoteFilePath,
-                ActualFilePath = remoteFilePath,
-                FileName = request.FileName,
-                FileSize = request.FileSize,
-                FileHash = request.FileHash,
-                AlreadyTransferredBytes = 0
-            };
-            var uploadResponse = new FileUploadResponse
-            {
-                TaskId = taskId,
-                Accept = true,
-                AlreadyTransferredBytes = 0,
-                RemoteFilePath = requestedRemoteFilePath,
-                Message = "文件不存在，将创建新文件"
-            };
-            await _server.SendCommandAsync(client, uploadResponse);
-            Logger.Info($"{_server.ServerMark} 收到客户端({clientKey})上传请求：{request.FileName} -> {remoteFilePath}，文件不存在，创建新文件");
+            await SendTransferRejectAsync(client, taskId, FileTransferErrorCode.UploadServerFileLarger,
+                "服务端文件大于请求文件", requestedRemoteFilePath, request.FileName);
             return;
         }
 
-        var actualTransferredBytes = ManagedFileSystem.GetEntry(remoteFilePath).Size;
-
-        if (actualTransferredBytes > alreadyTransferredBytes)
+        if (ManagedFileSystem.FileExists(remoteFilePath) && actualTransferredBytes == request.FileSize)
         {
-            var reject = new FileTransferReject
+            if (string.Equals(request.FileHash, await ComputeFileHashAsync(remoteFilePath),
+                    StringComparison.OrdinalIgnoreCase))
             {
-                TaskId = taskId,
-                ErrorCode = FileTransferErrorCode.UploadServerFileLarger,
-                Message = "服务端文件大于客户端已有文件",
-                RemoteFilePath = requestedRemoteFilePath,
-                FileName = request.FileName
-            };
-            await _server.SendCommandAsync(client, reject);
-            Logger.Error(
-                $"{_server.ServerMark} 收到客户端({clientKey})上传请求：{request.FileName} -> {remoteFilePath}，服务端文件({actualTransferredBytes}字节)大于客户端已有文件({alreadyTransferredBytes}字节)");
-            return;
-        }
-
-        if (actualTransferredBytes == alreadyTransferredBytes && actualTransferredBytes > 0)
-        {
-            if (request.FileHash == ComputeFileHash(remoteFilePath))
-            {
-                var reject = new FileTransferReject
-                {
-                    TaskId = taskId,
-                    ErrorCode = FileTransferErrorCode.UploadFileAlreadyExists,
-                    Message = "文件已存在，无需重复上传",
-                    RemoteFilePath = requestedRemoteFilePath,
-                    FileName = request.FileName
-                };
-                await _server.SendCommandAsync(client, reject);
-                Logger.Error($"{_server.ServerMark} 收到客户端({clientKey})上传请求：{request.FileName} -> {remoteFilePath}，文件已存在无需重复上传");
-                return;
+                await SendTransferRejectAsync(client, taskId, FileTransferErrorCode.UploadFileAlreadyExists,
+                    "文件已存在，无需重复上传", requestedRemoteFilePath, request.FileName);
             }
             else
             {
-                var reject = new FileTransferReject
+                await SendTransferRejectAsync(client, taskId, FileTransferErrorCode.UploadFileHashMismatch,
+                    "文件大小相同但Hash不同", requestedRemoteFilePath, request.FileName);
+            }
+
+            return;
+        }
+
+        var tempFilePath = GetPartFilePath(remoteFilePath);
+        var transferredBytes = ManagedFileSystem.FileExists(tempFilePath)
+            ? ManagedFileSystem.GetEntry(tempFilePath).Size
+            : 0;
+        if (!ManagedFileSystem.FileExists(tempFilePath) && actualTransferredBytes > 0)
+        {
+            ManagedFileSystem.CopyFile(remoteFilePath, tempFilePath, true);
+            transferredBytes = actualTransferredBytes;
+        }
+
+        if (transferredBytes > request.FileSize)
+        {
+            await SendTransferRejectAsync(client, taskId, FileTransferErrorCode.UploadServerFileLarger,
+                "服务端临时文件大于请求文件", requestedRemoteFilePath, request.FileName);
+            return;
+        }
+
+        if (transferredBytes == request.FileSize && ManagedFileSystem.FileExists(tempFilePath))
+        {
+            if (string.Equals(request.FileHash, await ComputeFileHashAsync(tempFilePath),
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                ManagedFileSystem.MoveFile(tempFilePath, remoteFilePath, true);
+                var completeResponse = new FileUploadResponse
                 {
                     TaskId = taskId,
-                    ErrorCode = FileTransferErrorCode.UploadFileHashMismatch,
-                    Message = "文件大小相同但Hash不同",
+                    Accept = true,
+                    AlreadyTransferredBytes = request.FileSize,
                     RemoteFilePath = requestedRemoteFilePath,
-                    FileName = request.FileName
+                    Message = "文件已完成"
                 };
-                await _server.SendCommandAsync(client, reject);
-                Logger.Error(
-                    $"{_server.ServerMark} 收到客户端({clientKey})上传请求：{request.FileName} -> {remoteFilePath}，文件大小相同但Hash不同");
+                await _server.SendCommandAsync(client, completeResponse);
                 return;
             }
+
+            ManagedFileSystem.DeleteFile(tempFilePath);
+            transferredBytes = 0;
         }
 
         _uploadContexts[contextKey] = new ServerUploadContext
@@ -616,22 +612,46 @@ public sealed class TcpSocketServerFileSystemFeature : IDisposable
             ClientKey = clientKey,
             RequestedRemoteFilePath = requestedRemoteFilePath,
             ActualFilePath = remoteFilePath,
+            TempFilePath = tempFilePath,
             FileName = request.FileName,
             FileSize = request.FileSize,
             FileHash = request.FileHash,
-            AlreadyTransferredBytes = actualTransferredBytes
+            AlreadyTransferredBytes = transferredBytes
         };
+
+        if (request.FileSize == 0)
+        {
+            await using (var emptyFile = ManagedFileSystem.OpenFile(
+                         tempFilePath, FileMode.Create, FileAccess.Write, FileShare.Read))
+            {
+                await emptyFile.FlushAsync();
+            }
+
+            if (!string.Equals(request.FileHash, await ComputeFileHashAsync(tempFilePath),
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                ManagedFileSystem.DeleteFile(tempFilePath);
+                _uploadContexts.TryRemove(contextKey, out _);
+                await SendTransferRejectAsync(client, taskId, FileTransferErrorCode.UploadFileHashMismatch,
+                    "空文件哈希校验失败", requestedRemoteFilePath, request.FileName);
+                return;
+            }
+
+            ManagedFileSystem.MoveFile(tempFilePath, remoteFilePath, true);
+            _uploadContexts.TryRemove(contextKey, out _);
+        }
+
         var response = new FileUploadResponse
         {
             TaskId = taskId,
             Accept = true,
-            AlreadyTransferredBytes = actualTransferredBytes,
+            AlreadyTransferredBytes = request.FileSize == 0 ? 0 : transferredBytes,
             RemoteFilePath = requestedRemoteFilePath,
-            Message = "确认接收"
+            Message = request.FileSize == 0 ? "空文件上传完成" : "确认接收"
         };
         await _server.SendCommandAsync(client, response);
         Logger.Info(
-            $"{_server.ServerMark} 收到客户端({clientKey})上传请求：{request.FileName} -> {remoteFilePath}，客户端报已传输：{alreadyTransferredBytes}字节，服务端确认：{actualTransferredBytes}字节，等待客户端发送文件块...");
+            $"{_server.ServerMark} 收到客户端({clientKey})上传请求：{request.FileName} -> {remoteFilePath}，服务端确认：{transferredBytes}字节，等待客户端发送文件块...");
     }
 
     /// <summary>
@@ -667,70 +687,71 @@ public sealed class TcpSocketServerFileSystemFeature : IDisposable
 
         try
         {
+            if (!IsValidChunk(context, chunkData, out var chunkError))
+            {
+                _uploadContexts.TryRemove(contextKey, out _);
+                await SendChunkAckAsync(client, context, chunkData, false, chunkError, context.AlreadyTransferredBytes);
+                return;
+            }
+
             var remoteFilePath = context.ActualFilePath;
+            var tempFilePath = context.TempFilePath;
             var directory = ManagedFileSystem.GetDirectoryName(remoteFilePath) ?? ".";
             if (!ManagedFileSystem.DirectoryExists(directory))
             {
                 ManagedFileSystem.CreateDirectory(directory);
             }
 
-            // FileMode.OpenOrCreate: 支持首次上传时自动建文件，也支持断点续传时继续写入同一文件。
-            await using var fs = ManagedFileSystem.OpenFile(
-                remoteFilePath,
-                FileMode.OpenOrCreate,
-                FileAccess.Write,
-                FileShare.Read);
-            // Position 指定实际写入偏移量，只有这样才能正确覆盖/续传指定区块，而不是无脑 Append。
-            fs.Position = chunkData.Offset;
-            await fs.WriteAsync(chunkData.Data.AsMemory(0, chunkData.BlockSize));
-            await fs.FlushAsync();
+            long totalBytes;
+            await using (var fs = ManagedFileSystem.OpenFile(
+                         tempFilePath,
+                         FileMode.OpenOrCreate,
+                         FileAccess.Write,
+                         FileShare.Read))
+            {
+                if (fs.Length != context.AlreadyTransferredBytes)
+                {
+                    throw new InvalidDataException("服务端临时文件长度与传输会话不一致");
+                }
 
-            var totalBytes = Math.Max(fs.Length, chunkData.Offset + chunkData.BlockSize);
+                fs.Position = chunkData.Offset;
+                await fs.WriteAsync(chunkData.Data.AsMemory());
+                await fs.FlushAsync();
+                totalBytes = chunkData.Offset + chunkData.BlockSize;
+            }
+
             context.AlreadyTransferredBytes = totalBytes;
             NotifyServerTransferProgress(context.FileName, totalBytes, context.FileSize, true);
 
             var success = true;
             var message = string.Empty;
-            if (context.FileSize > 0 && totalBytes >= context.FileSize)
+            if (totalBytes == context.FileSize)
             {
-                var currentHash = await ComputeFileHashAsync(remoteFilePath);
+                var currentHash = await ComputeFileHashAsync(tempFilePath);
                 if (!string.Equals(currentHash, context.FileHash, StringComparison.OrdinalIgnoreCase))
                 {
                     success = false;
                     message = "文件上传完成，但哈希校验失败";
+                    ManagedFileSystem.DeleteFile(tempFilePath);
                     Logger.Error($"{_server.ServerMark} 客户端({clientKey})上传文件哈希校验失败：{remoteFilePath}");
                 }
                 else
                 {
+                    ManagedFileSystem.MoveFile(tempFilePath, remoteFilePath, true);
                     Logger.Info($"{_server.ServerMark} 客户端({clientKey})上传文件完成：{remoteFilePath}");
                 }
 
                 _uploadContexts.TryRemove(contextKey, out _);
             }
 
-            var ack = new FileChunkAck
-            {
-                TaskId = context.TaskId,
-                BlockIndex = chunkData.BlockIndex,
-                Success = success,
-                Message = message,
-                RemoteFilePath = requestedRemoteFilePath,
-                AlreadyTransferredBytes = totalBytes
-            };
-            await _server.SendCommandAsync(client, ack);
+            await SendChunkAckAsync(client, context, chunkData, success, message, totalBytes);
         }
         catch (Exception ex)
         {
+            _uploadContexts.TryRemove(contextKey, out _);
             Logger.Error($"{_server.ServerMark} 处理文件块({chunkData.BlockIndex})异常", ex);
-            var ack = new FileChunkAck
-            {
-                TaskId = context.TaskId,
-                BlockIndex = chunkData.BlockIndex,
-                Success = false,
-                Message = ex.Message,
-                RemoteFilePath = requestedRemoteFilePath
-            };
-            await _server.SendCommandAsync(client, ack);
+            await SendChunkAckAsync(client, context, chunkData, false, ex.Message,
+                context.AlreadyTransferredBytes);
         }
     }
 
@@ -774,55 +795,34 @@ public sealed class TcpSocketServerFileSystemFeature : IDisposable
 
         var totalFileSize = ManagedFileSystem.GetEntry(remoteFilePath).Size;
 
-        if (totalFileSize < alreadyTransferredBytes)
+        if (!IsValidTransferRange(totalFileSize, alreadyTransferredBytes, out var rangeError))
         {
-            Logger.Error($"{_server.ServerMark} 服务端文件小于客户端已有文件：{remoteFilePath}");
-            var reject = new FileTransferReject
-            {
-                TaskId = taskId,
-                ErrorCode = FileTransferErrorCode.DownloadServerFileSmaller,
-                Message = "服务端文件小于客户端已有文件",
-                RemoteFilePath = requestedRemoteFilePath,
-                FileName = request.FileName
-            };
-            await _server.SendCommandAsync(client, reject);
+            var errorCode = totalFileSize < alreadyTransferredBytes
+                ? FileTransferErrorCode.DownloadServerFileSmaller
+                : FileTransferErrorCode.InvalidTransferRequest;
+            await SendTransferRejectAsync(client, taskId, errorCode, rangeError,
+                requestedRemoteFilePath, request.FileName);
             return;
         }
 
-        if (totalFileSize == alreadyTransferredBytes)
+        if (totalFileSize == alreadyTransferredBytes && alreadyTransferredBytes > 0)
         {
-            var fileHash = ComputeFileHash(remoteFilePath);
-            if (fileHash == request.FileHash)
+            var fileHash = await ComputeFileHashAsync(remoteFilePath);
+            if (string.Equals(fileHash, request.FileHash, StringComparison.OrdinalIgnoreCase))
             {
-                Logger.Error($"{_server.ServerMark} 文件相同，不需要下载：{remoteFilePath}");
-                var reject = new FileTransferReject
-                {
-                    TaskId = taskId,
-                    ErrorCode = FileTransferErrorCode.DownloadFileIdentical,
-                    Message = "文件相同，不需要下载",
-                    RemoteFilePath = requestedRemoteFilePath,
-                    FileName = request.FileName
-                };
-                await _server.SendCommandAsync(client, reject);
+                await SendTransferRejectAsync(client, taskId, FileTransferErrorCode.DownloadFileIdentical,
+                    "文件相同，不需要下载", requestedRemoteFilePath, request.FileName);
                 return;
             }
             else
             {
-                Logger.Error($"{_server.ServerMark} 文件大小相同但Hash不同：{remoteFilePath}");
-                var reject = new FileTransferReject
-                {
-                    TaskId = taskId,
-                    ErrorCode = FileTransferErrorCode.DownloadFileHashMismatch,
-                    Message = "文件大小相同但Hash不同",
-                    RemoteFilePath = requestedRemoteFilePath,
-                    FileName = request.FileName
-                };
-                await _server.SendCommandAsync(client, reject);
+                await SendTransferRejectAsync(client, taskId, FileTransferErrorCode.DownloadFileHashMismatch,
+                    "文件大小相同但Hash不同", requestedRemoteFilePath, request.FileName);
                 return;
             }
         }
 
-        var resolvedFileHash = ComputeFileHash(remoteFilePath);
+        var resolvedFileHash = await ComputeFileHashAsync(remoteFilePath);
         _downloadContexts[GetTransferKey(clientKey, requestedRemoteFilePath, taskId)] = new ServerDownloadContext
         {
             TaskId = taskId,
@@ -886,6 +886,16 @@ public sealed class TcpSocketServerFileSystemFeature : IDisposable
             var contextKey = GetTransferKey(clientKey, chunkAck.RemoteFilePath, chunkAck.TaskId);
             if (!_downloadContexts.TryGetValue(contextKey, out var context))
             {
+                return;
+            }
+
+            var expectedOffset = context.PendingOffset + context.PendingBlockSize;
+            if (chunkAck.AlreadyTransferredBytes != expectedOffset ||
+                chunkAck.AlreadyTransferredBytes > context.FileSize)
+            {
+                _downloadContexts.TryRemove(contextKey, out _);
+                Logger.Error(
+                    $"{_server.ServerMark} 客户端({clientKey})确认的文件偏移无效：{chunkAck.AlreadyTransferredBytes}，期望：{expectedOffset}");
                 return;
             }
 
@@ -956,6 +966,13 @@ public sealed class TcpSocketServerFileSystemFeature : IDisposable
             Data = bytesRead == blockSize ? buffer : buffer.AsSpan(0, bytesRead).ToArray(),
             RemoteFilePath = remoteFilePath
         };
+
+        var contextKey = GetTransferKey(clientKey, remoteFilePath, taskId);
+        if (_downloadContexts.TryGetValue(contextKey, out var context))
+        {
+            context.PendingOffset = alreadyTransferredBytes;
+            context.PendingBlockSize = bytesRead;
+        }
 
         await _server.SendCommandAsync(session.TcpSocket, chunkData);
         Logger.Info($"{_server.ServerMark} 向客户端({clientKey})发送文件块({blockIndex})：{bytesRead}字节");
@@ -1074,6 +1091,92 @@ public sealed class TcpSocketServerFileSystemFeature : IDisposable
         return Task.CompletedTask;
     }
 
+    private async Task SendTransferRejectAsync(Socket client, int taskId, FileTransferErrorCode errorCode,
+        string message, string remoteFilePath, string fileName)
+    {
+        await _server.SendCommandAsync(client, new FileTransferReject
+        {
+            TaskId = taskId,
+            ErrorCode = errorCode,
+            Message = message,
+            RemoteFilePath = remoteFilePath,
+            FileName = fileName
+        });
+    }
+
+    private async Task SendChunkAckAsync(Socket client, ServerUploadContext context, FileChunkData chunkData,
+        bool success, string message, long alreadyTransferredBytes)
+    {
+        await _server.SendCommandAsync(client, new FileChunkAck
+        {
+            TaskId = context.TaskId,
+            BlockIndex = chunkData.BlockIndex,
+            Success = success,
+            Message = message,
+            RemoteFilePath = context.RequestedRemoteFilePath,
+            AlreadyTransferredBytes = alreadyTransferredBytes
+        });
+    }
+
+    private static bool IsValidTransferRange(long fileSize, long alreadyTransferredBytes,
+        [NotNullWhen(false)] out string? errorMessage)
+    {
+        if (fileSize < 0)
+        {
+            errorMessage = "文件大小不能为负数";
+            return false;
+        }
+
+        if (alreadyTransferredBytes < 0 || alreadyTransferredBytes > fileSize)
+        {
+            errorMessage = "已传输字节数超出文件范围";
+            return false;
+        }
+
+        errorMessage = null;
+        return true;
+    }
+
+    private static bool IsValidChunk(ServerUploadContext context, FileChunkData chunkData,
+        [NotNullWhen(false)] out string? errorMessage)
+    {
+        if (chunkData.Data == null || chunkData.Data.Length == 0)
+        {
+            errorMessage = "文件块不能为空";
+            return false;
+        }
+
+        if (chunkData.BlockSize != chunkData.Data.Length ||
+            chunkData.BlockSize > TcpSocketServerFileSystemFeature.FileTransferBlockSize)
+        {
+            errorMessage = "文件块大小与数据长度不一致";
+            return false;
+        }
+
+        if (chunkData.Offset != context.AlreadyTransferredBytes || chunkData.Offset < 0)
+        {
+            errorMessage = "文件块偏移不是当前传输位置";
+            return false;
+        }
+
+        if (chunkData.BlockIndex != chunkData.Offset / TcpSocketServerFileSystemFeature.FileTransferBlockSize)
+        {
+            errorMessage = "文件块序号与偏移不一致";
+            return false;
+        }
+
+        if (chunkData.Offset > context.FileSize - chunkData.BlockSize)
+        {
+            errorMessage = "文件块超出文件大小";
+            return false;
+        }
+
+        errorMessage = null;
+        return true;
+    }
+
+    private static string GetPartFilePath(string filePath) => filePath + ".part";
+
     private static string GetTransferKey(string clientKey, string remoteFilePath, int taskId) =>
         $"{clientKey}|{taskId}|{remoteFilePath}";
 
@@ -1184,6 +1287,7 @@ internal sealed class ServerUploadContext
     public string ClientKey { get; set; } = string.Empty;
     public string RequestedRemoteFilePath { get; set; } = string.Empty;
     public string ActualFilePath { get; set; } = string.Empty;
+    public string TempFilePath { get; set; } = string.Empty;
     public string FileName { get; set; } = string.Empty;
     public long FileSize { get; set; }
     public string FileHash { get; set; } = string.Empty;
@@ -1200,4 +1304,6 @@ internal sealed class ServerDownloadContext
     public long FileSize { get; set; }
     public string FileHash { get; set; } = string.Empty;
     public long AlreadyTransferredBytes { get; set; }
+    public long PendingOffset { get; set; }
+    public int PendingBlockSize { get; set; }
 }

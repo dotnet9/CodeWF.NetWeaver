@@ -21,6 +21,10 @@ public interface IManagedFileSystem
 
     void DeleteFile(string path);
 
+    void CopyFile(string sourcePath, string destinationPath, bool overwrite);
+
+    void MoveFile(string sourcePath, string destinationPath, bool overwrite);
+
     bool PathIsRooted(string path);
 
     string GetFullPath(string path);

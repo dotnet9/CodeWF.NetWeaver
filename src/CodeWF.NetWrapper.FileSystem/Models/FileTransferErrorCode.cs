@@ -68,5 +68,10 @@ public enum FileTransferErrorCode
     /// <summary>
     ///     未知错误。
     /// </summary>
-    [Description("未知错误")] UnknownError = -99
+    [Description("未知错误")] UnknownError = -99,
+
+    /// <summary>
+    ///     请求或文件分块参数无效。
+    /// </summary>
+    [Description("传输请求无效")] InvalidTransferRequest = -50
 }

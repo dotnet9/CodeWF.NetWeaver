@@ -61,6 +61,12 @@ public sealed class PhysicalManagedFileSystem : IManagedFileSystem
 
     public void DeleteFile(string path) => File.Delete(path);
 
+    public void CopyFile(string sourcePath, string destinationPath, bool overwrite) =>
+        File.Copy(sourcePath, destinationPath, overwrite);
+
+    public void MoveFile(string sourcePath, string destinationPath, bool overwrite) =>
+        File.Move(sourcePath, destinationPath, overwrite);
+
     public bool PathIsRooted(string path) => Path.IsPathRooted(path);
 
     public string GetFullPath(string path) => Path.GetFullPath(path);
