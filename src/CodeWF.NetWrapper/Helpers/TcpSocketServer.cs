@@ -15,9 +15,13 @@ public partial class TcpSocketServer
     private readonly ConcurrentDictionary<Guid, Func<string, TcpSession, SocketCommand, Task<bool>>> _commandHandlers =
         new();
     private readonly SemaphoreSlim _sendLock = new(1, 1);
+    private const int MaxPendingRequests = 4096;
+    private readonly ConcurrentDictionary<string, Task> _clientTasks = new();
+    private Task? _listenTask;
+    private Task? _processingTask;
+    private Task? _detectionTask;
 
-    private Channel<(string ClientKey, SocketCommand Command)> _requests =
-        Channel.CreateUnbounded<(string, SocketCommand)>();
+    private Channel<(string ClientKey, SocketCommand Command)> _requests = CreateRequestChannel();
 
     #region 公开属性
 
@@ -71,6 +75,11 @@ public partial class TcpSocketServer
     public async Task<(bool IsSuccess, string? ErrorMessage)> StartAsync(string serverMark, string serverIP,
         int serverPort, int timeout = 30)
     {
+        if (IsRunning || Server != null)
+        {
+            await StopAsync();
+        }
+
         ServerMark = serverMark;
         ServerIP = serverIP;
         ServerPort = serverPort;
@@ -89,9 +98,9 @@ public partial class TcpSocketServer
             _listenTokenSource = new CancellationTokenSource();
             var requests = ResetRequestChannels();
 
-            _ = Task.Run(async () => await ListenForClientsAsync(_listenTokenSource, requests.Writer));
-            _ = Task.Run(async () => await ProcessingRequestsAsync(requests.Reader));
-            _ = Task.Run(async () => await DetectionClientsAsync(_listenTokenSource));
+            _listenTask = ListenForClientsAsync(_listenTokenSource, requests.Writer);
+            _processingTask = ProcessingRequestsAsync(requests.Reader);
+            _detectionTask = DetectionClientsAsync(_listenTokenSource);
 
             return (IsSuccess: true, ErrorMessage: null);
         }
@@ -123,6 +132,28 @@ public partial class TcpSocketServer
         CompleteRequestChannels();
         Server?.Close(0);
         Server = null;
+        var backgroundTasks = new List<Task>();
+        if (_listenTask != null)
+        {
+            backgroundTasks.Add(_listenTask);
+        }
+
+        if (_processingTask != null)
+        {
+            backgroundTasks.Add(_processingTask);
+        }
+
+        if (_detectionTask != null)
+        {
+            backgroundTasks.Add(_detectionTask);
+        }
+
+        backgroundTasks.AddRange(_clientTasks.Values);
+        await IgnoreBackgroundTasksAsync(backgroundTasks);
+        _clientTasks.Clear();
+        _listenTask = null;
+        _processingTask = null;
+        _detectionTask = null;
         _listenTokenSource = null;
         _detectionTimer = null;
     }
@@ -250,7 +281,9 @@ public partial class TcpSocketServer
 
                 Logger.Info($"{ServerMark} 客户端({socketClientKey})连接上线");
 
-                _ = Task.Run(async () => await HandleClientAsync(session, listenTokenSource, requests));
+                var clientTask = HandleClientAsync(session, listenTokenSource, requests);
+                _clientTasks[socketClientKey] = clientTask;
+                _ = ObserveClientTaskAsync(socketClientKey, clientTask);
             }
             catch (Exception ex)
             {
@@ -288,9 +321,14 @@ public partial class TcpSocketServer
                     break;
                 }
 
-                await requests.WriteAsync((tcpClientKey, new SocketCommand(headInfo, buffer, client.TcpSocket)));
+                await requests.WriteAsync((tcpClientKey, new SocketCommand(headInfo, buffer, client.TcpSocket)),
+                    receiveTokenSource.Token);
             }
             catch (OperationCanceledException) when (IsClientReceiveStopped(client, listenTokenSource))
+            {
+                break;
+            }
+            catch (ChannelClosedException) when (IsClientReceiveStopped(client, listenTokenSource))
             {
                 break;
             }
@@ -365,8 +403,50 @@ public partial class TcpSocketServer
 
     private Channel<(string ClientKey, SocketCommand Command)> ResetRequestChannels()
     {
-        _requests = Channel.CreateUnbounded<(string, SocketCommand)>();
+        _requests = CreateRequestChannel();
         return _requests;
+    }
+
+    private static Channel<(string ClientKey, SocketCommand Command)> CreateRequestChannel() =>
+        Channel.CreateBounded<(string ClientKey, SocketCommand Command)>(
+            new BoundedChannelOptions(MaxPendingRequests)
+            {
+                FullMode = BoundedChannelFullMode.Wait,
+                SingleReader = true,
+                SingleWriter = false,
+                AllowSynchronousContinuations = false
+            });
+
+    private async Task ObserveClientTaskAsync(string clientKey, Task clientTask)
+    {
+        try
+        {
+            await clientTask;
+        }
+        catch (Exception ex)
+        {
+            Logger.Error($"{ServerMark} 客户端({clientKey})后台接收任务异常", ex,
+                $"{ServerMark} 客户端({clientKey})后台接收任务异常，详细信息请查看日志文件");
+        }
+        finally
+        {
+            _clientTasks.TryRemove(clientKey, out _);
+        }
+    }
+
+    private static async Task IgnoreBackgroundTasksAsync(IEnumerable<Task> tasks)
+    {
+        try
+        {
+            await Task.WhenAll(tasks.Distinct());
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            Logger.Error("TCP 服务端后台任务异常", ex, "TCP 服务端后台任务异常，详细信息请查看日志文件");
+        }
     }
 
     private void CompleteRequestChannels()

@@ -8,7 +8,10 @@ public partial class TcpSocketClient
     private Socket? _client;
     private readonly SemaphoreSlim _sendLock = new(1, 1);
     private readonly ConcurrentDictionary<Guid, Func<SocketCommand, Task<bool>>> _commandHandlers = new();
-    private Channel<SocketCommand> _responses = Channel.CreateUnbounded<SocketCommand>();
+    private const int MaxPendingResponses = 4096;
+    private Task? _listenTask;
+    private Task? _responseTask;
+    private Channel<SocketCommand> _responses = CreateResponseChannel();
 
     #region 公开属性
 
@@ -61,6 +64,11 @@ public partial class TcpSocketClient
     public async Task<(bool IsSuccess, string? ErrorMessage)> ConnectAsync(string serverMark, string serverIP,
         int serverPort)
     {
+        if (IsRunning || _client != null)
+        {
+            await StopAsync();
+        }
+
         ServerMark = serverMark;
         ServerIP = serverIP;
         ServerPort = serverPort;
@@ -76,8 +84,8 @@ public partial class TcpSocketClient
             IsRunning = true;
             Logger.Info($"{ServerMark} 连接成功，服务地址是： {ServerIP}:{ServerPort}，当前客户端地址：{_client.LocalEndPoint}");
 
-            _ = Task.Run(async () => await ListenForServerAsync(responses.Writer));
-            _ = Task.Run(async () => await CheckResponseAsync(responses.Reader));
+            _listenTask = ListenForServerAsync(responses.Writer);
+            _responseTask = CheckResponseAsync(responses.Reader);
 
             LocalEndPoint = _client.LocalEndPoint?.ToString();
             return (IsSuccess: true, ErrorMessage: null);
@@ -96,8 +104,27 @@ public partial class TcpSocketClient
     /// </summary>
     public void Stop()
     {
+        StopAsync().GetAwaiter().GetResult();
+    }
+
+    public async Task StopAsync()
+    {
         CloseConnection();
         CompleteResponseChannels();
+
+        var listenTask = _listenTask;
+        var responseTask = _responseTask;
+        _listenTask = null;
+        _responseTask = null;
+        if (listenTask != null)
+        {
+            await IgnoreBackgroundTaskAsync(listenTask);
+        }
+
+        if (responseTask != null)
+        {
+            await IgnoreBackgroundTaskAsync(responseTask);
+        }
     }
 
     /// <summary>
@@ -215,8 +242,32 @@ public partial class TcpSocketClient
 
     private Channel<SocketCommand> ResetResponseChannels()
     {
-        _responses = Channel.CreateUnbounded<SocketCommand>();
+        _responses = CreateResponseChannel();
         return _responses;
+    }
+
+    private static Channel<SocketCommand> CreateResponseChannel() => Channel.CreateBounded<SocketCommand>(
+        new BoundedChannelOptions(MaxPendingResponses)
+        {
+            FullMode = BoundedChannelFullMode.Wait,
+            SingleReader = true,
+            SingleWriter = true,
+            AllowSynchronousContinuations = false
+        });
+
+    private static async Task IgnoreBackgroundTaskAsync(Task task)
+    {
+        try
+        {
+            await task;
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            Logger.Error("TCP 客户端后台任务异常", ex, "TCP 客户端后台任务异常，详细信息请查看日志文件");
+        }
     }
 
     private void CompleteResponseChannels()
@@ -236,12 +287,20 @@ public partial class TcpSocketClient
     {
         await foreach (var command in responses.ReadAllAsync())
         {
-            if (await TryHandleCommandAsync(command))
+            try
             {
-                continue;
-            }
+                if (await TryHandleCommandAsync(command))
+                {
+                    continue;
+                }
 
-            await EventBus.EventBus.Default.PublishAsync(command);
+                await EventBus.EventBus.Default.PublishAsync(command);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error($"{ServerMark} 处理服务端命令异常", ex,
+                    $"{ServerMark} 处理服务端命令异常，详细信息请查看日志文件");
+            }
         }
     }
 

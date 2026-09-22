@@ -13,7 +13,10 @@ public class UdpSocketClient
     /// <summary>
     ///     接收缓冲区通道。
     /// </summary>
-    private Channel<SocketCommand> _receivedBuffers = Channel.CreateUnbounded<SocketCommand>();
+    private const int MaxPendingMessages = 1024;
+    private Task? _receiveTask;
+    private Task? _consumerTask;
+    private Channel<SocketCommand> _receivedBuffers = CreateReceivedBufferChannel();
 
     #region 公开属性
 
@@ -101,8 +104,9 @@ public class UdpSocketClient
 
             IsRunning = true;
 
-            _ = Task.Run(async () => await ReceiveDataAsync(_client, receivedBuffers.Writer));
-            _ = Task.Run(async () => await CheckCommandMeAsync(receivedBuffers.Reader));
+            var client = _client;
+            _receiveTask = ReceiveDataAsync(client, receivedBuffers.Writer);
+            _consumerTask = CheckCommandMeAsync(receivedBuffers.Reader);
         }
         catch (Exception ex)
         {
@@ -127,6 +131,12 @@ public class UdpSocketClient
             IsRunning = false;
             CompleteReceivedBuffers();
             CloseClient();
+            var receiveTask = _receiveTask;
+            var consumerTask = _consumerTask;
+            _receiveTask = null;
+            _consumerTask = null;
+            WaitForBackgroundTask(receiveTask);
+            WaitForBackgroundTask(consumerTask);
             Logger.Info($"{ServerMark} 停止");
             return true;
         }
@@ -196,14 +206,52 @@ public class UdpSocketClient
     {
         await foreach (var message in receivedBuffers.ReadAllAsync())
         {
-            Received?.Invoke(this, message);
+            try
+            {
+                Received?.Invoke(this, message);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error($"{ServerMark} 处理 UDP 消息异常", ex,
+                    $"{ServerMark} 处理 UDP 消息异常，详细信息请查看日志文件");
+            }
         }
     }
 
     private Channel<SocketCommand> ResetReceivedBuffers()
     {
-        _receivedBuffers = Channel.CreateUnbounded<SocketCommand>();
+        _receivedBuffers = CreateReceivedBufferChannel();
         return _receivedBuffers;
+    }
+
+    private static Channel<SocketCommand> CreateReceivedBufferChannel() =>
+        Channel.CreateBounded<SocketCommand>(
+            new BoundedChannelOptions(MaxPendingMessages)
+            {
+                FullMode = BoundedChannelFullMode.DropOldest,
+                SingleReader = true,
+                SingleWriter = true,
+                AllowSynchronousContinuations = false
+            });
+
+    private static void WaitForBackgroundTask(Task? task)
+    {
+        if (task == null)
+        {
+            return;
+        }
+
+        try
+        {
+            task.GetAwaiter().GetResult();
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            Logger.Error("UDP 客户端后台任务异常", ex, "UDP 客户端后台任务异常，详细信息请查看日志文件");
+        }
     }
 
     private void CompleteReceivedBuffers()
