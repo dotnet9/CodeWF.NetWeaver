@@ -48,7 +48,40 @@ public partial class SerializeHelper
     /// <summary>
     ///     默认编码，用于字符串的序列化和反序列化
     /// </summary>
-    public static Encoding DefaultEncoding = Encoding.UTF8;
+    public static Encoding DefaultEncoding { get; set; } = Encoding.UTF8;
+
+    private static int _maxCollectionItemCount = 1_000_000;
+    private static int _maxStringByteLength = 16 * 1024 * 1024;
+
+    public static int MaxCollectionItemCount
+    {
+        get => Volatile.Read(ref _maxCollectionItemCount);
+        set
+        {
+            if (value < 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(value), value,
+                    "Collection item count cannot be negative.");
+            }
+
+            Volatile.Write(ref _maxCollectionItemCount, value);
+        }
+    }
+
+    public static int MaxStringByteLength
+    {
+        get => Volatile.Read(ref _maxStringByteLength);
+        set
+        {
+            if (value < 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(value), value,
+                    "String byte length cannot be negative.");
+            }
+
+            Volatile.Write(ref _maxStringByteLength, value);
+        }
+    }
 
     /// <summary>
     ///     获取指定类型的属性信息列表，使用缓存提高效率
@@ -65,9 +98,80 @@ public partial class SerializeHelper
             return propertyInfos;
         }
 
-        propertyInfos = type.GetProperties();
+        // OrderBy is stable, so unannotated properties keep the reflection order supplied by
+        // the runtime while explicitly ordered properties are moved to their wire positions.
+        // PropertyInfo.MetadataToken is unavailable for some Native AOT reflection metadata.
+        propertyInfos = type.GetProperties()
+            .OrderBy(property => property.GetCustomAttribute<NetFieldOrderAttribute>()?.Order ?? int.MaxValue)
+            .ToArray();
         ObjectPropertyInfos[type] = propertyInfos;
         return propertyInfos;
+    }
+
+    private static void WriteEnumValue(BinaryWriter writer, object? value, Type enumType)
+    {
+        var underlyingType = Enum.GetUnderlyingType(enumType);
+        if (underlyingType == typeof(byte))
+        {
+            writer.Write(Convert.ToByte(value));
+        }
+        else if (underlyingType == typeof(sbyte))
+        {
+            writer.Write(Convert.ToSByte(value));
+        }
+        else if (underlyingType == typeof(short))
+        {
+            writer.Write(Convert.ToInt16(value));
+        }
+        else if (underlyingType == typeof(ushort))
+        {
+            writer.Write(Convert.ToUInt16(value));
+        }
+        else if (underlyingType == typeof(int))
+        {
+            writer.Write(Convert.ToInt32(value));
+        }
+        else if (underlyingType == typeof(uint))
+        {
+            writer.Write(Convert.ToUInt32(value));
+        }
+        else if (underlyingType == typeof(long))
+        {
+            writer.Write(Convert.ToInt64(value));
+        }
+        else if (underlyingType == typeof(ulong))
+        {
+            writer.Write(Convert.ToUInt64(value));
+        }
+        else
+        {
+            throw new InvalidOperationException($"Unsupported enum underlying type: {underlyingType.FullName}.");
+        }
+    }
+
+    private static object ReadEnumValue(BinaryReader reader, Type enumType)
+    {
+        var underlyingType = Enum.GetUnderlyingType(enumType);
+        object value = underlyingType == typeof(byte)
+            ? reader.ReadByte()
+            : underlyingType == typeof(sbyte)
+                ? reader.ReadSByte()
+                : underlyingType == typeof(short)
+                    ? reader.ReadInt16()
+                    : underlyingType == typeof(ushort)
+                        ? reader.ReadUInt16()
+                        : underlyingType == typeof(int)
+                            ? reader.ReadInt32()
+                            : underlyingType == typeof(uint)
+                                ? reader.ReadUInt32()
+                                : underlyingType == typeof(long)
+                                    ? reader.ReadInt64()
+                                    : underlyingType == typeof(ulong)
+                                        ? reader.ReadUInt64()
+                                        : throw new InvalidOperationException(
+                                            $"Unsupported enum underlying type: {underlyingType.FullName}.");
+
+        return Enum.ToObject(enumType, value);
     }
 
     /// <summary>

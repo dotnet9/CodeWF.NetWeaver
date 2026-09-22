@@ -184,6 +184,10 @@ public static class Test
         }
     }
 
+    [DynamicDependency(DynamicallyAccessedMemberTypes.PublicProperties |
+        DynamicallyAccessedMemberTypes.PublicParameterlessConstructor, typeof(PersonDto))]
+    [DynamicDependency(DynamicallyAccessedMemberTypes.PublicProperties |
+        DynamicallyAccessedMemberTypes.PublicParameterlessConstructor, typeof(Project))]
     private static void AOTObject()
     {
         try
@@ -205,6 +209,11 @@ public static class Test
             Console.WriteLine($"Projects【{person.Projects.Count}】=》【{newPerson?.Projects?.Count}】");
             Console.WriteLine($"Records【{person.Records.Count}】=》【{newPerson?.Records?.Count}】");
             Console.WriteLine($"Course【{person.Course.Count}】=》【{newPerson?.Course?.Count}】");
+            if (newPerson == null || newPerson.Name != person.Name ||
+                newPerson.Projects?.Count != person.Projects.Count)
+            {
+                throw new InvalidDataException("AOT object round-trip did not preserve the DTO data.");
+            }
         }
         catch (Exception ex)
         {

@@ -28,6 +28,58 @@ namespace CodeWF.NetWeaver.Tests
         }
 
         [Fact]
+        public void Test_SerializeEnumsWithDifferentUnderlyingTypes_Success()
+        {
+            var value = new EnumUnderlyingTypesHolder
+            {
+                ByteValue = ByteEnum.Max,
+                LongValue = LongEnum.Large,
+                ULongValue = ULongEnum.Large
+            };
+
+            var result = value.SerializeObject().DeserializeObject<EnumUnderlyingTypesHolder>();
+
+            Assert.Equal(value.ByteValue, result.ByteValue);
+            Assert.Equal(value.LongValue, result.LongValue);
+            Assert.Equal(value.ULongValue, result.ULongValue);
+        }
+
+        [Fact]
+        public void Test_SerializeUsesConfiguredEncodingForRoundTrip()
+        {
+            var previousEncoding = SerializeHelper.DefaultEncoding;
+            try
+            {
+                SerializeHelper.DefaultEncoding = Encoding.Unicode;
+                var value = new StringHolder { Value = "网络" };
+                var result = value.SerializeObject().DeserializeObject<StringHolder>();
+                Assert.Equal(value.Value, result.Value);
+            }
+            finally
+            {
+                SerializeHelper.DefaultEncoding = previousEncoding;
+            }
+        }
+
+        [Fact]
+        public void Test_DeserializeRejectsOversizedCollection()
+        {
+            var previousLimit = SerializeHelper.MaxCollectionItemCount;
+            try
+            {
+                SerializeHelper.MaxCollectionItemCount = 1;
+                var buffer = new byte[sizeof(int)];
+                BitConverter.GetBytes(2).CopyTo(buffer, 0);
+                var exception = Assert.Throws<Exception>(() => buffer.DeserializeObject<ListHolder>());
+                Assert.IsType<InvalidDataException>(exception.InnerException);
+            }
+            finally
+            {
+                SerializeHelper.MaxCollectionItemCount = previousLimit;
+            }
+        }
+
+        [Fact]
         public void Test_SerializeExtendedScalarTypes_Success()
         {
             var obj = new ExtendedScalarTypes
@@ -388,6 +440,38 @@ namespace CodeWF.NetWeaver.Tests
     {
         public int TaskId { get; set; }
         public string Message { get; set; } = string.Empty;
+    }
+
+    public class StringHolder
+    {
+        public string Value { get; set; } = string.Empty;
+    }
+
+    public class ListHolder
+    {
+        public List<int> Values { get; set; } = [];
+    }
+
+    public class EnumUnderlyingTypesHolder
+    {
+        public ByteEnum ByteValue { get; set; }
+        public LongEnum LongValue { get; set; }
+        public ULongEnum ULongValue { get; set; }
+    }
+
+    public enum ByteEnum : byte
+    {
+        Max = byte.MaxValue
+    }
+
+    public enum LongEnum : long
+    {
+        Large = long.MaxValue
+    }
+
+    public enum ULongEnum : ulong
+    {
+        Large = ulong.MaxValue
     }
 }
 

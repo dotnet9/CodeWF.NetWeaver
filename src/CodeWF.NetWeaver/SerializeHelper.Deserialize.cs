@@ -11,7 +11,9 @@ public partial class SerializeHelper
     /// <typeparam name="T">要反序列化的对象类型</typeparam>
     /// <param name="buffer">字节数组</param>
     /// <returns>反序列化后的对象</returns>
-    public static T Deserialize<T>(this byte[] buffer) where T : new()
+    public static T Deserialize<
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties |
+            DynamicallyAccessedMemberTypes.PublicParameterlessConstructor)] T>(this byte[] buffer) where T : new()
     {
         return buffer.DeserializeObject<T>(PacketHeadLen);
     }
@@ -23,7 +25,10 @@ public partial class SerializeHelper
     /// <param name="buffer">字节数组</param>
     /// <param name="readIndex">读取起始索引</param>
     /// <returns>反序列化后的对象</returns>
-    public static T DeserializeObject<T>(this byte[] buffer, int readIndex = 0) where T : new()
+    public static T DeserializeObject<
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties |
+            DynamicallyAccessedMemberTypes.PublicParameterlessConstructor)] T>(this byte[] buffer,
+        int readIndex = 0) where T : new()
     {
         using var stream = new MemoryStream(buffer, readIndex, buffer.Length - readIndex);
         using var reader = new BinaryReader(stream);
@@ -39,7 +44,11 @@ public partial class SerializeHelper
     /// <param name="type">要反序列化的对象类型</param>
     /// <param name="readIndex">读取起始索引</param>
     /// <returns>反序列化后的对象</returns>
-    public static object? DeserializeObject(this byte[] buffer, Type type, int readIndex = 0)
+    public static object? DeserializeObject(
+        this byte[] buffer,
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties |
+            DynamicallyAccessedMemberTypes.PublicParameterlessConstructor)] Type type,
+        int readIndex = 0)
     {
         using var stream = new MemoryStream(buffer, readIndex, buffer.Length - readIndex);
         using var reader = new BinaryReader(stream);
@@ -152,9 +161,7 @@ public partial class SerializeHelper
     {
         if (propertyType.IsEnum)
         {
-            // Enum.ToObject 会把底层整数值重新包装成指定的枚举类型，
-            // 例如把 2 还原成 SampleEnum.SecondValue。
-            return Enum.ToObject(propertyType, reader.ReadInt32());
+            return ReadEnumValue(reader, propertyType);
         }
 
         if (propertyType == typeof(byte))
@@ -282,7 +289,25 @@ public partial class SerializeHelper
 
         if (propertyType == typeof(string))
         {
-            return reader.ReadString();
+            var byteLength = reader.Read7BitEncodedInt();
+            if (byteLength < 0 || byteLength > MaxStringByteLength)
+            {
+                throw new InvalidDataException(
+                    $"String length {byteLength} exceeds the configured limit of {MaxStringByteLength} bytes.");
+            }
+
+            if (byteLength > reader.BaseStream.Length - reader.BaseStream.Position)
+            {
+                throw new EndOfStreamException("Unexpected end of stream while reading a string.");
+            }
+
+            var bytes = reader.ReadBytes(byteLength);
+            if (bytes.Length != byteLength)
+            {
+                throw new EndOfStreamException("Unexpected end of stream while reading a string.");
+            }
+
+            return DefaultEncoding.GetString(bytes);
         }
 
         if (propertyType == typeof(bool))
@@ -305,6 +330,12 @@ public partial class SerializeHelper
         if (count < 0)
         {
             throw new InvalidDataException($"Collection count for {propertyType.FullName} cannot be negative.");
+        }
+
+        if (count > MaxCollectionItemCount)
+        {
+            throw new InvalidDataException(
+                $"Collection count for {propertyType.FullName} exceeds the configured limit of {MaxCollectionItemCount}.");
         }
 
         if (!TryGetCollectionMetadata(propertyType, out var genericArguments, out var isDictionary))
@@ -351,6 +382,12 @@ public partial class SerializeHelper
         if (length < 0)
         {
             throw new InvalidDataException($"Array length for {propertyType.FullName} cannot be negative.");
+        }
+
+        if (length > MaxCollectionItemCount)
+        {
+            throw new InvalidDataException(
+                $"Array length for {propertyType.FullName} exceeds the configured limit of {MaxCollectionItemCount}.");
         }
 
         // GetElementType() 返回数组元素类型，例如 int[] 返回 int。

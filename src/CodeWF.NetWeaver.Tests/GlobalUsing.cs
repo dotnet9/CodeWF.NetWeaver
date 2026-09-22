@@ -2,6 +2,7 @@ global using System.ComponentModel;
 global using System.Net;
 global using System.Net.Sockets;
 global using System.Reflection;
+global using System.Text;
 global using CodeWF.NetWeaver.Base;
 global using CodeWF.NetWeaver.Tests.Extensions;
 global using CodeWF.NetWeaver.Tests.Models;

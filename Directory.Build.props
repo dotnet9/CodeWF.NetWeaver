@@ -8,7 +8,7 @@
     <UseArtifactsOutput>true</UseArtifactsOutput>
     <ArtifactsPath>$(MSBuildThisFileDirectory)artifacts\</ArtifactsPath>
     <PackageOutputPath>$(ArtifactsPath)packages\</PackageOutputPath>
-    <Version>4.0.0.0</Version>
+    <Version>4.0.0.1</Version>
     <Company>https://codewf.com</Company>
     <Authors>CodeWF</Authors>
     <Owners>https://codewf.com</Owners>

@@ -45,7 +45,8 @@ public partial class SerializeHelper
     /// <typeparam name="T">对象类型</typeparam>
     /// <param name="data">要序列化的对象</param>
     /// <returns>序列化后的字节数组</returns>
-    public static byte[] SerializeObject<T>(this T data)
+    public static byte[] SerializeObject<
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties)] T>(this T data)
     {
         if (data == null)
         {
@@ -176,7 +177,7 @@ public partial class SerializeHelper
     {
         if (valueType.IsEnum)
         {
-            writer.Write(Convert.ToInt32(value));
+            WriteEnumValue(writer, value, valueType);
         }
         else if (valueType == typeof(byte))
         {
