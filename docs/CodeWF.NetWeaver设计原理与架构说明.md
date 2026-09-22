@@ -46,6 +46,7 @@ Body
 | `INetObject` | 标识可作为网络命令发送的对象。 |
 | `NetHeadAttribute` | 标记对象 ID 与协议版本。 |
 | `NetIgnoreMemberAttribute` | 序列化/反序列化时忽略成员。 |
+| `NetFieldOrderAttribute` | 显式声明对象属性的网络字段顺序，适用于跨运行时或跨语言协议。 |
 | `NetFieldOffsetAttribute` | 位字段序列化时声明偏移和长度。 |
 | `NetHeadInfo` | 运行时解析出的包头信息。 |
 
@@ -67,7 +68,7 @@ public sealed class ResponseProcessList : INetObject
 
 ### 序列化机制
 
-`SerializeHelper` 按属性声明顺序写入字段，并缓存 `PropertyInfo[]` 降低反射开销。当前支持：
+`SerializeHelper` 默认按运行时返回的属性顺序写入字段；使用 `NetFieldOrderAttribute` 的属性会按显式顺序优先写入，并缓存 `PropertyInfo[]` 降低反射开销。不要依赖 `PropertyInfo.MetadataToken`，因为 Native AOT 反射元数据可能不提供它。当前支持：
 
 - 基础值类型：`bool`、`char`、整数、`nint` / `nuint`、`Int128` / `UInt128`、`Half`、浮点、`decimal`、`DateTime`、`DateTimeOffset`、`DateOnly`、`TimeOnly`、`TimeSpan`、`Guid`
 - 可空值类型：`Nullable<T>` / `T?`，其中 `T` 必须是受支持的值类型
@@ -93,6 +94,8 @@ public sealed class ResponseProcessList : INetObject
 | `Guid` | 16 字节 | 使用 .NET `Guid.TryWriteBytes` / `Guid(ReadOnlySpan<byte>)` 的 16 字节布局 |
 
 已有非可空基础类型字段的包体大小保持不变。把 DTO 字段从非可空改成可空，或新增可空字段，都会改变对象正文布局，必须通过 DTO 的 `NetHead` 版本和双端包版本同步管理。
+
+字符串使用 `BinaryWriter.Write(string)` 兼容的 7-bit 长度前缀，但正文编码由 `SerializeHelper.DefaultEncoding` 决定，默认是 UTF-8。接收端通过 `MaxStringByteLength` 限制字符串字节数，通过 `MaxCollectionItemCount` 限制集合和数组项数；这两个限制应根据协议和不可信输入风险配置。
 
 AOT 与裁剪注意事项：
 
@@ -162,13 +165,15 @@ public interface IManagedFileSystem
     void CreateDirectory(string path);
     void DeleteDirectory(string path, bool recursive);
     void DeleteFile(string path);
+    void CopyFile(string sourcePath, string destinationPath, bool overwrite);
+    void MoveFile(string sourcePath, string destinationPath, bool overwrite);
     bool PathIsRooted(string path);
     string GetFullPath(string path);
     Stream OpenFile(string path, FileMode mode, FileAccess access, FileShare share);
 }
 ```
 
-默认实现是物理文件系统，后续可以替换成移动端容器、沙箱目录或虚拟文件系统。最新代码中服务端路径解析要求请求路径是绝对路径；空路径只在浏览场景下有特殊含义，用于返回磁盘列表或根级信息。
+默认实现是物理文件系统，后续可以替换成移动端容器、沙箱目录或虚拟文件系统。服务端默认使用当前工作目录作为沙箱根目录，也可以通过 `UseFileSystem(rootDirectory)` 指定根目录；只有显式设置 `RootDirectory = null` 才允许全路径访问。路径会先规范化并执行根目录包含检查，再执行可选的 `PathAuthorization` 回调。服务端路径要求是绝对路径；空路径只在浏览场景下有特殊含义。
 
 文件管理协议对象包括：
 
@@ -203,6 +208,8 @@ public interface IManagedFileSystem
 - 客户端暴露 `FileTransferProgress` 和 `FileTransferOutcome`。
 - 服务端暴露 `FileTransferProgress`。
 - 取消传输时会发送 `FileTransferReject`，并通过结果事件通知调用方。
+- 上传和下载均先使用 `.part` 文件，只有完整长度和 SHA-256 校验通过后才替换正式文件。
+- TCP/UDP 通道使用有界队列；慢消费者会施加 TCP 背压，UDP 在队列满时丢弃旧消息。
 
 上传主流程：
 
@@ -258,6 +265,8 @@ Client -> hash check + FileTransferOutcome(success)
 ## 维护建议
 
 - 变更 DTO 字段顺序会影响二进制兼容性，应通过 `ObjectVersion` 管理协议升级。
+- Native AOT DTO 必须保留公开属性、无参构造函数和实际使用的具体集合类型元数据。
+- TCP 帮助类不提供认证或 TLS；涉及文件系统能力时必须在受信网络或外部安全层中部署。
 - 新增 Wrapper 通用内置命令时同步更新 `SocketConstants`、请求/响应 DTO、分发逻辑和测试。
 - 新增文件扩展命令时同步更新 `FileSystemSocketConstants`、请求/响应 DTO、扩展处理器和测试。
 - 文件能力优先扩展 `IManagedFileSystem`，不要把物理路径假设写死到传输流程里。

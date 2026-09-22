@@ -4,7 +4,7 @@
     <File Path="Directory.Build.targets" />
     <File Path="Directory.Packages.props" />
     <File Path="UpdateLog.md" />
-    <File Path="docs/CodeWF-NetWeaver-Design-Principles.md" />
+    <File Path="docs/CodeWF.NetWeaver设计原理与架构说明.md" />
     <File Path="pack.bat" />
     <File Path="publish_all.bat" />
     <File Path="publishbase.bat" />

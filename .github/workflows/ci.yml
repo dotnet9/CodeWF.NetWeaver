@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build-test-aot:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 11.0.x
+
+      - name: Restore
+        run: dotnet restore CodeWF.NetWeaver.slnx
+
+      - name: Build release
+        run: dotnet build CodeWF.NetWeaver.slnx -c Release --no-restore
+
+      - name: Test debug
+        run: dotnet test CodeWF.NetWeaver.slnx -c Debug --no-restore
+
+      - name: Publish Native AOT sample
+        run: dotnet publish src/CodeWF.NetWeaver.AOTTest/CodeWF.NetWeaver.AOTTest.csproj -c Release -r win-x64 --self-contained true --no-restore

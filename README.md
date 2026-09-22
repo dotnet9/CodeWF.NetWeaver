@@ -17,8 +17,8 @@
 
 ## 仓库规范
 
-- 当前版本：`3.0.0`，版本号统一维护在根目录 `Directory.Build.props` 的 `<Version>` 节点。
-- NuGet 包项目支持 `net8.0;net10.0`；示例、测试与内部应用项目使用 `net11.0` / `net11.0-windows`。
+- 当前版本：`4.0.0.5`，版本号统一维护在根目录 `Directory.Build.props` 的 `<Version>` 节点。
+- NuGet 包项目支持 `net8.0;net10.0;net11.0`；示例、测试与内部应用项目使用 `net11.0` / `net11.0-windows`。
 - 根目录 `logo.svg`、`logo.png`、`logo.ico` 是唯一图标源，子工程通过 MSBuild `Link` 引用。
 - 使用 `Directory.Packages.props` 做中央包管理，并启用传递包 pin。
 
@@ -156,6 +156,8 @@ Console.WriteLine($"Process count: {deserialized.Processes?.Count ?? 0}");
 
 `SerializeHelper` 支持基础值类型、可空值类型、字符串、枚举、数组、`List<T>` / 集合接口、`Dictionary<TKey,TValue>` / 字典接口和嵌套对象。需要跳过字段时使用 `NetIgnoreMemberAttribute`。
 
+协议实现默认使用 UTF-8；字符串长度以 7-bit 编码的字节数写入，默认单个字符串上限为 16 MiB，集合或数组默认最多 1,000,000 项。接收不可信数据时应按部署场景调小 `SerializeHelper.MaxStringByteLength` 和 `SerializeHelper.MaxCollectionItemCount`。需要稳定跨编译器或跨语言字段顺序时，为 DTO 属性显式添加 `NetFieldOrderAttribute`。
+
 基础类型支持：
 
 | 类别 | 类型 |
@@ -210,7 +212,8 @@ await fileClient.DownloadFileAsync(@"D:\ServerFiles\uploads\demo.zip", @"D:\down
 
 ```csharp
 var server = new TcpSocketServer();
-var fileServer = server.UseFileSystem();
+var serverRootDirectory = Path.GetFullPath("server-files");
+var fileServer = server.UseFileSystem(serverRootDirectory);
 
 fileServer.FileTransferProgress += (sender, args) =>
 {
@@ -218,13 +221,17 @@ fileServer.FileTransferProgress += (sender, args) =>
 };
 ```
 
-`UseFileSystem()` 会把文件系统扩展注册到通用 Socket 命令管线。扩展包迁出不改变现有文件协议 DTO 的字段布局、对象 ID 或对象版本，因此数据包大小不受拆包影响；变化的是 NuGet 包和程序集边界。当前实现要求服务端路径使用绝对路径；空路径用于浏览入口，服务端可返回磁盘列表。文件浏览响应按页返回目录条目，上传和下载都通过 `TaskId` 关联同一次传输流程。
+`UseFileSystem(rootDirectory)` 会把文件系统扩展注册到通用 Socket 命令管线，并将服务端操作限制在 `rootDirectory` 及其子目录；根目录本身不能被删除。无参数 `UseFileSystem()` 默认使用服务进程当前目录作为沙箱根目录，只有显式设置 `RootDirectory = null` 才会放开路径边界。还可以通过 `PathAuthorization` 对浏览、创建目录、删除、上传和下载做二次授权。服务端路径必须是绝对路径，空路径仅用于浏览入口。扩展包迁出不改变现有文件协议 DTO 的字段布局、对象 ID 或对象版本，因此数据包大小不受拆包影响；变化的是 NuGet 包和程序集边界。
+
+TCP/UDP 帮助类不内置用户认证或 TLS。文件系统扩展具有远程读写和删除能力，生产环境必须使用受信网络，并在 Socket 外层增加认证、TLS/VPN 或其他访问控制；不能把无认证的文件服务直接暴露到公网。
 
 传输行为：
 
 - 文件块大小为 64 KB。
 - 上传和下载支持断点续传。
 - 完成后执行 SHA-256 校验。
+- 上传先写入目标文件的 `.part` 临时文件，校验成功后再替换正式文件；下载同样在本地 `.part` 文件中完成后再替换目标文件。
+- 分块偏移、长度、序号和总文件大小会在两端校验；空文件也会走完整的哈希与完成流程。
 - 客户端触发 `FileTransferProgress` 和 `FileTransferOutcome` 事件。
 - 服务端触发 `FileTransferProgress` 事件。
 - 传输拒绝、文件不存在、路径访问失败、哈希不一致等情况通过 `FileTransferReject` 表达。
@@ -262,7 +269,7 @@ Wrapper 文件链路已有测试覆盖：
 
 - 上传文件到服务端文件系统。
 - 下载文件到指定本地目录。
-- 拒绝不存在文件、文件大小冲突和哈希冲突等异常路径。
+- 拒绝不存在文件、文件大小冲突、哈希冲突、越出服务端根目录和无效分块等异常路径。
 
 运行方式：
 
