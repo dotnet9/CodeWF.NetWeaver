@@ -88,6 +88,22 @@ dotnet run --project src/SocketTest.Server/SocketTest.Server.csproj -f net11.0-w
 dotnet run --project src/SocketTest.Client/SocketTest.Client.csproj -f net11.0-windows
 ```
 
+## CI/CD：自动发布 NuGet 包
+
+推送 `v*` 标签（例如 `v4.0.0.10`）会触发 [.github/workflows/publish-nuget.yml](.github/workflows/publish-nuget.yml)，一次发布三个包：`CodeWF.NetWeaver`、`CodeWF.NetWrapper`、`CodeWF.NetWrapper.FileSystem`（含 snupkg 符号包），完成后自动创建 GitHub Release。
+
+包版本号以 `Directory.Build.props` 的 `<Version>` 为准，**打标签前先升版本**——nuget.org 拒绝重复的版本号；标签与 `<Version>` 不一致时工作流仅告警不阻断。认证使用 NuGet Trusted Publishing：工作流通过 `nuget/login@v1` 以 OIDC 令牌换取一次性发布凭据，仓库不保存任何 secret。nuget.org 侧的 API key 需绑定本仓库与工作流文件名 `publish-nuget.yml`（Scopes 勾选 Push，Glob 建议收窄为 `CodeWF.*`）；这类 key 创建后 7 天内需成功发布一次才会转永久有效。
+
+手工发布步骤：
+
+```bash
+# 1. 升版本：修改 Directory.Build.props 的 <Version>（或用 UpdateAssemblyVersion.ps1）并提交
+# 2. 打标签并推送，触发发布
+git tag -a v4.0.0.11 -m "CodeWF.NetWeaver v4.0.0.11"
+git push origin v4.0.0.11
+# 3. 在 GitHub Actions 观察 publish-nuget 运行，完成后到 nuget.org 核对三个包的新版本
+```
+
 ## 数据包模型
 
 每个网络数据包由固定头部和对象正文组成：
