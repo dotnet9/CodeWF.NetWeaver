@@ -10,13 +10,20 @@ public class UdpSocketClient
     /// </summary>
     private UdpClient? _client;
 
-    /// <summary>
-    ///     接收缓冲区通道。
-    /// </summary>
     private const int MaxPendingMessages = 1024;
     private Task? _receiveTask;
     private Task? _consumerTask;
+
+    /// <summary>
+    ///     接收缓冲区通道。
+    /// </summary>
     private Channel<SocketCommand> _receivedBuffers = CreateReceivedBufferChannel();
+
+    /// <summary>
+    ///     标记当前执行流正处于本客户端派发给订阅者的回调上下文中（含其异步延续）。
+    ///     用于 Stop() 重入防御：回调里再调用 Stop() 时不能阻塞等待内部线程退出。
+    /// </summary>
+    private static readonly AsyncLocal<UdpSocketClient?> CallbackClient = new();
 
     #region 公开属性
 
@@ -128,6 +135,9 @@ public class UdpSocketClient
     {
         try
         {
+            // 重入防御：订阅者回调里调用 Stop() 时，阻塞等待内部线程退出会形成自己等自己的死锁；
+            // 改为设置退出标记后由内部线程自行收尾。
+            var reentrant = ReferenceEquals(CallbackClient.Value, this);
             IsRunning = false;
             CompleteReceivedBuffers();
             CloseClient();
@@ -135,8 +145,12 @@ public class UdpSocketClient
             var consumerTask = _consumerTask;
             _receiveTask = null;
             _consumerTask = null;
-            WaitForBackgroundTask(receiveTask);
-            WaitForBackgroundTask(consumerTask);
+            if (!reentrant)
+            {
+                WaitForBackgroundTask(receiveTask);
+                WaitForBackgroundTask(consumerTask);
+            }
+
             Logger.Info($"{ServerMark} 停止");
             return true;
         }
@@ -206,16 +220,49 @@ public class UdpSocketClient
     {
         await foreach (var message in receivedBuffers.ReadAllAsync())
         {
+            DispatchToSubscribers(message);
+        }
+    }
+
+    /// <summary>
+    ///     把 Received 事件派发移出内部消费线程（线程池异步执行），避免订阅者在回调里
+    ///     调用 Stop() 时等待内部线程退出形成自死锁。事件参数为派发时的不可变快照；
+    ///     逐订阅者调用并隔离异常，单个订阅者抛异常不影响其他订阅者和库本身。
+    /// </summary>
+    private void DispatchToSubscribers(SocketCommand message)
+    {
+        var handler = Received;
+        if (handler == null)
+        {
+            return;
+        }
+
+        var client = this;
+        _ = Task.Run(() =>
+        {
+            var previous = CallbackClient.Value;
+            CallbackClient.Value = client;
             try
             {
-                Received?.Invoke(this, message);
+                foreach (var subscriber in handler.GetInvocationList()
+                             .Cast<EventHandler<SocketCommand>>())
+                {
+                    try
+                    {
+                        subscriber(client, message);
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Error($"{ServerMark} 处理 UDP 消息异常", ex,
+                            $"{ServerMark} 处理 UDP 消息异常，详细信息请查看日志文件");
+                    }
+                }
             }
-            catch (Exception ex)
+            finally
             {
-                Logger.Error($"{ServerMark} 处理 UDP 消息异常", ex,
-                    $"{ServerMark} 处理 UDP 消息异常，详细信息请查看日志文件");
+                CallbackClient.Value = previous;
             }
-        }
+        });
     }
 
     private Channel<SocketCommand> ResetReceivedBuffers()

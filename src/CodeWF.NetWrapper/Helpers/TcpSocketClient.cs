@@ -13,6 +13,12 @@ public partial class TcpSocketClient
     private Task? _responseTask;
     private Channel<SocketCommand> _responses = CreateResponseChannel();
 
+    /// <summary>
+    ///     标记当前执行流正处于本客户端派发给订阅者的回调上下文中（含其异步延续）。
+    ///     用于 Stop()/StopAsync() 重入防御：回调里再调用 Stop() 时不能阻塞等待内部线程退出。
+    /// </summary>
+    private static readonly AsyncLocal<TcpSocketClient?> CallbackClient = new();
+
     #region 公开属性
 
     /// <summary>
@@ -109,6 +115,10 @@ public partial class TcpSocketClient
 
     public async Task StopAsync()
     {
+        // 重入防御：订阅者回调里调用 Stop() 时，当前执行流正处于库派发事件的回调上下文，
+        // 阻塞等待内部线程退出会形成自己等自己的死锁；改为设置退出标记后由内部线程自行收尾。
+        var reentrant = ReferenceEquals(CallbackClient.Value, this);
+
         CloseConnection();
         CompleteResponseChannels();
 
@@ -116,6 +126,11 @@ public partial class TcpSocketClient
         var responseTask = _responseTask;
         _listenTask = null;
         _responseTask = null;
+        if (reentrant)
+        {
+            return;
+        }
+
         if (listenTask != null)
         {
             await IgnoreBackgroundTaskAsync(listenTask);
@@ -183,7 +198,7 @@ public partial class TcpSocketClient
                 var (success, buffer, headInfo) = await socket.ReadPacketAsync();
                 if (!success || buffer == null || headInfo == null)
                 {
-                    await HandleServerReceiveStoppedAsync(socket, responses, localEndPoint);
+                    HandleServerReceiveStopped(socket, responses, localEndPoint);
                     break;
                 }
 
@@ -192,13 +207,13 @@ public partial class TcpSocketClient
             }
             catch (Exception ex)
             {
-                await HandleServerReceiveStoppedAsync(socket, responses, localEndPoint, ex);
+                HandleServerReceiveStopped(socket, responses, localEndPoint, ex);
                 break;
             }
         }
     }
 
-    private async Task HandleServerReceiveStoppedAsync(Socket? socket, ChannelWriter<SocketCommand> responses,
+    private void HandleServerReceiveStopped(Socket? socket, ChannelWriter<SocketCommand> responses,
         string? localEndPoint, Exception? exception = null)
     {
         var shouldPublish = IsRunning && ReferenceEquals(_client, socket);
@@ -223,7 +238,36 @@ public partial class TcpSocketClient
             Logger.Error(msg, exception, $"{msg}，详细信息请查看日志文件");
         }
 
-        await EventBus.EventBus.Default.PublishAsync(new TcpClientErrorCommand(this, msg));
+        DispatchToSubscribers(
+            () => EventBus.EventBus.Default.PublishAsync(new TcpClientErrorCommand(this, msg)),
+            $"{ServerMark} 发布断开事件异常");
+    }
+
+    /// <summary>
+    ///     把对外事件派发移出内部接收/回调线程（线程池异步执行），避免订阅者在回调里
+    ///     调用 Stop() 时等待内部线程退出形成自死锁。事件参数均为不可变快照；
+    ///     处理器异常在此兜底隔离，不影响内部接收循环与库本身。
+    /// </summary>
+    private void DispatchToSubscribers(Func<Task> raise, string errorTitle)
+    {
+        var client = this;
+        _ = Task.Run(async () =>
+        {
+            var previous = CallbackClient.Value;
+            CallbackClient.Value = client;
+            try
+            {
+                await raise();
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(errorTitle, ex, $"{errorTitle}，详细信息请查看日志文件");
+            }
+            finally
+            {
+                CallbackClient.Value = previous;
+            }
+        });
     }
 
     private void CloseConnection(Socket? expectedSocket = null)
@@ -294,7 +338,9 @@ public partial class TcpSocketClient
                     continue;
                 }
 
-                await EventBus.EventBus.Default.PublishAsync(command);
+                DispatchToSubscribers(
+                    () => EventBus.EventBus.Default.PublishAsync(command),
+                    $"{ServerMark} 发布命令事件异常");
             }
             catch (Exception ex)
             {
@@ -308,9 +354,25 @@ public partial class TcpSocketClient
     {
         foreach (var handler in _commandHandlers.Values)
         {
-            if (await handler(command))
+            // 命令处理器在内部消费线程上同步执行（需返回是否已消费），标记回调上下文供 Stop() 重入防御；
+            // 逐处理器隔离异常，单个处理器异常不影响其他处理器和消费循环。
+            var previous = CallbackClient.Value;
+            CallbackClient.Value = this;
+            try
             {
-                return true;
+                if (await handler(command))
+                {
+                    return true;
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Error($"{ServerMark} 命令处理器异常", ex,
+                    $"{ServerMark} 命令处理器异常，详细信息请查看日志文件");
+            }
+            finally
+            {
+                CallbackClient.Value = previous;
             }
         }
 
